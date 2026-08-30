@@ -1,15 +1,29 @@
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local WorldBuilder = {}
 
-local function part(parent: Instance, name: string, size: Vector3, position: Vector3, color: Color3, material: Enum.Material?): Part
+local COLORS = {
+	cream = Color3.fromRGB(255, 239, 203),
+	red = Color3.fromRGB(199, 48, 49),
+	darkRed = Color3.fromRGB(118, 31, 35),
+	green = Color3.fromRGB(45, 123, 83),
+	dark = Color3.fromRGB(52, 39, 39),
+	wood = Color3.fromRGB(139, 83, 50),
+	darkWood = Color3.fromRGB(85, 50, 39),
+	yellow = Color3.fromRGB(255, 200, 59),
+	steel = Color3.fromRGB(82, 88, 96),
+}
+
+local function makePart(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?): Part
 	local item = Instance.new("Part")
 	item.Name = name
 	item.Size = size
-	item.Position = position
+	item.CFrame = cframe
 	item.Anchored = true
 	item.Color = color
 	item.Material = material or Enum.Material.SmoothPlastic
@@ -19,33 +33,305 @@ local function part(parent: Instance, name: string, size: Vector3, position: Vec
 	return item
 end
 
-local function rounded(parent: Instance, name: string, size: Vector3, position: Vector3, color: Color3): Part
-	local item = part(parent, name, size, position, color)
-	item.Shape = Enum.PartType.Cylinder
-	item.Orientation = Vector3.new(0, 0, 90)
-	return item
-end
-
-local function textLabel(adornee: BasePart, name: string, face: Enum.NormalId, displayText: string, color: Color3): SurfaceGui
+local function surfaceText(part: BasePart, name: string, face: Enum.NormalId, displayText: string, textColor: Color3, backgroundColor: Color3?, textSize: number?): SurfaceGui
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = name
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 32
-	gui.Adornee = adornee
-	gui.Parent = adornee
+	gui.PixelsPerStud = 38
+	gui.LightInfluence = 0
+	gui.Parent = part
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
 	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
+	label.BackgroundColor3 = backgroundColor or Color3.new(1, 1, 1)
+	label.BackgroundTransparency = backgroundColor and 0.05 or 1
 	label.Text = displayText
-	label.TextColor3 = color
+	label.TextColor3 = textColor
+	label.TextSize = textSize or 28
 	label.TextScaled = true
+	label.TextWrapped = true
 	label.Font = Enum.Font.GothamBlack
-	label.TextStrokeTransparency = 0.7
+	label.TextStrokeTransparency = 0.85
 	label.Parent = gui
 	return gui
+end
+
+local function billboard(adornee: BasePart, name: string, displayText: string, color: Color3, offset: Vector3, size: Vector2): BillboardGui
+	local gui = Instance.new("BillboardGui")
+	gui.Name = name
+	gui.Adornee = adornee
+	gui.Size = UDim2.fromOffset(size.X, size.Y)
+	gui.StudsOffsetWorldSpace = offset
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 180
+	gui.Parent = adornee
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.BackgroundColor3 = Color3.fromRGB(255, 250, 230)
+	frame.BackgroundTransparency = 0.04
+	frame.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = frame
+	local border = Instance.new("UIStroke")
+	border.Color = color
+	border.Thickness = 3
+	border.Parent = frame
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.Size = UDim2.new(1, -12, 1, -8)
+	label.Position = UDim2.fromOffset(6, 4)
+	label.BackgroundTransparency = 1
+	label.Text = displayText
+	label.TextColor3 = COLORS.dark
+	label.TextScaled = true
+	label.TextWrapped = true
+	label.Font = Enum.Font.GothamBold
+	label.Parent = frame
+	return gui
+end
+
+local function markSplatSurface(item: BasePart)
+	item:SetAttribute("SplatSurface", true)
+	return item
+end
+
+local function makeReactive(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?): Part
+	local item = makePart(parent, name, size, cframe, color, material)
+	item:SetAttribute("ReactiveProp", true)
+	item:SetAttribute("ResetCFrame", cframe)
+	item:SetAttribute("SplatSurface", true)
+	return item
+end
+
+local function configureLighting()
+	Workspace.Gravity = Config.GRAVITY
+	Lighting.ClockTime = 15.2
+	Lighting.Brightness = 2.15
+	Lighting.Ambient = Color3.fromRGB(101, 85, 78)
+	Lighting.OutdoorAmbient = Color3.fromRGB(128, 112, 102)
+	Lighting.EnvironmentDiffuseScale = 0.45
+	Lighting.EnvironmentSpecularScale = 0.55
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 226, 190)
+
+	for _, name in { "RestaurantAtmosphere", "RestaurantColor", "RestaurantBloom" } do
+		local existing = Lighting:FindFirstChild(name)
+		if existing then
+			existing:Destroy()
+		end
+	end
+
+	local atmosphere = Instance.new("Atmosphere")
+	atmosphere.Name = "RestaurantAtmosphere"
+	atmosphere.Density = 0.12
+	atmosphere.Color = Color3.fromRGB(255, 233, 203)
+	atmosphere.Decay = Color3.fromRGB(255, 190, 144)
+	atmosphere.Glare = 0.08
+	atmosphere.Parent = Lighting
+
+	local color = Instance.new("ColorCorrectionEffect")
+	color.Name = "RestaurantColor"
+	color.Brightness = 0
+	color.Contrast = 0.06
+	color.Saturation = 0.11
+	color.TintColor = Color3.fromRGB(255, 239, 220)
+	color.Parent = Lighting
+
+	local bloom = Instance.new("BloomEffect")
+	bloom.Name = "RestaurantBloom"
+	bloom.Intensity = 0.12
+	bloom.Size = 22
+	bloom.Threshold = 1.25
+	bloom.Parent = Lighting
+end
+
+local function buildShell(world: Folder)
+	local floor = markSplatSurface(makePart(world, "RestaurantFloor", Vector3.new(132, 1, 168), CFrame.new(0, -1, -12), Color3.fromRGB(91, 56, 42), Enum.Material.WoodPlanks))
+	floor:SetAttribute("MissSurface", true)
+
+	for x = -60, 60, 12 do
+		for z = -88, 68, 12 do
+			local even = ((x + z) / 12) % 2 == 0
+			local tileColor = even and Color3.fromRGB(249, 224, 183) or Color3.fromRGB(177, 49, 50)
+			local tile = makePart(world, "CheckerTile", Vector3.new(11.7, 0.08, 11.7), CFrame.new(x, -0.46, z), tileColor, Enum.Material.CeramicTiles)
+			tile.CanCollide = false
+			tile.CanTouch = false
+		end
+	end
+
+	local back = markSplatSurface(makePart(world, "BackWall", Vector3.new(132, 34, 2), CFrame.new(0, 16, -96), COLORS.cream, Enum.Material.Plaster))
+	back:SetAttribute("MissSurface", true)
+	local left = markSplatSurface(makePart(world, "LeftWall", Vector3.new(2, 34, 168), CFrame.new(-66, 16, -12), Color3.fromRGB(245, 213, 174), Enum.Material.Brick))
+	left:SetAttribute("MissSurface", true)
+	local right = markSplatSurface(makePart(world, "RightWall", Vector3.new(2, 34, 168), CFrame.new(66, 16, -12), Color3.fromRGB(245, 213, 174), Enum.Material.Brick))
+	right:SetAttribute("MissSurface", true)
+
+	makePart(world, "BackWainscot", Vector3.new(130, 8, 0.6), CFrame.new(0, 4, -94.7), COLORS.darkRed, Enum.Material.WoodPlanks)
+	makePart(world, "LeftWainscot", Vector3.new(0.6, 8, 166), CFrame.new(-64.7, 4, -12), COLORS.darkRed, Enum.Material.WoodPlanks)
+	makePart(world, "RightWainscot", Vector3.new(0.6, 8, 166), CFrame.new(64.7, 4, -12), COLORS.darkRed, Enum.Material.WoodPlanks)
+
+	for _, z in { 40, 5, -30, -65 } do
+		local beam = makePart(world, "CeilingBeam", Vector3.new(126, 1, 1), CFrame.new(0, 31, z), COLORS.darkWood, Enum.Material.Wood)
+		beam.CanCollide = false
+	end
+end
+
+local function buildHangingLight(world: Folder, position: Vector3)
+	local cord = makePart(world, "LightCord", Vector3.new(0.18, 7, 0.18), CFrame.new(position + Vector3.new(0, 3.5, 0)), COLORS.dark, Enum.Material.Metal)
+	cord.CanCollide = false
+	local shade = makePart(world, "LightShade", Vector3.new(5.5, 1.2, 5.5), CFrame.new(position), COLORS.red, Enum.Material.Metal)
+	shade.Shape = Enum.PartType.Cylinder
+	shade.Orientation = Vector3.new(0, 0, 90)
+	shade.CanCollide = false
+	local bulb = makePart(world, "WarmBulb", Vector3.new(1.1, 1.1, 1.1), CFrame.new(position - Vector3.new(0, 0.9, 0)), Color3.fromRGB(255, 221, 145), Enum.Material.Neon)
+	bulb.Shape = Enum.PartType.Ball
+	bulb.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 209, 145)
+	light.Brightness = 1.15
+	light.Range = 34
+	light.Shadows = true
+	light.Parent = bulb
+end
+
+local function buildPizzaArt(world: Folder, position: Vector3, accent: Color3)
+	local frame = makePart(world, "PizzaArtFrame", Vector3.new(15, 12, 0.7), CFrame.new(position), COLORS.darkWood, Enum.Material.Wood)
+	local canvas = makePart(world, "PizzaArtCanvas", Vector3.new(13.5, 10.5, 0.25), CFrame.new(position + Vector3.new(0, 0, 0.5)), Color3.fromRGB(255, 243, 209))
+	local pizza = makePart(world, "WallPizza", Vector3.new(0.3, 7, 7), CFrame.new(position + Vector3.new(0, 0, 0.72)) * CFrame.Angles(0, 0, math.pi / 2), COLORS.yellow)
+	pizza.Shape = Enum.PartType.Cylinder
+	for _, offset in { Vector3.new(-2, 1.8, 1), Vector3.new(1.8, 1.1, 1), Vector3.new(0, -2, 1) } do
+		local topping = makePart(world, "ArtPepperoni", Vector3.new(0.35, 1.3, 1.3), CFrame.new(position + offset + Vector3.new(0, 0, 0.85)) * CFrame.Angles(0, 0, math.pi / 2), accent)
+		topping.Shape = Enum.PartType.Cylinder
+	end
+	frame.CanCollide = false
+	canvas.CanCollide = false
+end
+
+local function buildKitchen(world: Folder)
+	local kitchen = Instance.new("Model")
+	kitchen.Name = "Kitchen"
+	kitchen.Parent = world
+
+	local counter = markSplatSurface(makePart(kitchen, "ServiceCounter", Vector3.new(112, 6, 7), CFrame.new(0, 2.5, -75), COLORS.darkWood, Enum.Material.WoodPlanks))
+	counter:SetAttribute("MissSurface", true)
+	makePart(kitchen, "CounterTop", Vector3.new(114, 1, 9), CFrame.new(0, 5.8, -75), Color3.fromRGB(238, 224, 205), Enum.Material.Marble)
+
+	local ovenBody = makePart(kitchen, "PizzaOven", Vector3.new(27, 18, 8), CFrame.new(-40, 9, -90.5), Color3.fromRGB(215, 190, 157), Enum.Material.Brick)
+	local ovenMouth = makePart(kitchen, "OvenMouth", Vector3.new(16, 9, 0.8), CFrame.new(-40, 7.2, -85.9), Color3.fromRGB(34, 28, 27), Enum.Material.Slate)
+	local fire = makePart(kitchen, "OvenFire", Vector3.new(10, 2.5, 0.4), CFrame.new(-40, 3.7, -85.35), Color3.fromRGB(255, 118, 34), Enum.Material.Neon)
+	fire.CanCollide = false
+	local ovenLight = Instance.new("PointLight")
+	ovenLight.Color = Color3.fromRGB(255, 132, 50)
+	ovenLight.Brightness = 2
+	ovenLight.Range = 22
+	ovenLight.Parent = fire
+	surfaceText(ovenBody, "OvenSign", Enum.NormalId.Back, "STONE-FIRED\nPIZZA OVEN", COLORS.darkRed)
+
+	local menu = makePart(kitchen, "MenuBoard", Vector3.new(47, 15, 0.8), CFrame.new(21, 20, -94.6), COLORS.green, Enum.Material.Wood)
+	surfaceText(menu, "Menu", Enum.NormalId.Back, "TODAY'S MENU\nCHEESE   PEPPERONI   VEGGIE\nEVERY PIZZA: LAUNCH-READY!", Color3.fromRGB(255, 244, 203), nil, 27)
+
+	local register = makeReactive(kitchen, "CashRegister", Vector3.new(5, 3.5, 4), CFrame.new(29, 8, -73), COLORS.steel, Enum.Material.Metal)
+	surfaceText(register, "RegisterDisplay", Enum.NormalId.Back, "$ PIZZA $", COLORS.yellow, COLORS.dark, 20)
+
+	for index = 1, 4 do
+		makeReactive(kitchen, "PizzaBox", Vector3.new(8, 0.8, 8), CFrame.new(45, 6.5 + index * 0.85, -74.5) * CFrame.Angles(0, math.rad((index % 2) * 5), 0), index % 2 == 0 and Color3.fromRGB(246, 221, 177) or Color3.fromRGB(233, 205, 159), Enum.Material.Cardboard)
+	end
+
+	for index = 1, 5 do
+		local cup = makeReactive(kitchen, "Cup", Vector3.new(1.4, 2.5, 1.4), CFrame.new(-8 + index * 2, 7.5, -74), Color3.fromRGB(244, 244, 238))
+		cup.Shape = Enum.PartType.Cylinder
+		cup.Orientation = Vector3.new(0, 0, 90)
+	end
+
+	buildPizzaArt(world, Vector3.new(-51, 20, -94.5), COLORS.red)
+	buildPizzaArt(world, Vector3.new(53, 20, -94.5), COLORS.green)
+end
+
+local function addHair(model: Model, head: BasePart, style: string, color: Color3)
+	local function hairPart(name: string, size: Vector3, offset: Vector3, shape: Enum.PartType?)
+		local item = makePart(model, name, size, head.CFrame * CFrame.new(offset), color)
+		item.CanCollide = false
+		item:SetAttribute("CustomerPart", true)
+		item:SetAttribute("TableId", model:GetAttribute("TableId"))
+		item:SetAttribute("ResetCFrame", item.CFrame)
+		if shape then
+			item.Shape = shape
+		end
+		return item
+	end
+
+	if style == "cap" then
+		hairPart("Cap", Vector3.new(4.5, 1.3, 4.5), Vector3.new(0, 1.8, 0), Enum.PartType.Cylinder).Orientation = Vector3.new(0, 0, 90)
+		hairPart("CapBrim", Vector3.new(3.5, 0.4, 1.4), Vector3.new(0, 1.35, 2.1))
+	elseif style == "bow" then
+		hairPart("Hair", Vector3.new(4.2, 2, 4.1), Vector3.new(0, 1.25, -0.25), Enum.PartType.Ball)
+		hairPart("BowLeft", Vector3.new(1.5, 1.3, 0.7), Vector3.new(-0.9, 2.3, 0.3), Enum.PartType.Ball).Color = Color3.fromRGB(255, 94, 127)
+		hairPart("BowRight", Vector3.new(1.5, 1.3, 0.7), Vector3.new(0.9, 2.3, 0.3), Enum.PartType.Ball).Color = Color3.fromRGB(255, 94, 127)
+	elseif style == "spikes" then
+		hairPart("Hair", Vector3.new(4.4, 2.1, 4.2), Vector3.new(0, 1.35, -0.2), Enum.PartType.Ball)
+		for x = -1.5, 1.5, 1.5 do
+			local spike = hairPart("HairSpike", Vector3.new(0.9, 2.4, 0.9), Vector3.new(x, 2.5, 0), Enum.PartType.Ball)
+			spike.Orientation = Vector3.new(0, 0, x * 12)
+		end
+	elseif style == "beanie" then
+		hairPart("Beanie", Vector3.new(4.5, 2.2, 4.3), Vector3.new(0, 1.4, -0.15), Enum.PartType.Ball).Color = Color3.fromRGB(45, 130, 92)
+		hairPart("Pompom", Vector3.new(1.3, 1.3, 1.3), Vector3.new(0, 3, 0), Enum.PartType.Ball).Color = Color3.fromRGB(255, 211, 74)
+	elseif style == "bun" then
+		hairPart("Hair", Vector3.new(4.3, 2.2, 4.2), Vector3.new(0, 1.3, -0.25), Enum.PartType.Ball)
+		hairPart("HairBun", Vector3.new(2.5, 2.5, 2.5), Vector3.new(0, 2.7, -0.6), Enum.PartType.Ball)
+	elseif style == "chef" then
+		hairPart("ChefHatBase", Vector3.new(4.6, 1.4, 4.4), Vector3.new(0, 1.9, 0), Enum.PartType.Cylinder).Color = Color3.fromRGB(250, 247, 234)
+		for x = -1.2, 1.2, 1.2 do
+			hairPart("ChefHatPuff", Vector3.new(2.4, 2.4, 2.4), Vector3.new(x, 3, 0), Enum.PartType.Ball).Color = Color3.fromRGB(250, 247, 234)
+		end
+	end
+end
+
+local function buildCustomer(parent: Model, definition, seatPosition: Vector3)
+	local model = Instance.new("Model")
+	model.Name = "Customer"
+	model:SetAttribute("TableId", definition.id)
+	model:SetAttribute("CustomerName", definition.customer)
+	model.Parent = parent
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.Name = "Humanoid"
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.BreakJointsOnDeath = false
+	humanoid.Parent = model
+
+	local root = makePart(model, "HumanoidRootPart", Vector3.new(2, 2, 1), CFrame.new(seatPosition + Vector3.new(0, 6, 0)), definition.skin)
+	root.Transparency = 1
+	root.CanCollide = false
+	model.PrimaryPart = root
+
+	local torso = makePart(model, "Torso", Vector3.new(4.5, 5, 2.2), CFrame.new(seatPosition + Vector3.new(0, 6.6, 0)), definition.shirt)
+	local head = makePart(model, "Head", Vector3.new(4.3, 4.3, 4.3), CFrame.new(seatPosition + Vector3.new(0, 11.2, 0)), definition.skin)
+	head.Shape = Enum.PartType.Ball
+	local leftArm = makePart(model, "LeftArm", Vector3.new(1.5, 4.8, 1.5), CFrame.new(seatPosition + Vector3.new(-3, 6.8, 0.25)) * CFrame.Angles(0, 0, math.rad(-8)), definition.skin)
+	local rightArm = makePart(model, "RightArm", Vector3.new(1.5, 4.8, 1.5), CFrame.new(seatPosition + Vector3.new(3, 6.8, 0.25)) * CFrame.Angles(0, 0, math.rad(8)), definition.skin)
+	local leftLeg = makePart(model, "LeftLeg", Vector3.new(1.7, 4.5, 1.8), CFrame.new(seatPosition + Vector3.new(-1.15, 3.2, 1.5)) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(54, 68, 91))
+	local rightLeg = makePart(model, "RightLeg", Vector3.new(1.7, 4.5, 1.8), CFrame.new(seatPosition + Vector3.new(1.15, 3.2, 1.5)) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(54, 68, 91))
+	for _, bodyPart in { torso, head, leftArm, rightArm, leftLeg, rightLeg } do
+		bodyPart.CanCollide = false
+		bodyPart:SetAttribute("CustomerPart", true)
+		bodyPart:SetAttribute("TableId", definition.id)
+		bodyPart:SetAttribute("ResetCFrame", bodyPart.CFrame)
+	end
+
+	surfaceText(head, "Face", Enum.NormalId.Back, "^  ^\n\\___/", COLORS.dark, nil, 45)
+	addHair(model, head, definition.style, Color3.fromRGB(63, 43, 37))
+	billboard(head, "OrderBubble", string.format("%s IS HUNGRY!\nPIZZA, PLEASE!", string.upper(definition.customer)), definition.color, Vector3.new(0, 5.8, 0), Vector2.new(165, 64))
+	local orderSign = makePart(model, "OrderSign", Vector3.new(10, 3.8, 0.4), CFrame.new(seatPosition + Vector3.new(0, 18, -0.3)), definition.color:Lerp(COLORS.dark, 0.22))
+	orderSign.CanCollide = false
+	orderSign.CanTouch = false
+	local orderDisplay = surfaceText(orderSign, "OrderDisplay", Enum.NormalId.Back, string.format("%s WANTS\nA PIZZA!", string.upper(definition.customer)), Color3.new(1, 1, 1), nil, 25)
+	orderDisplay:SetAttribute("TableId", definition.id)
+	return model
 end
 
 local function buildTable(world: Folder, definition)
@@ -56,66 +342,135 @@ local function buildTable(world: Folder, definition)
 	model.Parent = world
 
 	local p = definition.position
-	local top = rounded(model, "TableTop", Vector3.new(1.1, 18, 18), p + Vector3.new(0, 4.1, 0), Color3.fromRGB(250, 236, 203))
+	local rug = makePart(model, "Rug", Vector3.new(24, 0.12, 22), CFrame.new(p + Vector3.new(0, -0.38, -1)), definition.color:Lerp(COLORS.cream, 0.58), Enum.Material.Fabric)
+	rug.CanCollide = false
+	rug.CanTouch = false
+	local top = makePart(model, "TableTop", Vector3.new(16, 1, 11), CFrame.new(p + Vector3.new(0, 4.2, 0)), Color3.fromRGB(250, 231, 196), Enum.Material.Wood)
 	top:SetAttribute("TableId", definition.id)
 	top:SetAttribute("DeliverySurface", true)
-	part(model, "Pedestal", Vector3.new(3, 4.2, 3), p + Vector3.new(0, 1.5, 0), Color3.fromRGB(116, 83, 62), Enum.Material.Wood)
-	part(model, "Base", Vector3.new(9, 0.8, 9), p + Vector3.new(0, -0.55, 0), Color3.fromRGB(95, 67, 52), Enum.Material.Wood)
+	top:SetAttribute("SplatSurface", true)
+	makePart(model, "TablePost", Vector3.new(3, 4.2, 3), CFrame.new(p + Vector3.new(0, 1.7, 0)), COLORS.darkWood, Enum.Material.Wood)
+	makePart(model, "TableBase", Vector3.new(9, 0.8, 7), CFrame.new(p + Vector3.new(0, -0.2, 0)), COLORS.darkWood, Enum.Material.Wood)
 
-	local target = rounded(model, "TargetRing", Vector3.new(0.22, 6.6, 6.6), p + Vector3.new(0, 4.72, 0), definition.color)
-	target.Material = Enum.Material.Neon
-	target.CanCollide = false
-	target.CanTouch = false
-	target.Transparency = 0.12
-	target:SetAttribute("TableId", definition.id)
-
-	local plate = rounded(model, "Plate", Vector3.new(0.3, 5.2, 5.2), p + Vector3.new(0, 4.85, 0), Color3.fromRGB(255, 255, 255))
+	local plate = makePart(model, "Plate", Vector3.new(0.35, 6.8, 6.8), CFrame.new(p + Vector3.new(0, 4.85, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 255, 248))
+	plate.Shape = Enum.PartType.Cylinder
 	plate.CanCollide = false
 	plate:SetAttribute("TableId", definition.id)
 	plate:SetAttribute("DeliverySurface", true)
+	local ring = makePart(model, "TargetRing", Vector3.new(0.15, 8, 8), CFrame.new(p + Vector3.new(0, 5.04, 0)) * CFrame.Angles(0, 0, math.pi / 2), definition.color, Enum.Material.Neon)
+	ring.Shape = Enum.PartType.Cylinder
+	ring.CanCollide = false
+	ring.CanTouch = false
+	ring.Transparency = 0.18
+	ring:SetAttribute("TableId", definition.id)
 
-	local chairPosition = p + Vector3.new(0, 0, -9.8)
-	part(model, "ChairSeat", Vector3.new(7, 1, 6), chairPosition + Vector3.new(0, 2.2, 0), definition.color, Enum.Material.Wood)
-	part(model, "ChairBack", Vector3.new(7, 8, 1), chairPosition + Vector3.new(0, 5.5, -2.5), definition.color, Enum.Material.Wood)
+	local boothSeat = makePart(model, "BoothSeat", Vector3.new(13, 1.5, 5), CFrame.new(p + Vector3.new(0, 2, -8.7)), definition.color, Enum.Material.Fabric)
+	local boothBack = makePart(model, "BoothBack", Vector3.new(14, 8, 1.7), CFrame.new(p + Vector3.new(0, 5.4, -10.3)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
+	boothSeat:SetAttribute("SplatSurface", true)
+	boothBack:SetAttribute("SplatSurface", true)
 
-	rounded(model, "CustomerBody", Vector3.new(4.5, 5.5, 5.5), chairPosition + Vector3.new(0, 6.6, 0), definition.color)
-	local head = Instance.new("Part")
-	head.Name = "CustomerHead"
-	head.Shape = Enum.PartType.Ball
-	head.Size = Vector3.new(4.5, 4.5, 4.5)
-	head.Position = chairPosition + Vector3.new(0, 11.1, 0)
-	head.Anchored = true
-	head.Color = Color3.fromRGB(255, 213, 167)
-	head.Parent = model
-	textLabel(head, "Face", Enum.NormalId.Back, ":D", Color3.fromRGB(70, 45, 35))
-
-	local sign = part(model, "OrderSign", Vector3.new(8, 5.5, 0.5), p + Vector3.new(0, 10.5, -4.9), definition.color)
-	sign.CanCollide = false
-	textLabel(sign, "OrderDisplay", Enum.NormalId.Back, string.format("%s\nTABLE %d", string.upper(definition.customer), definition.id), Color3.fromRGB(35, 30, 40))
+	buildCustomer(model, definition, p + Vector3.new(0, 0, -8.2))
 	return model
 end
 
-local function buildCannon(world: Folder)
-	local model = Instance.new("Model")
-	model.Name = "PizzaCannon"
-	model.Parent = world
+local function buildCondimentStation(world: Folder, x: number, z: number)
+	local station = Instance.new("Model")
+	station.Name = "CondimentStation"
+	station.Parent = world
+	makePart(station, "Stand", Vector3.new(10, 5, 6), CFrame.new(x, 2, z), COLORS.darkWood, Enum.Material.Wood)
+	makePart(station, "Top", Vector3.new(11, 0.7, 7), CFrame.new(x, 4.8, z), Color3.fromRGB(238, 221, 194), Enum.Material.Marble)
+	for index, data in {
+		{ Color3.fromRGB(216, 45, 45), "KETCHUP" },
+		{ Color3.fromRGB(245, 194, 50), "MUSTARD" },
+		{ Color3.fromRGB(82, 164, 75), "PEPPER" },
+	} do
+		local bottle = makeReactive(station, data[2], Vector3.new(1.5, 3, 1.5), CFrame.new(x - 3 + index * 2.2, 6.5, z), data[1])
+		bottle.Shape = Enum.PartType.Cylinder
+		bottle.Orientation = Vector3.new(0, 0, 90)
+	end
+	local sign = makeReactive(station, "NapkinSign", Vector3.new(7, 3.5, 0.6), CFrame.new(x, 8, z - 2.7), COLORS.green)
+	surfaceText(sign, "Sign", Enum.NormalId.Back, "NAPKINS\n& SAUCE", Color3.new(1, 1, 1), nil, 20)
+end
 
-	local base = rounded(model, "Base", Vector3.new(4, 13, 13), Vector3.new(0, 3.2, 62), Color3.fromRGB(210, 42, 49))
-	base.Material = Enum.Material.Metal
-	local launchDirection = Vector3.new(0, math.sin(Config.LAUNCH_ANGLE), -math.cos(Config.LAUNCH_ANGLE))
-	local barrelCenter = Config.LAUNCH_ORIGIN - launchDirection * 8.2
-	local barrel = rounded(model, "Barrel", Vector3.new(18, 5.8, 5.8), barrelCenter, Color3.fromRGB(238, 57, 49))
-	barrel.CFrame = CFrame.lookAt(barrelCenter, barrelCenter + launchDirection) * CFrame.Angles(0, math.pi / 2, 0)
-	barrel.Material = Enum.Material.Metal
-	local trim = rounded(model, "Muzzle", Vector3.new(2.2, 7.4, 7.4), Config.LAUNCH_ORIGIN, Color3.fromRGB(255, 202, 57))
-	trim.CFrame = CFrame.lookAt(Config.LAUNCH_ORIGIN, Config.LAUNCH_ORIGIN + launchDirection) * CFrame.Angles(0, math.pi / 2, 0)
-	trim.Material = Enum.Material.Neon
-	local leftWheel = part(model, "LeftWheel", Vector3.new(1.8, 12, 12), Vector3.new(-7, 3.5, 62), Color3.fromRGB(55, 58, 65), Enum.Material.Metal)
-	leftWheel.Shape = Enum.PartType.Cylinder
-	local rightWheel = part(model, "RightWheel", Vector3.new(1.8, 12, 12), Vector3.new(7, 3.5, 62), Color3.fromRGB(55, 58, 65), Enum.Material.Metal)
-	rightWheel.Shape = Enum.PartType.Cylinder
-	local sign = part(model, "CannonSign", Vector3.new(18, 5, 1), Vector3.new(0, 4.8, 70), Color3.fromRGB(255, 226, 84))
-	textLabel(sign, "Title", Enum.NormalId.Back, "PIZZA\nLAUNCH!", Color3.fromRGB(181, 35, 41))
+local function buildLauncher(world: Folder)
+	local station = Instance.new("Model")
+	station.Name = "LauncherStation"
+	station.Parent = world
+	makePart(station, "Platform", Vector3.new(30, 1, 20), CFrame.new(0, -0.1, 66), COLORS.darkWood, Enum.Material.WoodPlanks)
+	makePart(station, "Backboard", Vector3.new(25, 8, 1), CFrame.new(0, 4, 75), COLORS.red, Enum.Material.Wood)
+	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "CAPTAIN'S\nPIZZA LAUNCHER", COLORS.yellow, nil, 27)
+
+	local base = makePart(station, "CannonBase", Vector3.new(14, 6, 14), CFrame.new(0, 3, 65), COLORS.red, Enum.Material.Metal)
+	base.Shape = Enum.PartType.Cylinder
+	base.Orientation = Vector3.new(0, 0, 90)
+	for _, x in { -7.5, 7.5 } do
+		local wheel = makePart(station, "CannonWheel", Vector3.new(2, 11, 11), CFrame.new(x, 3.2, 66), COLORS.steel, Enum.Material.Metal)
+		wheel.Shape = Enum.PartType.Cylinder
+	end
+
+	local rig = Instance.new("Model")
+	rig.Name = "AimRig"
+	rig.Parent = station
+	local pivot = makePart(rig, "AimPivot", Vector3.new(0.2, 0.2, 0.2), CFrame.new(Config.LAUNCH_ORIGIN), Color3.new(1, 1, 1))
+	pivot.Transparency = 1
+	pivot.CanCollide = false
+	pivot.CanTouch = false
+	rig.PrimaryPart = pivot
+	local barrel = makePart(rig, "Barrel", Vector3.new(5.2, 5.2, 15), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, 7.2)), Color3.fromRGB(226, 54, 52), Enum.Material.Metal)
+	barrel.CanCollide = false
+	local muzzle = makePart(rig, "Muzzle", Vector3.new(7, 7, 2), CFrame.new(Config.LAUNCH_ORIGIN), COLORS.yellow, Enum.Material.Neon)
+	muzzle.CanCollide = false
+
+	for _, x in { -13, 13 } do
+		local rail = makePart(station, "SafetyRail", Vector3.new(1, 5, 18), CFrame.new(x, 2.5, 65), COLORS.yellow, Enum.Material.Metal)
+		rail.CanCollide = false
+	end
+end
+
+local function buildDecor(world: Folder)
+	buildCondimentStation(world, -57, 0)
+	buildCondimentStation(world, 57, -18)
+
+	for _, position in {
+		Vector3.new(-43, 26, 27), Vector3.new(0, 26, 2), Vector3.new(43, 26, -20), Vector3.new(0, 26, -52),
+	} do
+		buildHangingLight(world, position)
+	end
+
+	for _, data in {
+		{ -60, 14, 39, Color3.fromRGB(119, 198, 230) },
+		{ 60, 14, 21, Color3.fromRGB(119, 198, 230) },
+		{ -60, 14, -48, Color3.fromRGB(255, 198, 95) },
+		{ 60, 14, -62, Color3.fromRGB(255, 198, 95) },
+	} do
+		local window = makePart(world, "RestaurantWindow", Vector3.new(0.45, 15, 19), CFrame.new(data[1], data[2], data[3]), data[4], Enum.Material.Glass)
+		window.Transparency = 0.25
+		window.CanCollide = false
+		makePart(world, "WindowCross", Vector3.new(0.7, 1, 19), CFrame.new(data[1] * 0.999, data[2], data[3]), COLORS.darkWood)
+		makePart(world, "WindowCross", Vector3.new(0.7, 15, 1), CFrame.new(data[1] * 0.999, data[2], data[3]), COLORS.darkWood)
+	end
+
+	for _, x in { -51, 51 } do
+		local anchor = makePart(world, "BalloonAnchor", Vector3.new(0.6, 0.6, 0.6), CFrame.new(x, 3, 52), COLORS.dark)
+		anchor.CanCollide = false
+		for index, color in { COLORS.red, COLORS.yellow, COLORS.green } do
+			local balloon = makeReactive(world, "Balloon", Vector3.new(3.2, 4, 3.2), CFrame.new(x + (index - 2) * 2.5, 12 + index, 52), color, Enum.Material.SmoothPlastic)
+			balloon.Shape = Enum.PartType.Ball
+			balloon.CanCollide = false
+		end
+	end
+
+	local cupTray = makePart(world, "CupTray", Vector3.new(11, 1, 7), CFrame.new(0, 2.2, -1), COLORS.darkWood, Enum.Material.Wood)
+	for index = 1, 4 do
+		local cup = makeReactive(world, "LooseCup", Vector3.new(1.7, 3.4, 1.7), CFrame.new(-4.2 + index * 1.7, 4.35, -1), index % 2 == 0 and COLORS.red or COLORS.yellow)
+		cup.Shape = Enum.PartType.Cylinder
+		cup.Orientation = Vector3.new(0, 0, 90)
+	end
+	local floorSign = makeReactive(world, "WobblySpecialSign", Vector3.new(10, 7, 1), CFrame.new(0, 4, -32), COLORS.green, Enum.Material.Wood)
+	surfaceText(floorSign, "Special", Enum.NormalId.Back, "TODAY'S SPECIAL\nFLYING PIZZA", Color3.new(1, 1, 1), nil, 20)
+	for index = 1, 3 do
+		makeReactive(world, "LoosePizzaBox", Vector3.new(8, 0.9, 8), CFrame.new((index - 2) * 1.1, 0.3 + index * 0.9, -63), Color3.fromRGB(242, 214, 166), Enum.Material.Cardboard)
+	end
 end
 
 function WorldBuilder.build()
@@ -123,64 +478,30 @@ function WorldBuilder.build()
 	if old then
 		old:Destroy()
 	end
+	configureLighting()
+	StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 
 	local world = Instance.new("Folder")
 	world.Name = "PizzaLaunchWorld"
 	world.Parent = Workspace
 
-	Workspace.Gravity = Config.GRAVITY
-	Lighting.ClockTime = 14.5
-	Lighting.Brightness = 2.6
-	Lighting.Ambient = Color3.fromRGB(125, 110, 105)
-	Lighting.OutdoorAmbient = Color3.fromRGB(145, 135, 130)
-	Lighting.EnvironmentDiffuseScale = 0.35
-	Lighting.EnvironmentSpecularScale = 0.5
-
-	local oldAtmosphere = Lighting:FindFirstChild("RestaurantAtmosphere")
-	if oldAtmosphere then
-		oldAtmosphere:Destroy()
-	end
-	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Name = "RestaurantAtmosphere"
-	atmosphere.Density = 0.18
-	atmosphere.Color = Color3.fromRGB(255, 235, 210)
-	atmosphere.Decay = Color3.fromRGB(255, 200, 160)
-	atmosphere.Glare = 0.05
-	atmosphere.Parent = Lighting
-
-	local floor = part(world, "RestaurantFloor", Vector3.new(150, 1, 160), Vector3.new(0, -1, -15), Color3.fromRGB(244, 218, 176), Enum.Material.Slate)
-	floor:SetAttribute("MissSurface", true)
-	part(world, "BackWall", Vector3.new(150, 34, 2), Vector3.new(0, 16, -94), Color3.fromRGB(255, 239, 211), Enum.Material.Brick)
-	part(world, "LeftWall", Vector3.new(2, 34, 160), Vector3.new(-75, 16, -15), Color3.fromRGB(236, 92, 78), Enum.Material.Brick)
-	part(world, "RightWall", Vector3.new(2, 34, 160), Vector3.new(75, 16, -15), Color3.fromRGB(236, 92, 78), Enum.Material.Brick)
-
-	for x = -68, 68, 8 do
-		for z = -90, 61, 8 do
-			if ((x + z) / 8) % 2 == 0 then
-				local tile = part(world, "FloorTile", Vector3.new(7.8, 0.05, 7.8), Vector3.new(x, -0.47, z), Color3.fromRGB(255, 239, 205))
-				tile.CanCollide = false
-			end
-		end
-	end
-
-	local banner = part(world, "BackBanner", Vector3.new(58, 15, 0.5), Vector3.new(0, 20, -92.8), Color3.fromRGB(255, 202, 57))
-	textLabel(banner, "Welcome", Enum.NormalId.Back, "FEED THE HUNGRY TABLE!", Color3.fromRGB(185, 39, 43))
-
-	buildCannon(world)
+	buildShell(world)
+	buildKitchen(world)
+	buildDecor(world)
+	buildLauncher(world)
 	for _, definition in Config.TABLES do
 		buildTable(world, definition)
 	end
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "PlayerSpawn"
-	spawn.Size = Vector3.new(12, 1, 8)
-	spawn.Position = Vector3.new(0, 0, 75)
+	spawn.Size = Vector3.new(10, 1, 8)
+	spawn.CFrame = CFrame.new(0, 0, 78)
 	spawn.Anchored = true
 	spawn.Transparency = 1
 	spawn.CanCollide = true
 	spawn.Neutral = true
 	spawn.Parent = world
-
 	return world
 end
 
