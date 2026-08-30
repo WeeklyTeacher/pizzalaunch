@@ -6,18 +6,18 @@ Config.STATE_REMOTE = "GameState"
 Config.PURCHASE_REMOTE = "PurchaseUpgrade"
 
 Config.GRAVITY = 196.2
-Config.MIN_SPEED = 96
-Config.MAX_SPEED = 155
+Config.MIN_SPEED = 90
+Config.MAX_SPEED = 151
 Config.CHARGE_TIME = 1.25
 Config.RELOAD_TIME = 0.85
 Config.PROJECTILE_LIFETIME = 5
 Config.MAX_AIM_X = 0.82
 Config.MIN_PITCH = math.rad(27)
 Config.MAX_PITCH = math.rad(58)
-Config.DEFAULT_PITCH = math.rad(41)
+Config.DEFAULT_PITCH = math.rad(34)
 Config.MAX_YAW = math.rad(33)
 
-Config.LAUNCH_ORIGIN = Vector3.new(0, 8.2, 58)
+Config.LAUNCH_ORIGIN = Vector3.new(0, 12, 50)
 Config.CAMERA_POSITION = Vector3.new(0, 29, 82)
 Config.CAMERA_FOCUS = Vector3.new(0, 6.5, -22)
 

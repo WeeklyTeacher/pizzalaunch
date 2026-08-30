@@ -207,9 +207,9 @@ roundOverlayDetail.ZIndex = 9
 
 local controls = Instance.new("Frame")
 controls.Name = "Controls"
-controls.AnchorPoint = Vector2.new(0.5, 1)
+controls.AnchorPoint = Vector2.new(1, 1)
 controls.Size = UDim2.new(1, -24, 0, 136)
-controls.Position = UDim2.new(0.5, 0, 1, -20)
+controls.Position = UDim2.new(1, -18, 1, -20)
 controls.BackgroundColor3 = COLORS.cream
 controls.Parent = gui
 addCorner(controls, 22)
@@ -221,7 +221,7 @@ controlsConstraint.Parent = controls
 
 local powerText = makeLabel(controls, "PowerText", "POWER 34%", UDim2.new(0.52, 0, 0, 27), UDim2.fromOffset(18, 9), 18)
 powerText.TextXAlignment = Enum.TextXAlignment.Left
-local arcText = makeLabel(controls, "ArcText", "ARC  MEDIUM", UDim2.new(0.35, 0, 0, 27), UDim2.new(0.5, 0, 0, 9), 17)
+local arcText = makeLabel(controls, "ArcText", "ARC  MEDIUM", UDim2.fromOffset(145, 27), UDim2.new(1, -322, 0, 9), 17)
 arcText.TextColor3 = COLORS.red
 local powerBack = Instance.new("Frame")
 powerBack.Name = "PowerBar"
@@ -342,12 +342,13 @@ if UserInputService.TouchEnabled then
 		button.TextSize = 11
 	end
 	controls.Size = UDim2.new(1, -24, 0, 108)
-	controls.Position = UDim2.new(0.5, 48, 1, -12)
+	controls.Position = UDim2.new(1, -10, 1, -12)
 	controlsConstraint.MinSize = Vector2.new(300, 108)
 	controlsConstraint.MaxSize = Vector2.new(440, 108)
 	powerText.Position = UDim2.fromOffset(14, 5)
 	powerText.TextSize = 14
-	arcText.Position = UDim2.new(0.44, 0, 0, 5)
+	arcText.Size = UDim2.fromOffset(120, 27)
+	arcText.Position = UDim2.new(1, -260, 0, 5)
 	arcText.TextSize = 13
 	powerBack.Size = UDim2.new(1, -168, 0, 29)
 	powerBack.Position = UDim2.fromOffset(14, 34)

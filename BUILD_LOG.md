@@ -108,3 +108,20 @@ The earlier build was treated as a prototype. This pass replaced weak systems in
 - Persistence remains intentionally disabled until the new round rewards and upgrade prices receive human playtesting.
 - The six-table room is deliberately fixed; future variation should reposition only one or two props/tables per round after verifying target clarity.
 - The shared physical launcher model is locally aimed for each player. A future multiplayer pass should decide whether to instance launcher stations or present other players' aim direction.
+
+## 2026-08-30 — Launcher framing polish
+
+### Council decision
+
+- **Creative / Gameplay Directors:** Keep the wide restaurant composition, but expose the physical cannon between the aiming pad and the launch console so the action visibly begins at the machine instead of appearing from behind the HUD.
+- **Child Player Advocate:** Start new players on a lower, easier-to-read arc while retaining explicit up/down control for distant orders.
+- **Roblox Engineer / Scope Guardian:** Reposition existing UI and shared ballistic constants rather than introduce a second camera mode or fragile first-person rig. The preview and server continue to use the same equations.
+
+### Changes and validation
+
+- Raised and moved the muzzle forward, lowered the initial arc, and rebalanced the charge range so the nearby opening tables remain reachable while the far tables still require intentional extra arc/power.
+- Moved the power/launch console to the lower-right on desktop and touch layouts, uncovering the cannon in the center foreground without covering the active target lane.
+- Desktop framing now clearly shows the red cannon barrel and glowing muzzle between the restaurant lanes and the lower-right launch console; the arc label was resized after the screenshot exposed an overlap.
+- A recalibrated Table 2 opening shot landed `PERFECT!` at 2% charge. A 41° / 87% shot reached Table 6 accurately, confirming the full distance range remains playable.
+- iPhone 17 Pro landscape at 750×361 kept stats, target card, upgrade button, four-way aim pad, power/arc console, and launch button in-bounds without overlap or truncated text. Runtime orientation reported `LandscapeSensor` and Output remained empty.
+- Studio device simulation was returned to the default viewport after the phone test.
