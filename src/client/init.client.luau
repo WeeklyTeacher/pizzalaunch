@@ -120,7 +120,7 @@ screenTint.Size = UDim2.fromScale(1, 1)
 screenTint.BackgroundColor3 = COLORS.yellow
 screenTint.BackgroundTransparency = 1
 screenTint.BorderSizePixel = 0
-screenTint.ZIndex = 2
+screenTint.ZIndex = 0
 screenTint.Parent = gui
 
 local stats = Instance.new("Frame")
@@ -692,7 +692,18 @@ stateRemote.OnClientEvent:Connect(function(newState)
 			if payload.comboBonus and payload.comboBonus > 0 then
 				detail ..= string.format(" • COMBO +%d", payload.comboBonus)
 			end
+			if payload.comboMilestone then
+				detail ..= "\nTHE WHOLE ROOM CHEERS!"
+				screenTint.BackgroundColor3 = COLORS.yellow
+				TweenService:Create(screenTint, TweenInfo.new(0.08), { BackgroundTransparency = 0.76 }):Play()
+				task.delay(0.1, function()
+					TweenService:Create(screenTint, TweenInfo.new(0.28), { BackgroundTransparency = 1 }):Play()
+				end)
+			end
 			shakeStrength = payload.result == "PERFECT!" and 1.15 or 0.65
+			if payload.comboMilestone then
+				shakeStrength = 1.4
+			end
 			shakeUntil = os.clock() + 0.34
 		else
 			detail = "Quick reload — give it another whirl!"

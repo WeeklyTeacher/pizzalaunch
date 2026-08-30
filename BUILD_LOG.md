@@ -125,3 +125,18 @@ The earlier build was treated as a prototype. This pass replaced weak systems in
 - A recalibrated Table 2 opening shot landed `PERFECT!` at 2% charge. A 41° / 87% shot reached Table 6 accurately, confirming the full distance range remains playable.
 - iPhone 17 Pro landscape at 750×361 kept stats, target card, upgrade button, four-way aim pad, power/arc console, and launch button in-bounds without overlap or truncated text. Runtime orientation reported `LandscapeSensor` and Output remained empty.
 - Studio device simulation was returned to the default viewport after the phone test.
+
+## 2026-08-30 — Combo crowd payoff
+
+### Council decision
+
+- **Creative / Gameplay Directors:** Make streaks change the room, not only the coin counter. At combo 3, 5, and every 10, all non-target customers now throw up their arms and cheer while the HUD flashes a crowd message.
+- **Child Player Advocate:** Use visible celebration at memorable small numbers; no extra rules or meter are introduced.
+- **Roblox Engineer / Scope Guardian:** Reuse the bounded NPC tween/reset and screen-feedback systems. This adds no persistent objects, new remotes, or animation asset dependency.
+
+### Tests and repair
+
+- Ten consecutive calibrated deliveries crossed combo 3, 5, and 10. Each milestone arrived in the authoritative shot payload; combo 10 displayed `THE WHOLE ROOM CHEERS!` with the capped +12 combo bonus.
+- Live pose inspection during combo 10 measured every non-target customer's head raised about 1.37 units and the delivered customer's success jump at about 1.98 units. All six returned exactly to their authored reset poses after the celebration.
+- The first screenshot showed the celebration tint compositing over the HUD. Its layer was moved behind the interface; the repeat test kept power, arc, and launch controls fully visible during the flash.
+- Studio Output remained empty after the 10-shot progression and reaction-reset regression.

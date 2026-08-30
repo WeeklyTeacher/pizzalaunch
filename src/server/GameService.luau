@@ -239,6 +239,25 @@ local function customerReaction(tableId: number, reaction: string)
 				}):Play()
 			end
 		end
+	elseif reaction == "crowd" then
+		reactionText(customer, "PIZZA STREAK!\nWOOHOO!")
+		if faceLabel and faceLabel:IsA("TextLabel") then
+			faceLabel.Text = "^  ^\n\\___/"
+		end
+		if head and head:IsA("BasePart") then
+			TweenService:Create(head, TweenInfo.new(0.3, Enum.EasingStyle.Back), { CFrame = head.CFrame + Vector3.new(0, 1.25, 0) }):Play()
+		end
+		if torso and torso:IsA("BasePart") then
+			TweenService:Create(torso, TweenInfo.new(0.3, Enum.EasingStyle.Back), { CFrame = torso.CFrame + Vector3.new(0, 0.55, 0) }):Play()
+		end
+		for _, arm in { leftArm, rightArm } do
+			if arm and arm:IsA("BasePart") then
+				local side = arm.Name == "LeftArm" and -1 or 1
+				TweenService:Create(arm, TweenInfo.new(0.32, Enum.EasingStyle.Back), {
+					CFrame = arm.CFrame * CFrame.new(side * 0.45, 1.6, 0) * CFrame.Angles(0, 0, math.rad(side * -105)),
+				}):Play()
+			end
+		end
 	elseif reaction == "wrong" then
 		reactionText(customer, "HEY! NOT MY ORDER!\n...STILL SMELLS GOOD")
 		if faceLabel and faceLabel:IsA("TextLabel") then
@@ -408,6 +427,14 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		pizza.Anchored = true
 		pizza.CFrame = CFrame.new(definition.position + Vector3.new(0, 4.95, 0)) * CFrame.Angles(0, 0, math.pi / 2)
 		customerReaction(tableId, "success")
+		if state.combo == 3 or state.combo == 5 or state.combo % 10 == 0 then
+			payload.comboMilestone = state.combo
+			for _, tableData in Config.TABLES do
+				if tableData.id ~= tableId then
+					customerReaction(tableData.id, "crowd")
+				end
+			end
+		end
 		playSound(pizza, accuracy.name == "PERFECT!" and SOUND.perfect or SOUND.success, accuracy.name == "PERFECT!" and 0.75 or 0.65, 1.05)
 		task.delay(0.62, function()
 			if not pizza.Parent then
