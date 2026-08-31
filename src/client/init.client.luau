@@ -16,6 +16,7 @@ local remotes = ReplicatedStorage:WaitForChild(Config.REMOTES_FOLDER)
 local launchRemote = remotes:WaitForChild(Config.LAUNCH_REMOTE)
 local stateRemote = remotes:WaitForChild(Config.STATE_REMOTE)
 local purchaseRemote = remotes:WaitForChild(Config.PURCHASE_REMOTE)
+local modeRemote = remotes:WaitForChild(Config.MODE_REMOTE)
 
 local COLORS = {
 	red = Color3.fromRGB(205, 48, 53),
@@ -34,6 +35,7 @@ local state = {
 	round = 1,
 	roundProgress = 0,
 	roundGoal = 3,
+	mode = "walk",
 	upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 }
 local aimYaw = 0
@@ -50,6 +52,9 @@ local keyboardHeld = {}
 local touchHeld = {}
 local shakeUntil = 0
 local shakeStrength = 0
+local operating = false
+local hasLaunched = false
+local playerControls
 
 local function addCorner(parent: GuiObject, radius: number)
 	local corner = Instance.new("UICorner")
@@ -173,9 +178,9 @@ tutorial.BackgroundTransparency = 0.03
 tutorial.Parent = gui
 addCorner(tutorial, 18)
 addStroke(tutorial, COLORS.darkRed, 2)
-local tutorialTitle = makeLabel(tutorial, "Title", "DELIVER SOME HAPPINESS!", UDim2.new(1, -20, 0, 28), UDim2.fromOffset(10, 9), 16)
+local tutorialTitle = makeLabel(tutorial, "Title", "WELCOME, PIZZA CHEF!", UDim2.new(1, -20, 0, 28), UDim2.fromOffset(10, 9), 16)
 tutorialTitle.TextColor3 = COLORS.red
-local tutorialText = makeLabel(tutorial, "Steps", "1  AIM the landing ring\n2  ADJUST the arc up or down\n3  HOLD power, then RELEASE!", UDim2.new(1, -28, 0, 92), UDim2.fromOffset(14, 41), 16)
+local tutorialText = makeLabel(tutorial, "Steps", "1  WALK around the restaurant\n2  FIND the glowing launcher\n3  PRESS E to start serving!", UDim2.new(1, -28, 0, 92), UDim2.fromOffset(14, 41), 16)
 tutorialText.TextXAlignment = Enum.TextXAlignment.Left
 tutorialText.TextYAlignment = Enum.TextYAlignment.Top
 
@@ -211,6 +216,7 @@ controls.AnchorPoint = Vector2.new(1, 1)
 controls.Size = UDim2.new(1, -24, 0, 136)
 controls.Position = UDim2.new(1, -18, 1, -20)
 controls.BackgroundColor3 = COLORS.cream
+controls.Visible = false
 controls.Parent = gui
 addCorner(controls, 22)
 addStroke(controls, COLORS.red, 3)
@@ -252,6 +258,9 @@ fireButton.TextSize = 23
 
 local shopToggle = makeButton(gui, "ShopToggle", "UPGRADES", UDim2.fromOffset(150, 54), UDim2.new(1, -168, 0, 16), COLORS.yellow)
 shopToggle.TextColor3 = COLORS.red
+local exitButton = makeButton(gui, "ExitLauncher", "EXIT LAUNCHER  [Q]", UDim2.fromOffset(150, 48), UDim2.new(1, -168, 0, 78), COLORS.red)
+exitButton.TextSize = 14
+exitButton.Visible = false
 local shopPanel = Instance.new("Frame")
 shopPanel.Name = "ShopPanel"
 shopPanel.AnchorPoint = Vector2.new(1, 0)
@@ -286,7 +295,7 @@ touchAimPad.Size = UDim2.fromOffset(142, 108)
 touchAimPad.Position = UDim2.new(0, 18, 1, -14)
 touchAimPad.BackgroundColor3 = COLORS.cream
 touchAimPad.BackgroundTransparency = 0.12
-touchAimPad.Visible = UserInputService.TouchEnabled
+touchAimPad.Visible = false
 touchAimPad.Parent = gui
 addCorner(touchAimPad, 20)
 addStroke(touchAimPad, COLORS.red, 2)
@@ -332,6 +341,10 @@ if UserInputService.TouchEnabled then
 	shopToggle.Size = UDim2.fromOffset(108, 45)
 	shopToggle.Position = UDim2.new(1, -126, 0, 8)
 	shopToggle.TextSize = 13
+	exitButton.Size = UDim2.fromOffset(108, 40)
+	exitButton.Position = UDim2.new(1, -126, 0, 58)
+	exitButton.Text = "EXIT [Q]"
+	exitButton.TextSize = 12
 	shopPanel.Size = UDim2.fromOffset(270, 280)
 	shopPanel.Position = UDim2.new(1, -16, 0, 60)
 	shopTitle.TextSize = 13
@@ -363,19 +376,19 @@ if UserInputService.TouchEnabled then
 	roundOverlayTitle.TextSize = 31
 	roundOverlayDetail.TextSize = 17
 
-	task.defer(function()
-		local touchGui = playerGui:WaitForChild("TouchGui", 8)
-		if touchGui and touchGui:IsA("ScreenGui") then
-			touchGui.Enabled = false
-		end
-		local playerModule = player.PlayerScripts:WaitForChild("PlayerModule", 8)
-		if playerModule then
-			local success, module = pcall(require, playerModule)
-			if success and module.GetControls then
-				module:GetControls():Disable()
-			end
-		end
-	end)
+end
+
+local walkHint = makeLabel(gui, "WalkHint", "WALK TO THE GLOWING LAUNCHER  •  PRESS E / TAP TO OPERATE", UDim2.fromOffset(500, 48), UDim2.new(0.5, -250, 1, -68), 15)
+walkHint.BackgroundTransparency = 0.05
+walkHint.BackgroundColor3 = COLORS.cream
+walkHint.TextColor3 = COLORS.red
+addCorner(walkHint, 16)
+addStroke(walkHint, COLORS.darkRed, 2)
+if UserInputService.TouchEnabled then
+	walkHint.Size = UDim2.fromOffset(390, 38)
+	walkHint.Position = UDim2.new(0.5, -195, 1, -48)
+	walkHint.Text = "WALK TO THE GLOWING LAUNCHER • TAP OPERATE"
+	walkHint.TextSize = 11
 end
 
 local trajectoryFolder = Instance.new("Folder")
@@ -456,6 +469,11 @@ end
 
 local function updateTargetVisuals()
 	local definition = tableDefinition(state.targetId)
+	local round = Config.ROUNDS[math.clamp(state.round or 1, 1, #Config.ROUNDS)]
+	local activeTables = {}
+	for _, tableId in round.tables do
+		activeTables[tableId] = true
+	end
 	if targetHighlight then
 		targetHighlight:Destroy()
 	end
@@ -467,14 +485,28 @@ local function updateTargetVisuals()
 	if world then
 		for _, tableModel in world:GetChildren() do
 			if tableModel:IsA("Model") and tableModel:GetAttribute("TableId") then
-				local orderSign = tableModel:FindFirstChild("OrderSign", true)
-				local orderDisplay = tableModel:FindFirstChild("OrderDisplay", true)
-				local isTarget = tableModel:GetAttribute("TableId") == state.targetId
-				if orderSign and orderSign:IsA("BasePart") then
-					orderSign.LocalTransparencyModifier = isTarget and 0 or 1
+				local tableId = tableModel:GetAttribute("TableId")
+				local isActive = activeTables[tableId] == true
+				local targetRing = tableModel:FindFirstChild("TargetRing")
+				local isTarget = tableId == state.targetId
+				local customer = tableModel:FindFirstChild("Customer")
+				if customer then
+					for _, descendant in customer:GetDescendants() do
+						if descendant:IsA("BasePart") then
+							descendant.LocalTransparencyModifier = isActive and 0 or 1
+						elseif descendant:IsA("SurfaceGui") and descendant.Name == "Face" then
+							descendant.Enabled = isActive
+						elseif descendant:IsA("ProximityPrompt") then
+							descendant.Enabled = isActive and not operating
+						end
+					end
+					local waitingMarker = customer:FindFirstChild("WaitingMarker", true)
+					if waitingMarker and waitingMarker:IsA("BillboardGui") then
+						waitingMarker.Enabled = isActive and not isTarget
+					end
 				end
-				if orderDisplay and orderDisplay:IsA("SurfaceGui") then
-					orderDisplay.Enabled = isTarget
+				if targetRing and targetRing:IsA("BasePart") then
+					targetRing.LocalTransparencyModifier = isTarget and 0 or 1
 				end
 			end
 		end
@@ -497,11 +529,11 @@ local function updateTargetVisuals()
 		yourOrderBillboard = Instance.new("BillboardGui")
 		yourOrderBillboard.Name = "YourOrder"
 		yourOrderBillboard.Adornee = top
-		yourOrderBillboard.Size = UDim2.fromOffset(145, 36)
+		yourOrderBillboard.Size = UDim2.fromOffset(150, 40)
 		yourOrderBillboard.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
 		yourOrderBillboard.AlwaysOnTop = true
 		yourOrderBillboard.Parent = top
-		local label = makeLabel(yourOrderBillboard, "Label", "YOUR ORDER!", UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), 19)
+		local label = makeLabel(yourOrderBillboard, "Label", "DELIVER HERE!", UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), 19)
 		label.TextColor3 = definition.color
 		label.TextStrokeColor3 = COLORS.ink
 		label.TextStrokeTransparency = 0.1
@@ -509,7 +541,6 @@ local function updateTargetVisuals()
 
 	local ring = model:FindFirstChild("TargetRing")
 	if ring and ring:IsA("BasePart") then
-		local round = Config.ROUNDS[math.clamp(state.round, 1, #Config.ROUNDS)]
 		local scale = round.accuracyScale * (1 + (state.upgrades.assist or 0) * 0.12)
 		ring.Size = Vector3.new(0.15, 8 * scale, 8 * scale)
 	end
@@ -559,6 +590,122 @@ local function showRoundComplete(payload)
 	end)
 end
 
+local movementLocked = false
+local function blockMovement()
+	return Enum.ContextActionResult.Sink
+end
+
+local function setMovementLocked(locked: boolean)
+	if movementLocked == locked then
+		return
+	end
+	movementLocked = locked
+	if locked then
+		ContextActionService:BindActionAtPriority("BlockMovement", blockMovement, false, Enum.ContextActionPriority.High.Value,
+			Enum.PlayerActions.CharacterForward, Enum.PlayerActions.CharacterBackward, Enum.PlayerActions.CharacterLeft,
+			Enum.PlayerActions.CharacterRight, Enum.PlayerActions.CharacterJump)
+	else
+		ContextActionService:UnbindAction("BlockMovement")
+	end
+	if playerControls then
+		if locked then
+			playerControls:Disable()
+		else
+			playerControls:Enable()
+		end
+	end
+	local touchGui = playerGui:FindFirstChild("TouchGui")
+	if touchGui and touchGui:IsA("ScreenGui") then
+		touchGui.Enabled = not locked
+	end
+end
+
+local function restoreTutorialAppearance()
+	tutorial.BackgroundTransparency = 0.03
+	for _, descendant in tutorial:GetDescendants() do
+		if descendant:IsA("TextLabel") then
+			descendant.TextTransparency = 0
+		elseif descendant:IsA("UIStroke") then
+			descendant.Transparency = 0.05
+		end
+	end
+end
+
+local function applyMode()
+	operating = state.mode == "launcher"
+	shopPanel.Visible = false
+	shopToggle.Text = "UPGRADES"
+	controls.Visible = operating
+	touchAimPad.Visible = operating and UserInputService.TouchEnabled
+	exitButton.Visible = operating
+	walkHint.Visible = not operating
+	setMovementLocked(operating)
+
+	if operating then
+		tutorialTitle.Text = "DELIVER SOME HAPPINESS!"
+		tutorialText.Text = "1  AIM the landing ring\n2  ADJUST the arc up or down\n3  HOLD power, then RELEASE!"
+		tutorial.Visible = not UserInputService.TouchEnabled and not hasLaunched
+		if tutorial.Visible then
+			restoreTutorialAppearance()
+		end
+	else
+		charging = false
+		activeFireInput = nil
+		table.clear(keyboardHeld)
+		table.clear(touchHeld)
+		controls.Visible = false
+		touchAimPad.Visible = false
+		exitButton.Visible = false
+		if not hasLaunched and not UserInputService.TouchEnabled then
+			tutorialTitle.Text = "WELCOME, PIZZA CHEF!"
+			tutorialText.Text = "1  WALK around the restaurant\n2  FIND the glowing launcher\n3  PRESS E to start serving!"
+			tutorial.Visible = true
+			restoreTutorialAppearance()
+		else
+			tutorial.Visible = false
+		end
+		for _, dot in trajectoryParts do
+			dot.Transparency = 1
+		end
+		landingRing.Transparency = 1
+		landingLight.Enabled = false
+		camera.CameraType = Enum.CameraType.Custom
+		camera.FieldOfView = 70
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
+	end
+	updateTargetVisuals()
+end
+
+task.defer(function()
+	local playerModule = player.PlayerScripts:WaitForChild("PlayerModule", 8)
+	if playerModule then
+		local success, module = pcall(require, playerModule)
+		if success and module.GetControls then
+			playerControls = module:GetControls()
+			if operating then
+				playerControls:Disable()
+			else
+				playerControls:Enable()
+			end
+		end
+	end
+	local touchGui = playerGui:WaitForChild("TouchGui", 8)
+	if touchGui and touchGui:IsA("ScreenGui") then
+		touchGui:GetPropertyChangedSignal("Enabled"):Connect(function()
+			if operating and touchGui.Enabled then
+				touchGui.Enabled = false
+			end
+		end)
+		if operating then
+			touchGui.Enabled = false
+		end
+	end
+end)
+
 local function setAimFromScreen(position: Vector3)
 	local viewport = camera.ViewportSize
 	if viewport.X <= 0 or viewport.Y <= 0 then
@@ -570,7 +717,7 @@ local function setAimFromScreen(position: Vector3)
 end
 
 local function beginCharge(input: InputObject?)
-	if not ready or charging then
+	if not operating or not ready or charging then
 		return
 	end
 	charging = true
@@ -584,12 +731,13 @@ local function beginCharge(input: InputObject?)
 end
 
 local function launch()
-	if not charging or not ready then
+	if not operating or not charging or not ready then
 		return
 	end
 	charging = false
 	activeFireInput = nil
 	ready = false
+	hasLaunched = true
 	launchRemote:FireServer(currentDirection(), charge)
 	fireButton.Text = "OVEN\nRELOAD"
 	fireButton.BackgroundColor3 = Color3.fromRGB(142, 128, 119)
@@ -614,9 +762,13 @@ end
 shopToggle.Activated:Connect(function()
 	shopPanel.Visible = not shopPanel.Visible
 	shopToggle.Text = shopPanel.Visible and "CLOSE" or "UPGRADES"
-	if UserInputService.TouchEnabled then
-		controls.Visible = not shopPanel.Visible
-		touchAimPad.Visible = not shopPanel.Visible
+	controls.Visible = operating and not shopPanel.Visible
+	touchAimPad.Visible = operating and UserInputService.TouchEnabled and not shopPanel.Visible
+	exitButton.Visible = operating and not shopPanel.Visible
+end)
+exitButton.Activated:Connect(function()
+	if operating then
+		modeRemote:FireServer("walk")
 	end
 end)
 fireButton.InputBegan:Connect(function(input)
@@ -637,6 +789,13 @@ local aimKeyMap = {
 	[Enum.KeyCode.S] = "down", [Enum.KeyCode.Down] = "down",
 }
 UserInputService.InputBegan:Connect(function(input, processed)
+	if operating and input.KeyCode == Enum.KeyCode.Q then
+		modeRemote:FireServer("walk")
+		return
+	end
+	if not operating then
+		return
+	end
 	local aimKey = aimKeyMap[input.KeyCode]
 	if aimKey then
 		keyboardHeld[aimKey] = true
@@ -649,6 +808,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 end)
 UserInputService.InputEnded:Connect(function(input, _processed)
+	if not operating then
+		return
+	end
 	local aimKey = aimKeyMap[input.KeyCode]
 	if aimKey then
 		keyboardHeld[aimKey] = false
@@ -658,7 +820,7 @@ UserInputService.InputEnded:Connect(function(input, _processed)
 	end
 end)
 UserInputService.InputChanged:Connect(function(input, processed)
-	if processed then
+	if not operating or processed then
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseMovement then
@@ -668,11 +830,8 @@ UserInputService.InputChanged:Connect(function(input, processed)
 	end
 end)
 
-ContextActionService:BindActionAtPriority("BlockMovement", function()
-	return Enum.ContextActionResult.Sink
-end, false, Enum.ContextActionPriority.High.Value, Enum.PlayerActions.CharacterForward, Enum.PlayerActions.CharacterBackward, Enum.PlayerActions.CharacterLeft, Enum.PlayerActions.CharacterRight, Enum.PlayerActions.CharacterJump)
-
 stateRemote.OnClientEvent:Connect(function(newState)
+	local changedMode = (newState.mode == "launcher") ~= operating
 	state = newState
 	state.upgrades = state.upgrades or { tips = 0, assist = 0, reload = 0, power = 0 }
 	coinsLabel.Text = string.format("COINS  %d", state.coins or 0)
@@ -682,7 +841,11 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	progressFill.Size = UDim2.fromScale(math.clamp((state.roundProgress or 0) / math.max(state.roundGoal or 1, 1), 0, 1), 1)
 	roundCard.BackgroundColor3 = state.roundColor or COLORS.green
 	updateShop(state.upgrades)
-	updateTargetVisuals()
+	if changedMode then
+		applyMode()
+	else
+		updateTargetVisuals()
+	end
 
 	if state.event == "shotResult" and state.payload then
 		local payload = state.payload
@@ -723,12 +886,20 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		end)
 	elseif state.event == "purchaseResult" and state.payload then
 		showFeedback(state.payload.result, state.payload.success and COLORS.green or COLORS.orange, state.payload.success and "Upgrade equipped!" or "Deliver more pizzas!")
+	elseif state.event == "modeChanged" and state.payload then
+		showFeedback(state.payload.result or (operating and "READY!" or "LET'S WALK!"), operating and COLORS.green or COLORS.yellow,
+			operating and "Aim for the glowing delivery plate" or "Explore, greet customers, or check the register")
+	elseif state.event == "notice" and state.payload then
+		showFeedback(state.payload.result or "PIZZA PLACE", state.payload.color or COLORS.yellow, state.payload.detail)
 	elseif state.event == "welcome" then
-		showFeedback("LUNCH RUSH!", COLORS.yellow, "Feed the glowing customer")
+		showFeedback("WELCOME, CHEF!", COLORS.yellow, "Walk to the glowing launcher and press E")
 	end
 end)
 
 RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
+	if not operating then
+		return
+	end
 	local horizontalInput = ((keyboardHeld.right or touchHeld.right) and 1 or 0) - ((keyboardHeld.left or touchHeld.left) and 1 or 0)
 	local verticalInput = ((keyboardHeld.up or touchHeld.up) and 1 or 0) - ((keyboardHeld.down or touchHeld.down) and 1 or 0)
 	aimYaw = math.clamp(aimYaw + horizontalInput * deltaTime * 0.72, -1, 1)
@@ -781,6 +952,18 @@ end)
 task.defer(function()
 	local world = Workspace:WaitForChild("PizzaLaunchWorld", 10)
 	if world then
+		applyMode()
 		updateTargetVisuals()
+	end
+end)
+
+player.CharacterAdded:Connect(function(character)
+	if not operating then
+		local humanoid = character:WaitForChild("Humanoid", 8)
+		if humanoid then
+			camera.CameraType = Enum.CameraType.Custom
+			camera.CameraSubject = humanoid
+			camera.FieldOfView = 70
+		end
 	end
 end)

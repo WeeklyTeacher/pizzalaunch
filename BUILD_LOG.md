@@ -140,3 +140,43 @@ The earlier build was treated as a prototype. This pass replaced weak systems in
 - Live pose inspection during combo 10 measured every non-target customer's head raised about 1.37 units and the delivered customer's success jump at about 1.98 units. All six returned exactly to their authored reset poses after the celebration.
 - The first screenshot showed the celebration tint compositing over the HUD. Its layer was moved behind the interface; the repeat test kept power, arc, and launch controls fully visible during the flash.
 - Studio Output remained empty after the 10-shot progression and reaction-reset regression.
+
+## 2026-08-30 — Walk-in restaurant and living-shift overhaul
+
+### Council decisions
+
+- **Gameplay designer:** Preserve the proven launch/scoring physics and add replayability through a walk-to-launch loop, changing occupied seats, and deterministic late-round comedy obstacles.
+- **Environment designer:** Reframe the entrance so the visible avatar, side-mounted launcher sign, front register counter, dining aisle, kitchen/menu, and customers share the first view. Normalize table/NPC proportions rather than adding more decoration.
+- **Gameplay engineer:** Give one server-authoritative player a launcher lease at a time. Split prompts, customer motion, layouts, and prop restoration into bounded modules; never reposition a live target during a shot.
+- **Nine-year-old playtester:** Use one bottom objective, one active target marker, ordinary movement, an obvious `E` interaction, forgiving 16–23% opening shots, and almost no floating reading.
+
+### Implemented
+
+- Added normal third-person walk mode with a visible player avatar and deterministic entrance spawn. Launcher operation is now entered through a proximity prompt and exited with `Q` or an on-screen button.
+- Added validated single-operator launcher occupancy, server-side distance checks, frozen operator pose, death/respawn recovery, and camera/movement restoration.
+- Added front register/order counter dressing with order signage, parmesan, pepper flakes, napkin dispenser, splat surfaces, and concise register interaction feedback.
+- Added short customer mood/personality interactions through contextual prompts and the existing HUD feedback toast.
+- Removed all six legacy order signs/bubbles. Waiting customers use tiny pizza markers; reactions temporarily use `!`, `?`, `★`, or `YUM`; only the active table receives the prominent delivery marker/highlight/ring.
+- Moved the opening tables to readable mid-range lanes and kept a broad center aisle. Varied small, booth, and family table proportions by distance.
+- Rescaled customers to believable stylized Roblox proportions while preserving distinct clothing, skin tones, faces, hair, and accessories.
+- Added staggered, bounded head/arm idle gestures and a served-seat step-away/return beat that cannot enter projectile lanes.
+- First Orders shows two occupied seats, Dinner Rush four, Full House the middle/far group, and Master Chef all six. Full House activates a center reactive sign; Master Chef also activates the far pizza-box stack.
+- Extracted prompt routing, customer motion, round dressing, and prop reset into `InteractionService`, `CustomerService`, `LayoutService`, and `PropService` modules.
+- Walking and launcher interfaces now switch cleanly: normal touch/character controls versus aim pad, power/arc, trajectory, launch, and exit controls. Added a guard against Roblox re-enabling the touch movement GUI during launcher operation.
+
+### Studio tests and repairs
+
+- Fresh character spawned visibly at the authored entrance with `CameraType.Custom`, `WalkSpeed 16`, and an unanchored root. The initial spawn-order bug that placed characters in the dining room was fixed.
+- Launcher prompt moved the character to the operator pose, anchored/froze movement, switched to the scriptable aiming camera, and showed launch controls. `Q` restored the side exit pose, normal camera, movement, and prompt availability.
+- Customer interaction returned `MIA • SUPER HUNGRY` plus her short line; register interaction returned First Orders progress and coin status.
+- Recalibrated opening tables landed Perfect at 16% and 23% charge instead of near-zero power.
+- Twelve consecutive calibrated deliveries advanced First Orders → Dinner Rush → Full House → Master Chef. Every shot landed Perfect; active seating reached all six and both late-round obstacle sets enabled at the intended transitions.
+- A center-cup shot returned `PIZZA CHAOS!`; the cup unanchored with `RecentlyHit=true`, then returned to its exact authored position, anchored/collidable state, and `RecentlyHit=false` after 4.5 seconds.
+- iPhone 17 Pro landscape at 750×361 showed normal thumbstick/jump controls and the walk objective without overlap. Launcher mode removed those controls and fit the aim pad, target card, upgrades, exit, power/arc, and launch button without clipping.
+- Studio device simulation was returned to default after testing.
+
+### Remaining priorities
+
+- Run a dedicated two-player contention/play-observation session before deciding whether one shared launcher is sufficient or each player needs a station.
+- Add shift results/timing only after human playtesting confirms walking does not slow the desired arcade cadence.
+- Add DataStore persistence only after the larger reward totals and upgrade prices are rebalanced with real players.

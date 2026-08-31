@@ -4,6 +4,7 @@ Config.REMOTES_FOLDER = "PizzaLaunchRemotes"
 Config.LAUNCH_REMOTE = "LaunchPizza"
 Config.STATE_REMOTE = "GameState"
 Config.PURCHASE_REMOTE = "PurchaseUpgrade"
+Config.MODE_REMOTE = "LauncherMode"
 
 Config.GRAVITY = 196.2
 Config.MIN_SPEED = 90
@@ -20,14 +21,17 @@ Config.MAX_YAW = math.rad(33)
 Config.LAUNCH_ORIGIN = Vector3.new(0, 12, 50)
 Config.CAMERA_POSITION = Vector3.new(0, 29, 82)
 Config.CAMERA_FOCUS = Vector3.new(0, 6.5, -22)
+Config.LAUNCHER_OPERATOR_CFRAME = CFrame.new(0, 3.5, 73)
+Config.LAUNCHER_EXIT_CFRAME = CFrame.new(16, 3.5, 72) * CFrame.Angles(0, math.rad(-90), 0)
+Config.WALK_SPAWN_CFRAME = CFrame.lookAt(Vector3.new(-16, 3.5, 84), Vector3.new(0, 3.5, 65))
 
 Config.TABLES = {
-	{ id = 1, position = Vector3.new(-21, 2.5, 17), color = Color3.fromRGB(255, 190, 65), customer = "Mia", skin = Color3.fromRGB(246, 199, 154), shirt = Color3.fromRGB(255, 102, 118), style = "bow" },
-	{ id = 2, position = Vector3.new(21, 2.5, 9), color = Color3.fromRGB(80, 201, 244), customer = "Bo", skin = Color3.fromRGB(126, 82, 56), shirt = Color3.fromRGB(63, 135, 224), style = "cap" },
-	{ id = 3, position = Vector3.new(-27, 2.5, -13), color = Color3.fromRGB(255, 120, 145), customer = "Ziggy", skin = Color3.fromRGB(226, 165, 115), shirt = Color3.fromRGB(126, 83, 202), style = "spikes" },
-	{ id = 4, position = Vector3.new(27, 2.5, -23), color = Color3.fromRGB(117, 218, 126), customer = "Pip", skin = Color3.fromRGB(255, 220, 177), shirt = Color3.fromRGB(52, 176, 113), style = "beanie" },
-	{ id = 5, position = Vector3.new(-19, 2.5, -48), color = Color3.fromRGB(190, 137, 245), customer = "Nana", skin = Color3.fromRGB(111, 70, 49), shirt = Color3.fromRGB(233, 103, 55), style = "bun" },
-	{ id = 6, position = Vector3.new(20, 2.5, -57), color = Color3.fromRGB(255, 155, 72), customer = "Max", skin = Color3.fromRGB(235, 184, 139), shirt = Color3.fromRGB(229, 70, 65), style = "chef" },
+	{ id = 1, position = Vector3.new(-24, 2.5, 2), color = Color3.fromRGB(255, 190, 65), customer = "Mia", skin = Color3.fromRGB(246, 199, 154), shirt = Color3.fromRGB(255, 102, 118), style = "bow", mood = "SUPER HUNGRY", line = "I saved room for a flying pizza!" },
+	{ id = 2, position = Vector3.new(24, 2.5, -3), color = Color3.fromRGB(80, 201, 244), customer = "Bo", skin = Color3.fromRGB(126, 82, 56), shirt = Color3.fromRGB(63, 135, 224), style = "cap", mood = "CHILL", line = "Bank shot or straight shot? Surprise me!" },
+	{ id = 3, position = Vector3.new(-28, 2.5, -24), color = Color3.fromRGB(255, 120, 145), customer = "Ziggy", skin = Color3.fromRGB(226, 165, 115), shirt = Color3.fromRGB(126, 83, 202), style = "spikes", mood = "EXCITED", line = "Make it fly extra high!" },
+	{ id = 4, position = Vector3.new(28, 2.5, -30), color = Color3.fromRGB(117, 218, 126), customer = "Pip", skin = Color3.fromRGB(255, 220, 177), shirt = Color3.fromRGB(52, 176, 113), style = "beanie", mood = "PECKISH", line = "I can almost smell the cheese!" },
+	{ id = 5, position = Vector3.new(-24, 2.5, -49), color = Color3.fromRGB(190, 137, 245), customer = "Nana", skin = Color3.fromRGB(111, 70, 49), shirt = Color3.fromRGB(233, 103, 55), style = "bun", mood = "PATIENT", line = "Take your time, chef. Aim true!" },
+	{ id = 6, position = Vector3.new(24, 2.5, -55), color = Color3.fromRGB(255, 155, 72), customer = "Max", skin = Color3.fromRGB(235, 184, 139), shirt = Color3.fromRGB(229, 70, 65), style = "chef", mood = "PIZZA EXPERT", line = "Show me your master-chef launch!" },
 }
 
 Config.ACCURACY = {

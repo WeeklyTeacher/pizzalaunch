@@ -1,26 +1,30 @@
 # Pizza Launch
 
-Pizza Launch is a family-friendly Roblox arcade game: aim the restaurant's pizza cannon, charge the shot, and land dinner on the glowing customer's table. Accurate deliveries earn coins, combo bonuses, and session upgrades; misses bounce harmlessly and reset quickly.
+Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through the pizzeria, greet customers, step behind the counter to operate the pizza cannon, and land dinner on the highlighted table. Accurate deliveries earn coins, combo bonuses, and session upgrades; misses create harmless, temporary restaurant chaos.
 
 ## Play the game
 
-- Move the mouse to aim naturally left/right and raise/lower the launch arc.
+- Walk with normal Roblox movement (`WASD`, thumbstick, or touch controls).
+- Use `E`, the gamepad interaction button, or the touch prompt at the glowing launcher to operate it.
+- While operating, move the mouse to aim naturally left/right and raise/lower the launch arc.
 - Keyboard: `A`/`D` or left/right arrows turn; `W`/`S` or up/down arrows change arc.
 - Touch: drag to aim or use the large four-way aim pad.
 - Hold the red **Launch** button, left mouse button, or `Space` to charge power, then release.
+- Press `Q` or the visible **Exit Launcher** button to return to walking.
+- Walk up to customers for a short mood/order line, or check the front register for shift progress.
 - Follow the dotted arc and landing ring. Green is lined up, yellow is close, and orange needs adjustment.
 - Deliver the round's orders, build combos, earn accuracy bonuses, and spend coins on earnings, precision, reload, and power upgrades.
 
-Mobile play is landscape-only. The launch button is touch-sized and character movement is disabled because all play happens through the cannon.
+Mobile play is landscape-only. Normal touch movement appears while walking; it is replaced by the dedicated aim pad and launch controls only while operating the cannon.
 
 ## Progression
 
 The restaurant runs four escalating service rounds:
 
-1. **First Orders** — three short shots with generous accuracy.
-2. **Dinner Rush** — four orders across the near and middle lanes.
-3. **Full House** — five longer shots with standard accuracy.
-4. **Master Chef** — six orders across the full restaurant with tighter plates.
+1. **First Orders** — two open, comfortable lanes and three forgiving deliveries.
+2. **Dinner Rush** — four occupied tables across the near and middle lanes.
+3. **Full House** — middle/far seating plus a safe reactive sign obstacle.
+4. **Master Chef** — all six customers, tighter accuracy, and a distant knockable box stack.
 
 Round completions pay coin bonuses. Master Chef repeats as an endgame score/combo challenge.
 
@@ -50,11 +54,15 @@ src/
   shared/Config.luau          Tables, two-axis ballistics, rounds, and upgrades
   server/WorldBuilder.luau    Pizzeria, NPCs, kitchen, props, lighting, spawn
   server/GameService.luau     Physics, validation, reactions, mess, progression
+  server/InteractionService.luau  Launcher/register/customer prompt routing
+  server/CustomerService.luau     Bounded idle and served-seat choreography
+  server/LayoutService.luau       Deterministic round seating/obstacle dressing
+  server/PropService.luau         Knockable-prop impulse and reliable restoration
   server/init.server.luau     Server bootstrap
   client/init.client.luau     Camera, controls, trajectory, HUD, touch layout
 ```
 
-The server owns projectile creation, hit resolution, rewards, combos, rounds, reactions, prop resets, and purchases. Clients only submit a validated 3D aim direction and charge value. World and UI assets are generated from code so the repository remains the source of truth.
+The server owns launcher occupancy, projectile creation, hit resolution, rewards, combos, rounds, reactions, prop resets, and purchases. Clients only submit a validated 3D aim direction/charge while they hold the launcher lease. World and UI assets are generated from code so the repository remains the source of truth.
 
 ## Audio assets
 
@@ -67,4 +75,4 @@ All five IDs were preloaded successfully in Studio during the 2026-08-30 quality
 
 ## Current scope
 
-Coins and upgrades last for the current server session only. DataStore saving is intentionally deferred until the revised economy has broader playtesting. The table layout is fixed, while target pools, shot distance, accuracy, goals, and bonuses escalate across rounds.
+Coins and upgrades last for the current server session only. DataStore saving remains deferred until the revised economy has broader playtesting. Furniture positions are authored and stable for predictable physics; occupied seats and safe reactive obstacles change deterministically by round.

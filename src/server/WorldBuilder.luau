@@ -95,6 +95,21 @@ local function billboard(adornee: BasePart, name: string, displayText: string, c
 	return gui
 end
 
+local function prompt(parent: Instance, name: string, actionText: string, objectText: string, distance: number): ProximityPrompt
+	local item = Instance.new("ProximityPrompt")
+	item.Name = name
+	item.ActionText = actionText
+	item.ObjectText = objectText
+	item.KeyboardKeyCode = Enum.KeyCode.E
+	item.GamepadKeyCode = Enum.KeyCode.ButtonX
+	item.HoldDuration = 0
+	item.MaxActivationDistance = distance
+	item.RequiresLineOfSight = false
+	item.Style = Enum.ProximityPromptStyle.Default
+	item.Parent = parent
+	return item
+end
+
 local function markSplatSurface(item: BasePart)
 	item:SetAttribute("SplatSurface", true)
 	return item
@@ -253,7 +268,7 @@ end
 
 local function addHair(model: Model, head: BasePart, style: string, color: Color3)
 	local function hairPart(name: string, size: Vector3, offset: Vector3, shape: Enum.PartType?)
-		local item = makePart(model, name, size, head.CFrame * CFrame.new(offset), color)
+		local item = makePart(model, name, size * 0.72, head.CFrame * CFrame.new(offset * 0.72), color)
 		item.CanCollide = false
 		item:SetAttribute("CustomerPart", true)
 		item:SetAttribute("TableId", model:GetAttribute("TableId"))
@@ -304,18 +319,18 @@ local function buildCustomer(parent: Model, definition, seatPosition: Vector3)
 	humanoid.BreakJointsOnDeath = false
 	humanoid.Parent = model
 
-	local root = makePart(model, "HumanoidRootPart", Vector3.new(2, 2, 1), CFrame.new(seatPosition + Vector3.new(0, 6, 0)), definition.skin)
+	local root = makePart(model, "HumanoidRootPart", Vector3.new(2, 2, 1), CFrame.new(seatPosition + Vector3.new(0, 4.5, 0)), definition.skin)
 	root.Transparency = 1
 	root.CanCollide = false
 	model.PrimaryPart = root
 
-	local torso = makePart(model, "Torso", Vector3.new(4.5, 5, 2.2), CFrame.new(seatPosition + Vector3.new(0, 6.6, 0)), definition.shirt)
-	local head = makePart(model, "Head", Vector3.new(4.3, 4.3, 4.3), CFrame.new(seatPosition + Vector3.new(0, 11.2, 0)), definition.skin)
+	local torso = makePart(model, "Torso", Vector3.new(3.2, 3.6, 1.8), CFrame.new(seatPosition + Vector3.new(0, 4.7, 0)), definition.shirt)
+	local head = makePart(model, "Head", Vector3.new(3.1, 3.1, 3.1), CFrame.new(seatPosition + Vector3.new(0, 7.8, 0)), definition.skin)
 	head.Shape = Enum.PartType.Ball
-	local leftArm = makePart(model, "LeftArm", Vector3.new(1.5, 4.8, 1.5), CFrame.new(seatPosition + Vector3.new(-3, 6.8, 0.25)) * CFrame.Angles(0, 0, math.rad(-8)), definition.skin)
-	local rightArm = makePart(model, "RightArm", Vector3.new(1.5, 4.8, 1.5), CFrame.new(seatPosition + Vector3.new(3, 6.8, 0.25)) * CFrame.Angles(0, 0, math.rad(8)), definition.skin)
-	local leftLeg = makePart(model, "LeftLeg", Vector3.new(1.7, 4.5, 1.8), CFrame.new(seatPosition + Vector3.new(-1.15, 3.2, 1.5)) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(54, 68, 91))
-	local rightLeg = makePart(model, "RightLeg", Vector3.new(1.7, 4.5, 1.8), CFrame.new(seatPosition + Vector3.new(1.15, 3.2, 1.5)) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(54, 68, 91))
+	local leftArm = makePart(model, "LeftArm", Vector3.new(1.1, 3.4, 1.1), CFrame.new(seatPosition + Vector3.new(-2.15, 4.8, 0.2)) * CFrame.Angles(0, 0, math.rad(-8)), definition.skin)
+	local rightArm = makePart(model, "RightArm", Vector3.new(1.1, 3.4, 1.1), CFrame.new(seatPosition + Vector3.new(2.15, 4.8, 0.2)) * CFrame.Angles(0, 0, math.rad(8)), definition.skin)
+	local leftLeg = makePart(model, "LeftLeg", Vector3.new(1.2, 3.1, 1.3), CFrame.new(seatPosition + Vector3.new(-0.82, 2.4, 1.1)) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(54, 68, 91))
+	local rightLeg = makePart(model, "RightLeg", Vector3.new(1.2, 3.1, 1.3), CFrame.new(seatPosition + Vector3.new(0.82, 2.4, 1.1)) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(54, 68, 91))
 	for _, bodyPart in { torso, head, leftArm, rightArm, leftLeg, rightLeg } do
 		bodyPart.CanCollide = false
 		bodyPart:SetAttribute("CustomerPart", true)
@@ -325,12 +340,10 @@ local function buildCustomer(parent: Model, definition, seatPosition: Vector3)
 
 	surfaceText(head, "Face", Enum.NormalId.Back, "^  ^\n\\___/", COLORS.dark, nil, 45)
 	addHair(model, head, definition.style, Color3.fromRGB(63, 43, 37))
-	billboard(head, "OrderBubble", string.format("%s IS HUNGRY!\nPIZZA, PLEASE!", string.upper(definition.customer)), definition.color, Vector3.new(0, 5.8, 0), Vector2.new(165, 64))
-	local orderSign = makePart(model, "OrderSign", Vector3.new(10, 3.8, 0.4), CFrame.new(seatPosition + Vector3.new(0, 18, -0.3)), definition.color:Lerp(COLORS.dark, 0.22))
-	orderSign.CanCollide = false
-	orderSign.CanTouch = false
-	local orderDisplay = surfaceText(orderSign, "OrderDisplay", Enum.NormalId.Back, string.format("%s WANTS\nA PIZZA!", string.upper(definition.customer)), Color3.new(1, 1, 1), nil, 25)
-	orderDisplay:SetAttribute("TableId", definition.id)
+	local marker = billboard(head, "WaitingMarker", "🍕", definition.color, Vector3.new(0, 4.7, 0), Vector2.new(42, 42))
+	marker.MaxDistance = 95
+	local customerPrompt = prompt(head, "CustomerPrompt", "Say Hi", definition.customer, 24)
+	customerPrompt:SetAttribute("TableId", definition.id)
 	return model
 end
 
@@ -342,10 +355,13 @@ local function buildTable(world: Folder, definition)
 	model.Parent = world
 
 	local p = definition.position
-	local rug = makePart(model, "Rug", Vector3.new(24, 0.12, 22), CFrame.new(p + Vector3.new(0, -0.38, -1)), definition.color:Lerp(COLORS.cream, 0.58), Enum.Material.Fabric)
+	local topWidth = definition.id <= 2 and 14 or (definition.id <= 4 and 16 or 18)
+	local topDepth = definition.id <= 2 and 9 or (definition.id <= 4 and 10 or 11)
+	local seatOffset = topDepth * 0.5 + 3.2
+	local rug = makePart(model, "Rug", Vector3.new(topWidth + 7, 0.12, topDepth + 9), CFrame.new(p + Vector3.new(0, -0.38, -1)), definition.color:Lerp(COLORS.cream, 0.58), Enum.Material.Fabric)
 	rug.CanCollide = false
 	rug.CanTouch = false
-	local top = makePart(model, "TableTop", Vector3.new(16, 1, 11), CFrame.new(p + Vector3.new(0, 4.2, 0)), Color3.fromRGB(250, 231, 196), Enum.Material.Wood)
+	local top = makePart(model, "TableTop", Vector3.new(topWidth, 1, topDepth), CFrame.new(p + Vector3.new(0, 4.2, 0)), Color3.fromRGB(250, 231, 196), Enum.Material.Wood)
 	top:SetAttribute("TableId", definition.id)
 	top:SetAttribute("DeliverySurface", true)
 	top:SetAttribute("SplatSurface", true)
@@ -364,12 +380,12 @@ local function buildTable(world: Folder, definition)
 	ring.Transparency = 0.18
 	ring:SetAttribute("TableId", definition.id)
 
-	local boothSeat = makePart(model, "BoothSeat", Vector3.new(13, 1.5, 5), CFrame.new(p + Vector3.new(0, 2, -8.7)), definition.color, Enum.Material.Fabric)
-	local boothBack = makePart(model, "BoothBack", Vector3.new(14, 8, 1.7), CFrame.new(p + Vector3.new(0, 5.4, -10.3)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
+	local boothSeat = makePart(model, "BoothSeat", Vector3.new(topWidth - 2, 1.5, 4.2), CFrame.new(p + Vector3.new(0, 2, -seatOffset - 0.5)), definition.color, Enum.Material.Fabric)
+	local boothBack = makePart(model, "BoothBack", Vector3.new(topWidth - 1, definition.id <= 2 and 6 or 7, 1.5), CFrame.new(p + Vector3.new(0, 5, -seatOffset - 2.2)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
 	boothSeat:SetAttribute("SplatSurface", true)
 	boothBack:SetAttribute("SplatSurface", true)
 
-	buildCustomer(model, definition, p + Vector3.new(0, 0, -8.2))
+	buildCustomer(model, definition, p + Vector3.new(0, 0, -seatOffset))
 	return model
 end
 
@@ -397,8 +413,19 @@ local function buildLauncher(world: Folder)
 	station.Name = "LauncherStation"
 	station.Parent = world
 	makePart(station, "Platform", Vector3.new(30, 1, 20), CFrame.new(0, -0.1, 66), COLORS.darkWood, Enum.Material.WoodPlanks)
-	makePart(station, "Backboard", Vector3.new(25, 8, 1), CFrame.new(0, 4, 75), COLORS.red, Enum.Material.Wood)
-	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "CAPTAIN'S\nPIZZA LAUNCHER", COLORS.yellow, nil, 27)
+	local marquee = makePart(station, "Backboard", Vector3.new(12, 4, 1), CFrame.new(18, 9, 72.5), COLORS.red, Enum.Material.Wood)
+	marquee.CanCollide = false
+	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "PIZZA\nLAUNCH", COLORS.yellow, nil, 23)
+
+	local operatorConsole = makePart(station, "OperatorConsole", Vector3.new(9, 4.5, 3), CFrame.new(0, 3.2, 73), COLORS.green, Enum.Material.Metal)
+	operatorConsole.CanCollide = false
+	surfaceText(operatorConsole, "ConsoleLabel", Enum.NormalId.Back, "PRESS E\nTO LAUNCH", COLORS.yellow, COLORS.dark, 18)
+	prompt(operatorConsole, "LauncherPrompt", "Operate Launcher", "Pizza Cannon", 12)
+	local operatorSpot = makePart(station, "OperatorSpot", Vector3.new(0.18, 8, 8), CFrame.new(0, 0.04, 73) * CFrame.Angles(0, 0, math.pi / 2), COLORS.green, Enum.Material.Neon)
+	operatorSpot.Shape = Enum.PartType.Cylinder
+	operatorSpot.CanCollide = false
+	operatorSpot.CanTouch = false
+	operatorSpot.Transparency = 0.3
 
 	local base = makePart(station, "CannonBase", Vector3.new(14, 6, 14), CFrame.new(0, 3, 65), COLORS.red, Enum.Material.Metal)
 	base.Shape = Enum.PartType.Cylinder
@@ -424,6 +451,25 @@ local function buildLauncher(world: Folder)
 	for _, x in { -13, 13 } do
 		local rail = makePart(station, "SafetyRail", Vector3.new(1, 5, 18), CFrame.new(x, 2.5, 65), COLORS.yellow, Enum.Material.Metal)
 		rail.CanCollide = false
+	end
+
+	local frontCounter = Instance.new("Model")
+	frontCounter.Name = "FrontOrderCounter"
+	frontCounter.Parent = world
+	local counterBody = makePart(frontCounter, "CounterBody", Vector3.new(27, 5.5, 8), CFrame.new(40, 2.25, 67), COLORS.darkWood, Enum.Material.WoodPlanks)
+	counterBody:SetAttribute("SplatSurface", true)
+	local counterTop = makePart(frontCounter, "CounterTop", Vector3.new(29, 0.8, 10), CFrame.new(40, 5.35, 67), Color3.fromRGB(243, 225, 197), Enum.Material.Marble)
+	counterTop:SetAttribute("SplatSurface", true)
+	local register = makeReactive(frontCounter, "FrontRegister", Vector3.new(5, 3.2, 4), CFrame.new(36, 7.3, 67), COLORS.steel, Enum.Material.Metal)
+	surfaceText(register, "RegisterFace", Enum.NormalId.Back, "ORDER\nHERE", COLORS.yellow, COLORS.dark, 20)
+	prompt(register, "RegisterPrompt", "Check Shift", "Order Register", 11)
+	for index, data in {
+		{ "Parmesan", Color3.fromRGB(244, 237, 199) },
+		{ "PepperFlakes", Color3.fromRGB(190, 56, 45) },
+		{ "NapkinDispenser", Color3.fromRGB(194, 201, 207) },
+	} do
+		local prop = makeReactive(frontCounter, data[1], Vector3.new(1.6, 2.6, 1.6), CFrame.new(42 + index * 2.2, 7, 67), data[2], index == 3 and Enum.Material.Metal or Enum.Material.SmoothPlastic)
+		prop.Shape = index == 3 and Enum.PartType.Block or Enum.PartType.Cylinder
 	end
 end
 
@@ -467,9 +513,11 @@ local function buildDecor(world: Folder)
 		cup.Orientation = Vector3.new(0, 0, 90)
 	end
 	local floorSign = makeReactive(world, "WobblySpecialSign", Vector3.new(10, 7, 1), CFrame.new(0, 4, -32), COLORS.green, Enum.Material.Wood)
+	floorSign:SetAttribute("MinRound", 3)
 	surfaceText(floorSign, "Special", Enum.NormalId.Back, "TODAY'S SPECIAL\nFLYING PIZZA", Color3.new(1, 1, 1), nil, 20)
 	for index = 1, 3 do
-		makeReactive(world, "LoosePizzaBox", Vector3.new(8, 0.9, 8), CFrame.new((index - 2) * 1.1, 0.3 + index * 0.9, -63), Color3.fromRGB(242, 214, 166), Enum.Material.Cardboard)
+		local box = makeReactive(world, "LoosePizzaBox", Vector3.new(8, 0.9, 8), CFrame.new((index - 2) * 1.1, 0.3 + index * 0.9, -63), Color3.fromRGB(242, 214, 166), Enum.Material.Cardboard)
+		box:SetAttribute("MinRound", 4)
 	end
 end
 
@@ -496,7 +544,8 @@ function WorldBuilder.build()
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "PlayerSpawn"
 	spawn.Size = Vector3.new(10, 1, 8)
-	spawn.CFrame = CFrame.new(0, 0, 78)
+	local spawnPosition = Vector3.new(Config.WALK_SPAWN_CFRAME.Position.X, 0, Config.WALK_SPAWN_CFRAME.Position.Z)
+	spawn.CFrame = CFrame.lookAt(spawnPosition, spawnPosition + Config.WALK_SPAWN_CFRAME.LookVector)
 	spawn.Anchored = true
 	spawn.Transparency = 1
 	spawn.CanCollide = true

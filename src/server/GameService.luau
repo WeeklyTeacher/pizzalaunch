@@ -4,6 +4,10 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CustomerService = require(script.Parent.CustomerService)
+local InteractionService = require(script.Parent.InteractionService)
+local LayoutService = require(script.Parent.LayoutService)
+local PropService = require(script.Parent.PropService)
 
 local GameService = {}
 
@@ -21,6 +25,8 @@ local states = {}
 local launchRemote: RemoteEvent
 local stateRemote: RemoteEvent
 local purchaseRemote: RemoteEvent
+local modeRemote: RemoteEvent
+local launcherOccupant: Player?
 
 local function playSound(parent: Instance, soundId: string, volume: number, playbackSpeed: number?)
 	local sound = Instance.new("Sound")
@@ -59,6 +65,9 @@ local function createRemotes()
 	purchaseRemote = Instance.new("RemoteEvent")
 	purchaseRemote.Name = Config.PURCHASE_REMOTE
 	purchaseRemote.Parent = folder
+	modeRemote = Instance.new("RemoteEvent")
+	modeRemote.Name = Config.MODE_REMOTE
+	modeRemote.Parent = folder
 end
 
 local function tableDefinition(tableId: number)
@@ -106,6 +115,7 @@ local function sendState(player: Player, eventName: string?, payload: { [string]
 		roundGoal = round.goal,
 		roundColor = round.color,
 		upgrades = state.upgrades,
+		mode = state.mode,
 		payload = payload,
 	})
 end
@@ -137,20 +147,20 @@ local function worldTable(tableId: number): Model?
 end
 
 local function reactionText(customer: Model, text: string)
-	local head = customer:FindFirstChild("Head")
-	if not head or not head:IsA("BasePart") then
-		return
-	end
-	local bubble = head:FindFirstChild("OrderBubble")
-	local frame = bubble and bubble:FindFirstChildWhichIsA("Frame")
-	local label = frame and frame:FindFirstChild("Label")
+	local marker = customer:FindFirstChild("WaitingMarker", true)
+	local label = marker and marker:FindFirstChild("Label", true)
 	if label and label:IsA("TextLabel") then
-		label.Text = text
-	end
-	local orderDisplay = customer:FindFirstChild("OrderDisplay", true)
-	local signLabel = orderDisplay and orderDisplay:FindFirstChild("Label")
-	if signLabel and signLabel:IsA("TextLabel") then
-		signLabel.Text = text
+		if string.find(text, "NOM") then
+			label.Text = "YUM"
+		elseif string.find(text, "HEY") then
+			label.Text = "?"
+		elseif string.find(text, "WHOA") or string.find(text, "DUCK") then
+			label.Text = "!"
+		elseif string.find(text, "YES") or string.find(text, "WOOHOO") or string.find(text, "BEST") then
+			label.Text = "★"
+		else
+			label.Text = "🍕"
+		end
 	end
 end
 
@@ -215,6 +225,7 @@ local function customerReaction(tableId: number, reaction: string)
 	end
 	local token = (customer:GetAttribute("ReactionToken") or 0) + 1
 	customer:SetAttribute("ReactionToken", token)
+	CustomerService.markReacting(customer, 1.7)
 	local head = customer:FindFirstChild("Head")
 	local torso = customer:FindFirstChild("Torso")
 	local leftArm = customer:FindFirstChild("LeftArm")
@@ -427,6 +438,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		pizza.Anchored = true
 		pizza.CFrame = CFrame.new(definition.position + Vector3.new(0, 4.95, 0)) * CFrame.Angles(0, 0, math.pi / 2)
 		customerReaction(tableId, "success")
+		CustomerService.served(tableId)
 		if state.combo == 3 or state.combo == 5 or state.combo % 10 == 0 then
 			payload.comboMilestone = state.combo
 			for _, tableData in Config.TABLES do
@@ -463,6 +475,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			if state.round < #Config.ROUNDS then
 				state.round += 1
 			end
+			LayoutService.setRound(state.round)
 		end
 		state.targetId = nextTarget(state.targetId, state.round)
 	elseif tableId then
@@ -534,26 +547,13 @@ local function makePizza(player: Player, direction: Vector3, charge: number): Ba
 	return pizza
 end
 
-local function resetReactiveProp(prop: BasePart)
-	local reset = prop:GetAttribute("ResetCFrame")
-	task.delay(4.5, function()
-		if prop.Parent and typeof(reset) == "CFrame" then
-			prop.Anchored = true
-			prop.AssemblyLinearVelocity = Vector3.zero
-			prop.AssemblyAngularVelocity = Vector3.zero
-			prop.CFrame = reset
-			prop:SetAttribute("RecentlyHit", false)
-		end
-	end)
-end
-
 local function isFinite(value: number): boolean
 	return value == value and value > -math.huge and value < math.huge
 end
 
 local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 	local state = states[player]
-	if not state or state.shotActive then
+	if not state or state.shotActive or state.mode ~= "launcher" or launcherOccupant ~= player then
 		return
 	end
 	if typeof(directionValue) ~= "Vector3" or typeof(chargeValue) ~= "number" then
@@ -592,16 +592,9 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 			return
 		end
 
-		if hit:GetAttribute("ReactiveProp") and not hit:GetAttribute("RecentlyHit") then
-			hit:SetAttribute("RecentlyHit", true)
-			hit.Anchored = false
-			hit.CanCollide = true
-			hit:SetNetworkOwner(nil)
-			hit:ApplyImpulse((pizza.AssemblyLinearVelocity.Unit * 55 + Vector3.new(0, 38, 0)) * hit.AssemblyMass)
-			hit:ApplyAngularImpulse(Vector3.new(math.random(-20, 20), math.random(-20, 20), math.random(-20, 20)) * hit.AssemblyMass)
+		if hit:GetAttribute("ReactiveProp") and PropService.knock(hit, pizza.AssemblyLinearVelocity) then
 			createSplat(hit, pizza.Position, Color3.fromRGB(255, 190, 57))
 			playSound(hit, SOUND.bounce, 0.6, math.random(85, 125) / 100)
-			resetReactiveProp(hit)
 			connection:Disconnect()
 			finishShot(player, pizza, "PIZZA CHAOS!", pizza.Position, nil)
 		elseif hit:GetAttribute("CustomerPart") then
@@ -658,21 +651,83 @@ local function onPurchase(player: Player, upgradeId: any)
 	})
 end
 
-local function hideCharacter(character: Model)
-	for _, descendant in character:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			descendant.Transparency = 1
-			descendant.CanCollide = false
-		elseif descendant:IsA("Decal") then
-			descendant.Transparency = 1
+local function restoreMovement(character: Model, moveToExit: boolean)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		root.Anchored = false
+		if moveToExit then
+			root.CFrame = Config.LAUNCHER_EXIT_CFRAME
 		end
 	end
-	character.DescendantAdded:Connect(function(descendant)
-		if descendant:IsA("BasePart") then
-			descendant.Transparency = 1
-			descendant.CanCollide = false
-		elseif descendant:IsA("Decal") then
-			descendant.Transparency = 1
+	if humanoid then
+		humanoid.WalkSpeed = 16
+		humanoid.JumpPower = 50
+		humanoid.AutoRotate = true
+	end
+end
+
+local function setPlayerMode(player: Player, requestedMode: string)
+	local state = states[player]
+	if not state then
+		return
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if requestedMode == "launcher" then
+		if launcherOccupant and launcherOccupant ~= player then
+			sendState(player, "notice", { result = "LAUNCHER BUSY", detail = "Another chef is serving right now." })
+			return
+		end
+		if not character or not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
+			return
+		end
+		local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+		local console = world and world:FindFirstChild("OperatorConsole", true)
+		if not console or not console:IsA("BasePart") or (root.Position - console.Position).Magnitude > 17 then
+			return
+		end
+		launcherOccupant = player
+		InteractionService.setLauncherAvailable(false)
+		LayoutService.setRound(state.round)
+		state.mode = "launcher"
+		root.CFrame = Config.LAUNCHER_OPERATOR_CFRAME
+		root.Anchored = true
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
+		humanoid.AutoRotate = false
+		sendState(player, "modeChanged", { result = "READY TO LAUNCH!", mode = "launcher" })
+	elseif requestedMode == "walk" then
+		local wasOperating = state.mode == "launcher"
+		state.mode = "walk"
+		if launcherOccupant == player then
+			launcherOccupant = nil
+			InteractionService.setLauncherAvailable(true)
+		end
+		if character then
+			restoreMovement(character, wasOperating)
+		end
+		sendState(player, "modeChanged", { result = "BACK ON THE FLOOR", mode = "walk" })
+	end
+end
+
+local function initializeCharacter(player: Player, character: Model)
+	local state = states[player]
+	if state then
+		state.mode = "walk"
+	end
+	if launcherOccupant == player then
+		launcherOccupant = nil
+		InteractionService.setLauncherAvailable(true)
+	end
+	task.defer(function()
+		if character.Parent then
+			restoreMovement(character, false)
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") then
+				root.CFrame = Config.WALK_SPAWN_CFRAME
+			end
 		end
 	end)
 end
@@ -687,6 +742,7 @@ local function addPlayer(player: Player)
 		targetId = nextTarget(nil, 1),
 		lastLaunch = -100,
 		shotActive = false,
+		mode = "walk",
 		upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 	}
 
@@ -699,9 +755,11 @@ local function addPlayer(player: Player)
 		value.Value = name == "Round" and 1 or 0
 		value.Parent = leaderstats
 	end
-	player.CharacterAdded:Connect(hideCharacter)
+	player.CharacterAdded:Connect(function(character)
+		initializeCharacter(player, character)
+	end)
 	if player.Character then
-		hideCharacter(player.Character)
+		initializeCharacter(player, player.Character)
 	end
 	task.delay(0.8, function()
 		if player.Parent then
@@ -714,8 +772,47 @@ function GameService.start()
 	createRemotes()
 	launchRemote.OnServerEvent:Connect(onLaunch)
 	purchaseRemote.OnServerEvent:Connect(onPurchase)
+	modeRemote.OnServerEvent:Connect(function(player, requestedMode)
+		if requestedMode == "walk" then
+			setPlayerMode(player, "walk")
+		end
+	end)
+	local world = Workspace:WaitForChild("PizzaLaunchWorld")
+	CustomerService.start(world)
+	LayoutService.start(world)
+	InteractionService.start(world, {
+		launcher = function(player)
+			setPlayerMode(player, "launcher")
+		end,
+		register = function(player)
+			local state = states[player]
+			if state and state.mode == "walk" then
+				local round = roundDefinition(state.round)
+				sendState(player, "notice", {
+					result = string.format("%s SHIFT", round.name),
+					detail = string.format("%d of %d orders served • %d coins", state.roundProgress, round.goal, state.coins),
+				})
+			end
+		end,
+		customer = function(player, tableId)
+			local state = states[player]
+			local definition = typeof(tableId) == "number" and tableDefinition(tableId) or nil
+			if state and state.mode == "walk" and definition then
+				local isOrder = tableId == state.targetId
+				sendState(player, "notice", {
+					result = string.format("%s • %s", string.upper(definition.customer), definition.mood),
+					detail = isOrder and "That's my order! Meet me at the launcher!" or definition.line,
+					color = definition.color,
+				})
+			end
+		end,
+	})
 	Players.PlayerAdded:Connect(addPlayer)
 	Players.PlayerRemoving:Connect(function(player)
+		if launcherOccupant == player then
+			launcherOccupant = nil
+			InteractionService.setLauncherAvailable(true)
+		end
 		states[player] = nil
 	end)
 	for _, player in Players:GetPlayers() do
