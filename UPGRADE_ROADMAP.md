@@ -54,7 +54,7 @@ The current build has a satisfying, server-authoritative launch and reward loop,
 
 ## Priority 3 — continued upgrades
 
-- [ ] Add a short shift timer/results card with deliveries, perfects, best combo, and prop-chaos count.
+- [x] Add an optional one-minute Record Run with countdown, authoritative score/combo, results card, personal best, and all-time top-10 wall.
 - [ ] Add optional bonus orders that reward bank shots or prop ricochets without blocking normal progress.
 - [ ] Add authored customer entrance paths using waypoint tweens or pathfinding only outside active shot lanes.
 - [ ] Add multiple launcher stations or per-player visual rigs after a dedicated multiplayer test.
@@ -68,6 +68,8 @@ The current build has a satisfying, server-authoritative launch and reward loop,
 Completed in this run: Priority 1 plus the listed safe Priority 2 work—the walk/launcher loop, contextual prompts, fairer floor plan, compact target communication, deterministic round seating/obstacles, idle/customer-cycle behavior, expanded prop comedy, responsive mode-specific HUD, and live Studio regression testing.
 
 ## Ideas intentionally deferred
+
+Focused follow-up completed: the existing station now offers a separate 60-second Record Run. It preserves free roam and free play, uses fixed competitive physics, calculates points on the server, persists one best score per player in an OrderedDataStore, and presents the global top 10 on an in-world Legends wall.
 
 - DataStore persistence and monetization: economy values still need human balance testing.
 - Free-roaming pathfinding customers across firing lanes: high glitch and obstruction risk for little immediate gain.

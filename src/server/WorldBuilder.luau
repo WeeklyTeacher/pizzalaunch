@@ -427,6 +427,20 @@ local function buildLauncher(world: Folder)
 	operatorSpot.CanTouch = false
 	operatorSpot.Transparency = 0.3
 
+	local recordConsole = makePart(station, "RecordRunConsole", Vector3.new(10, 5.5, 3), CFrame.new(-13, 3.7, 73), COLORS.red, Enum.Material.Metal)
+	recordConsole.CanCollide = false
+	surfaceText(recordConsole, "RecordRunSign", Enum.NormalId.Back, "1-MINUTE RECORD RUN\nFAR TABLES SCORE MORE", COLORS.yellow, COLORS.dark, 18)
+	prompt(recordConsole, "RecordRunPrompt", "Start 1-Minute Record Run", "Pizza Launch Records", 12)
+	local recordGlow = makePart(station, "RecordRunGlow", Vector3.new(0.16, 9, 9), CFrame.new(-13, 0.04, 73) * CFrame.Angles(0, 0, math.pi / 2), COLORS.yellow, Enum.Material.Neon)
+	recordGlow.Shape = Enum.PartType.Cylinder
+	recordGlow.CanCollide = false
+	recordGlow.CanTouch = false
+	recordGlow.Transparency = 0.38
+
+	local bestDisplay = makePart(station, "PersonalBestDisplay", Vector3.new(10, 3.6, 0.7), CFrame.new(-13, 8.8, 72.7), COLORS.darkRed, Enum.Material.Wood)
+	bestDisplay.CanCollide = false
+	surfaceText(bestDisplay, "PersonalBestGui", Enum.NormalId.Back, "YOUR BEST\nLOADING...", COLORS.cream, nil, 18)
+
 	local base = makePart(station, "CannonBase", Vector3.new(14, 6, 14), CFrame.new(0, 3, 65), COLORS.red, Enum.Material.Metal)
 	base.Shape = Enum.PartType.Cylinder
 	base.Orientation = Vector3.new(0, 0, 90)
@@ -470,6 +484,20 @@ local function buildLauncher(world: Folder)
 	} do
 		local prop = makeReactive(frontCounter, data[1], Vector3.new(1.6, 2.6, 1.6), CFrame.new(42 + index * 2.2, 7, 67), data[2], index == 3 and Enum.Material.Metal or Enum.Material.SmoothPlastic)
 		prop.Shape = index == 3 and Enum.PartType.Block or Enum.PartType.Cylinder
+	end
+end
+
+local function buildLegendsBoard(world: Folder)
+	local model = Instance.new("Model")
+	model.Name = "PizzaLaunchLegends"
+	model.Parent = world
+	makePart(model, "Frame", Vector3.new(1.2, 22, 32), CFrame.new(59.2, 15, 45), COLORS.darkWood, Enum.Material.Wood)
+	local board = makePart(model, "LegendsBoard", Vector3.new(1.35, 19, 29), CFrame.new(58.5, 15, 45), COLORS.darkRed, Enum.Material.SmoothPlastic)
+	board.CanCollide = false
+	surfaceText(board, "LegendsGui", Enum.NormalId.Left, "PIZZA LAUNCH LEGENDS\n\nLoading all-time records...", COLORS.cream, nil, 20)
+	for _, y in { 4.2, 25.8 } do
+		local lamp = makePart(model, "BoardLamp", Vector3.new(2, 1, 30), CFrame.new(57.5, y, 45), COLORS.yellow, Enum.Material.Neon)
+		lamp.CanCollide = false
 	end
 end
 
@@ -537,6 +565,7 @@ function WorldBuilder.build()
 	buildKitchen(world)
 	buildDecor(world)
 	buildLauncher(world)
+	buildLegendsBoard(world)
 	for _, definition in Config.TABLES do
 		buildTable(world, definition)
 	end

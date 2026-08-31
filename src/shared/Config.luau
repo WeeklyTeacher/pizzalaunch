@@ -6,6 +6,23 @@ Config.STATE_REMOTE = "GameState"
 Config.PURCHASE_REMOTE = "PurchaseUpgrade"
 Config.MODE_REMOTE = "LauncherMode"
 
+Config.RECORD_RUN_DURATION = 60
+Config.RECORD_RUN_COUNTDOWN = 3
+Config.RECORD_RUN_STORE = "PizzaLaunch_RecordRun_AllTime_v1"
+Config.RECORD_RUN_TABLE_POINTS = {
+	[1] = 100,
+	[2] = 110,
+	[3] = 140,
+	[4] = 150,
+	[5] = 180,
+	[6] = 200,
+}
+Config.RECORD_RUN_ACCURACY_BONUS = {
+	["PERFECT!"] = 40,
+	["GREAT!"] = 20,
+	["DELIVERED!"] = 0,
+}
+
 Config.GRAVITY = 196.2
 Config.MIN_SPEED = 90
 Config.MAX_SPEED = 151

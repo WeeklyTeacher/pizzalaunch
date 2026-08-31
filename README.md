@@ -6,6 +6,7 @@ Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through th
 
 - Walk with normal Roblox movement (`WASD`, thumbstick, or touch controls).
 - Use `E`, the gamepad interaction button, or the touch prompt at the glowing launcher to operate it.
+- Use the separate red **Start 1-Minute Record Run** console for the optional timed challenge. Free play remains available at the green console.
 - While operating, move the mouse to aim naturally left/right and raise/lower the launch arc.
 - Keyboard: `A`/`D` or left/right arrows turn; `W`/`S` or up/down arrows change arc.
 - Touch: drag to aim or use the large four-way aim pad.
@@ -16,6 +17,12 @@ Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through th
 - Deliver the round's orders, build combos, earn accuracy bonuses, and spend coins on earnings, precision, reload, and power upgrades.
 
 Mobile play is landscape-only. Normal touch movement appears while walking; it is replaced by the dedicated aim pad and launch controls only while operating the cannon.
+
+## One-minute Record Run
+
+The red console beside the normal launcher starts an in-restaurant record attempt: a three-second countdown followed by 60 seconds of launches. The target sequence is the same for every attempt. Near, middle, and far tables pay progressively more points; Perfect and Great accuracy add bonuses. Consecutive correct deliveries raise a stepped multiplier from 1x to 2x, while misses and wrong tables reset the run combo.
+
+Record scoring is calculated entirely by the server. Record runs use fixed launch power, reload timing, and accuracy assistance so session upgrades cannot affect the all-time competition. The end card shows final score, personal best, and top-10 status. The wall-mounted **Pizza Launch Legends** board reads the ten highest saved personal records from an `OrderedDataStore`.
 
 ## Progression
 
@@ -39,6 +46,12 @@ rojo serve default.project.json
 
 In Studio, open a new baseplate/place, open the Rojo plugin, connect to the local server, and sync. Press **Play** to run both the server-generated restaurant and client HUD.
 
+### Enable record persistence in Studio
+
+The place must be published before Roblox DataStores are available. For Studio-only persistence testing, open **File > Experience Settings > Security**, enable **Enable Studio Access to API Services**, and save. Roblox recommends using this setting on a separate test version because Studio accesses the same DataStores as live servers. The published live experience does not need the Studio testing toggle.
+
+When the place is unpublished or Studio API access is off, gameplay still works: the personal best is retained for the current server session, the results card explains that the global board is unavailable, and no DataStore error is emitted.
+
 To build a standalone place file instead:
 
 ```powershell
@@ -58,11 +71,12 @@ src/
   server/CustomerService.luau     Bounded idle and served-seat choreography
   server/LayoutService.luau       Deterministic round seating/obstacle dressing
   server/PropService.luau         Knockable-prop impulse and reliable restoration
+  server/RecordRunService.luau    Timed scoring, personal bests, OrderedDataStore top 10
   server/init.server.luau     Server bootstrap
   client/init.client.luau     Camera, controls, trajectory, HUD, touch layout
 ```
 
-The server owns launcher occupancy, projectile creation, hit resolution, rewards, combos, rounds, reactions, prop resets, and purchases. Clients only submit a validated 3D aim direction/charge while they hold the launcher lease. World and UI assets are generated from code so the repository remains the source of truth.
+The server owns launcher occupancy, projectile creation, hit resolution, rewards, combos, rounds, record timing/scoring, reactions, prop resets, and purchases. Clients only submit a validated 3D aim direction/charge while they hold the launcher lease. World and UI assets are generated from code so the repository remains the source of truth.
 
 ## Audio assets
 
@@ -75,4 +89,4 @@ All five IDs were preloaded successfully in Studio during the 2026-08-30 quality
 
 ## Current scope
 
-Coins and upgrades last for the current server session only. DataStore saving remains deferred until the revised economy has broader playtesting. Furniture positions are authored and stable for predictable physics; occupied seats and safe reactive obstacles change deterministically by round.
+Record Run personal bests and the all-time top 10 persist through an OrderedDataStore when Roblox services are available. Coins and upgrades still last for the current server session only; economy persistence remains deferred until broader balance testing. Furniture positions are authored and stable for predictable physics; occupied seats and safe reactive obstacles change deterministically by round.

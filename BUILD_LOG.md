@@ -1,5 +1,32 @@
 # Pizza Launch Build Log
 
+## 2026-08-30 — Record Run council decision
+
+- **Game / Creative Director:** Keep the restaurant and proven launch feel fully visible. Add a bright second console at the existing station so free play remains the default and the timed challenge feels like an in-world arcade event.
+- **Roblox Engineer:** Reuse the authoritative projectile resolver and calculate every record point on the server. Isolate run timing, scoring, OrderedDataStore access, and board refreshes in one service with guarded failures.
+- **Child Player Advocate:** Use a three-second countdown, one glowing order, a large timer, and a stepped combo multiplier. Near targets start at 100 points; farther targets visibly pay more without extra rules to read.
+- **Product / Scope Guardian:** Ship one 60-second all-time record mode, personal best, and top-10 wall. Defer moving targets and additional modes until the fixed-table timing and scoring receive human playtesting.
+
+### Built
+
+- Added a second red `Start 1-Minute Record Run` proximity prompt beside the existing green free-play console. It claims the same validated launcher lease, positions the character correctly, and leaves the restaurant visible.
+- Added a server-clock three-second countdown and 60-second run state. Launches are accepted only while the server says the run is active; exiting or respawning cancels cleanly and restores the prior free-play target.
+- Added a deterministic all-table target sequence with fixed competitive power, reload, and accuracy values. Near tables award 100–110 base points, middle tables 140–150, and far tables 180–200; Perfect adds 40 and Great adds 20.
+- Added a stepped 1x–2x record multiplier that increases every three consecutive deliveries. Wrong tables, customer hits, prop hits, floor shots, and other misses reset the record combo without subtracting points.
+- Added a responsive Record Run HUD, large countdown, server-time timer, point/combo feedback, multiplier celebration, and end card with final score, personal best, and global top-10 status.
+- Added `RecordRunService` for isolated timing, scoring, player-best loading, guarded OrderedDataStore writes, username resolution, top-10 ranking, and periodic wall refresh.
+- Added the physical **Pizza Launch Legends** wall and a locally personalized best-score display above the launcher. Unpublished/API-disabled Studio sessions show friendly fallback copy and continue without errors.
+
+### Tests and repairs
+
+- `rojo build default.project.json -o pizzalaunch.rbxlx` and `git diff --check` passed during implementation.
+- Initial unpublished-place playtest exposed that `GetOrderedDataStore()` itself can fail during module loading. Store acquisition is now guarded and lazy; a fresh Studio session produced empty Output.
+- Actual prompt input showed the three-second countdown, anchored operator pose, Scriptable camera, record HUD, and enabled launcher controls. Q exit restored Custom camera, WalkSpeed 16, an unanchored character, the side exit, and both station prompts.
+- Authoritative calibrated shots scored Table 1 Perfect at 140 and Table 2 Perfect at 150. Four consecutive Perfect deliveries reached 708 points and multiplier 1.25x; a deliberate wrong-table delivery left the score at 708 and reset the combo to 0.
+- A complete API-disabled run ended with a 290-point session best, a readable `GLOBAL BOARD UNAVAILABLE THIS SESSION` result, and an updated local best display. No DataStore error appeared.
+- iPhone 17 Pro landscape at a 750x361 runtime viewport fit the record header, timer, score, combo, personal best, target lane, aim pad, power controls, launch button, and exit button without clipping. The end summary remained centered and readable.
+- Fresh free-play regression after Record Run work delivered a Perfect pizza for +20 coins and combo 1, confirming the original restaurant loop remains intact. Final Studio Output was empty.
+
 ## 2026-08-30 — Playable arcade vertical slice
 
 ### Council decisions

@@ -37,6 +37,7 @@ local state = {
 	roundGoal = 3,
 	mode = "walk",
 	upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
+	recordRun = { status = "idle", personalBest = 0, score = 0, combo = 0, multiplier = 1 },
 }
 local aimYaw = 0
 local aimPitch = (Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH)
@@ -210,6 +211,61 @@ local roundOverlayDetail = makeLabel(roundOverlay, "Detail", "+25 COINS • NEXT
 roundOverlayDetail.TextColor3 = Color3.new(1, 1, 1)
 roundOverlayDetail.ZIndex = 9
 
+local recordHud = Instance.new("Frame")
+recordHud.Name = "RecordRunHUD"
+recordHud.AnchorPoint = Vector2.new(0.5, 0)
+recordHud.Size = UDim2.fromOffset(470, 108)
+recordHud.Position = UDim2.new(0.5, 0, 0, 12)
+recordHud.BackgroundColor3 = COLORS.darkRed
+recordHud.Visible = false
+recordHud.ZIndex = 6
+recordHud.Parent = gui
+addCorner(recordHud, 20)
+addStroke(recordHud, COLORS.yellow, 4)
+local recordTitle = makeLabel(recordHud, "Title", "1-MINUTE RECORD RUN", UDim2.new(1, -20, 0, 24), UDim2.fromOffset(10, 5), 15)
+recordTitle.TextColor3 = COLORS.yellow
+recordTitle.ZIndex = 7
+local recordTimer = makeLabel(recordHud, "Timer", "1:00", UDim2.fromOffset(118, 52), UDim2.fromOffset(12, 30), 37)
+recordTimer.TextColor3 = Color3.new(1, 1, 1)
+recordTimer.ZIndex = 7
+local recordScore = makeLabel(recordHud, "Score", "SCORE\n0", UDim2.fromOffset(150, 52), UDim2.fromOffset(132, 31), 19)
+recordScore.TextColor3 = COLORS.cream
+recordScore.ZIndex = 7
+local recordCombo = makeLabel(recordHud, "Combo", "COMBO 0\nx1.00", UDim2.fromOffset(165, 52), UDim2.fromOffset(288, 31), 18)
+recordCombo.TextColor3 = COLORS.green
+recordCombo.ZIndex = 7
+local recordBest = makeLabel(recordHud, "Best", "PERSONAL BEST  0", UDim2.new(1, -24, 0, 18), UDim2.fromOffset(12, 86), 12)
+recordBest.TextColor3 = COLORS.yellow
+recordBest.ZIndex = 7
+
+local countdownLabel = makeLabel(gui, "RecordCountdown", "3", UDim2.fromOffset(500, 170), UDim2.new(0.5, -250, 0.28, 0), 100)
+countdownLabel.TextColor3 = COLORS.yellow
+countdownLabel.TextStrokeColor3 = COLORS.darkRed
+countdownLabel.TextStrokeTransparency = 0
+countdownLabel.Visible = false
+countdownLabel.ZIndex = 12
+
+local recordSummary = Instance.new("Frame")
+recordSummary.Name = "RecordSummary"
+recordSummary.AnchorPoint = Vector2.new(0.5, 0.5)
+recordSummary.Size = UDim2.fromOffset(540, 270)
+recordSummary.Position = UDim2.fromScale(0.5, 0.47)
+recordSummary.BackgroundColor3 = COLORS.darkRed
+recordSummary.Visible = false
+recordSummary.ZIndex = 10
+recordSummary.Parent = gui
+addCorner(recordSummary, 28)
+addStroke(recordSummary, COLORS.yellow, 5)
+local recordSummaryTitle = makeLabel(recordSummary, "Title", "TIME!", UDim2.new(1, -30, 0, 65), UDim2.fromOffset(15, 18), 43)
+recordSummaryTitle.TextColor3 = COLORS.yellow
+recordSummaryTitle.ZIndex = 11
+local recordSummaryDetail = makeLabel(recordSummary, "Detail", "FINAL SCORE  0\nPERSONAL BEST  0", UDim2.new(1, -40, 0, 110), UDim2.fromOffset(20, 88), 24)
+recordSummaryDetail.TextColor3 = Color3.new(1, 1, 1)
+recordSummaryDetail.ZIndex = 11
+local recordSummaryHint = makeLabel(recordSummary, "Hint", "EXIT THE LAUNCHER TO WALK AROUND OR TRY AGAIN", UDim2.new(1, -30, 0, 35), UDim2.fromOffset(15, 218), 13)
+recordSummaryHint.TextColor3 = COLORS.cream
+recordSummaryHint.ZIndex = 11
+
 local controls = Instance.new("Frame")
 controls.Name = "Controls"
 controls.AnchorPoint = Vector2.new(1, 1)
@@ -375,6 +431,34 @@ if UserInputService.TouchEnabled then
 	roundOverlay.Size = UDim2.fromOffset(390, 150)
 	roundOverlayTitle.TextSize = 31
 	roundOverlayDetail.TextSize = 17
+	recordHud.Size = UDim2.fromOffset(330, 74)
+	recordHud.Position = UDim2.new(0.5, 0, 0, 5)
+	recordTitle.Size = UDim2.new(1, -12, 0, 16)
+	recordTitle.Position = UDim2.fromOffset(6, 2)
+	recordTitle.TextSize = 10
+	recordTimer.Size = UDim2.fromOffset(78, 35)
+	recordTimer.Position = UDim2.fromOffset(8, 19)
+	recordTimer.TextSize = 26
+	recordScore.Size = UDim2.fromOffset(105, 35)
+	recordScore.Position = UDim2.fromOffset(88, 19)
+	recordScore.TextSize = 14
+	recordCombo.Size = UDim2.fromOffset(122, 35)
+	recordCombo.Position = UDim2.fromOffset(196, 19)
+	recordCombo.TextSize = 13
+	recordBest.Size = UDim2.new(1, -16, 0, 14)
+	recordBest.Position = UDim2.fromOffset(8, 56)
+	recordBest.TextSize = 9
+	countdownLabel.Size = UDim2.fromOffset(360, 120)
+	countdownLabel.Position = UDim2.new(0.5, -180, 0.22, 0)
+	countdownLabel.TextSize = 74
+	recordSummary.Size = UDim2.fromOffset(390, 220)
+	recordSummaryTitle.TextSize = 34
+	recordSummaryDetail.Position = UDim2.fromOffset(16, 74)
+	recordSummaryDetail.Size = UDim2.new(1, -32, 0, 95)
+	recordSummaryDetail.TextSize = 19
+	recordSummaryHint.Position = UDim2.fromOffset(12, 177)
+	recordSummaryHint.Size = UDim2.new(1, -24, 0, 32)
+	recordSummaryHint.TextSize = 10
 
 end
 
@@ -454,6 +538,68 @@ local function findTargetModel(id: number): Model?
 	return nil
 end
 
+local function recordStatus(): string
+	return state.recordRun and state.recordRun.status or "idle"
+end
+
+local function isRecordSession(): boolean
+	return recordStatus() ~= "idle"
+end
+
+local function updatePersonalBestDisplay()
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local display = world and world:FindFirstChild("PersonalBestDisplay", true)
+	local surface = display and display:FindFirstChild("PersonalBestGui")
+	local label = surface and surface:FindFirstChild("Label")
+	if label and label:IsA("TextLabel") then
+		label.Text = string.format("YOUR BEST\n%d POINTS", state.recordRun and state.recordRun.personalBest or 0)
+	end
+end
+
+local function updateRecordUI()
+	local run = state.recordRun or { status = "idle", score = 0, combo = 0, multiplier = 1, personalBest = 0 }
+	local status = run.status or "idle"
+	local session = status ~= "idle"
+	recordHud.Visible = operating and (status == "countdown" or status == "running" or status == "saving")
+	recordScore.Text = string.format("SCORE\n%d", run.score or 0)
+	recordCombo.Text = string.format("COMBO %d\nx%.2f", run.combo or 0, run.multiplier or 1)
+	recordBest.Text = string.format("PERSONAL BEST  %d", run.personalBest or 0)
+	recordCombo.TextColor3 = (run.combo or 0) >= 4 and COLORS.yellow or COLORS.green
+	roundCard.Visible = not session
+	stats.Visible = not session
+	shopToggle.Visible = not session
+	if session then
+		local canAim = operating and (status == "countdown" or status == "running")
+		controls.Visible = canAim
+		touchAimPad.Visible = canAim and UserInputService.TouchEnabled
+	end
+	if status == "saving" then
+		recordSummary.Visible = true
+		recordSummaryTitle.Text = "TIME!"
+		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nChecking the Legends board...", run.score or 0)
+		recordSummaryHint.Text = "YOUR SCORE WAS CALCULATED ON THE SERVER"
+	elseif status == "finished" then
+		recordSummary.Visible = true
+		if run.madeTopTen and run.rank then
+			recordSummaryTitle.Text = string.format("LEGEND!  #%d", run.rank)
+		else
+			recordSummaryTitle.Text = run.isNewBest and "NEW PERSONAL BEST!" or "RUN COMPLETE!"
+		end
+		local rankLine = run.madeTopTen and string.format("GLOBAL TOP 10  -  RANK #%d", run.rank) or "GLOBAL TOP 10  -  NOT THIS TIME"
+		if not run.persistenceAvailable then
+			rankLine = "GLOBAL BOARD UNAVAILABLE THIS SESSION"
+		end
+		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nPERSONAL BEST  %d\n%s", run.score or 0, run.personalBest or 0, rankLine)
+		recordSummaryHint.Text = "EXIT TO WALK AROUND - USE THE RED CONSOLE TO TRY AGAIN"
+	else
+		recordSummary.Visible = false
+	end
+	if not session then
+		countdownLabel.Visible = false
+	end
+	updatePersonalBestDisplay()
+end
+
 local function updateShop(upgrades)
 	for _, upgradeId in upgradeOrder do
 		local definition = Config.UPGRADES[upgradeId]
@@ -471,8 +617,14 @@ local function updateTargetVisuals()
 	local definition = tableDefinition(state.targetId)
 	local round = Config.ROUNDS[math.clamp(state.round or 1, 1, #Config.ROUNDS)]
 	local activeTables = {}
-	for _, tableId in round.tables do
-		activeTables[tableId] = true
+	if isRecordSession() then
+		for _, tableData in Config.TABLES do
+			activeTables[tableData.id] = true
+		end
+	else
+		for _, tableId in round.tables do
+			activeTables[tableId] = true
+		end
 	end
 	if targetHighlight then
 		targetHighlight:Destroy()
@@ -541,7 +693,7 @@ local function updateTargetVisuals()
 
 	local ring = model:FindFirstChild("TargetRing")
 	if ring and ring:IsA("BasePart") then
-		local scale = round.accuracyScale * (1 + (state.upgrades.assist or 0) * 0.12)
+		local scale = isRecordSession() and 1.12 or round.accuracyScale * (1 + (state.upgrades.assist or 0) * 0.12)
 		ring.Size = Vector3.new(0.15, 8 * scale, 8 * scale)
 	end
 end
@@ -633,18 +785,20 @@ end
 
 local function applyMode()
 	operating = state.mode == "launcher"
+	local runStatus = recordStatus()
+	local recordSession = runStatus ~= "idle"
 	shopPanel.Visible = false
 	shopToggle.Text = "UPGRADES"
-	controls.Visible = operating
+	controls.Visible = operating and (not recordSession or runStatus == "countdown" or runStatus == "running")
 	touchAimPad.Visible = operating and UserInputService.TouchEnabled
 	exitButton.Visible = operating
 	walkHint.Visible = not operating
 	setMovementLocked(operating)
 
 	if operating then
-		tutorialTitle.Text = "DELIVER SOME HAPPINESS!"
-		tutorialText.Text = "1  AIM the landing ring\n2  ADJUST the arc up or down\n3  HOLD power, then RELEASE!"
-		tutorial.Visible = not UserInputService.TouchEnabled and not hasLaunched
+		tutorialTitle.Text = recordSession and "60 SECONDS. CHASE THE RECORD!" or "DELIVER SOME HAPPINESS!"
+		tutorialText.Text = recordSession and "1  HIT the glowing order\n2  FAR tables score more\n3  KEEP the combo alive!" or "1  AIM the landing ring\n2  ADJUST the arc up or down\n3  HOLD power, then RELEASE!"
+		tutorial.Visible = not recordSession and not UserInputService.TouchEnabled and not hasLaunched
 		if tutorial.Visible then
 			restoreTutorialAppearance()
 		end
@@ -677,6 +831,7 @@ local function applyMode()
 			camera.CameraSubject = humanoid
 		end
 	end
+	updateRecordUI()
 	updateTargetVisuals()
 end
 
@@ -718,6 +873,10 @@ end
 
 local function beginCharge(input: InputObject?)
 	if not operating or not ready or charging then
+		return
+	end
+	local status = recordStatus()
+	if status ~= "idle" and status ~= "running" then
 		return
 	end
 	charging = true
@@ -834,6 +993,7 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	local changedMode = (newState.mode == "launcher") ~= operating
 	state = newState
 	state.upgrades = state.upgrades or { tips = 0, assist = 0, reload = 0, power = 0 }
+	state.recordRun = state.recordRun or { status = "idle", personalBest = 0, score = 0, combo = 0, multiplier = 1 }
 	coinsLabel.Text = string.format("COINS  %d", state.coins or 0)
 	comboLabel.Text = string.format("COMBO  x%d", state.combo or 0)
 	roundTitle.Text = string.format("ROUND %d • %s", state.round or 1, state.roundName or "FIRST ORDERS")
@@ -844,13 +1004,26 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	if changedMode then
 		applyMode()
 	else
+		updateRecordUI()
 		updateTargetVisuals()
 	end
 
 	if state.event == "shotResult" and state.payload then
 		local payload = state.payload
 		local detail
-		if payload.coinsEarned and payload.coinsEarned > 0 then
+		if payload.recordRun then
+			if payload.recordPoints and payload.recordPoints > 0 then
+				detail = string.format("+%d POINTS  -  COMBO %d  x%.2f", payload.recordPoints, payload.recordCombo or 0, payload.recordMultiplier or 1)
+				if payload.recordComboMilestone then
+					detail ..= "\nMULTIPLIER UP - THE ROOM CHEERS!"
+				end
+				shakeStrength = payload.result == "PERFECT!" and 1.15 or 0.65
+			else
+				detail = "COMBO RESET - NEXT PIZZA!"
+				shakeStrength = 0.75
+			end
+			shakeUntil = os.clock() + 0.28
+		elseif payload.coinsEarned and payload.coinsEarned > 0 then
 			detail = string.format("+%d COINS", payload.coinsEarned)
 			if payload.comboBonus and payload.comboBonus > 0 then
 				detail ..= string.format(" • COMBO +%d", payload.comboBonus)
@@ -873,17 +1046,34 @@ stateRemote.OnClientEvent:Connect(function(newState)
 			shakeStrength = 0.85
 			shakeUntil = os.clock() + 0.28
 		end
-		showFeedback(payload.result or "PIZZA!", payload.color or COLORS.yellow, detail)
+		if not payload.recordRun or recordStatus() == "running" then
+			showFeedback(payload.result or "PIZZA!", payload.color or COLORS.yellow, detail)
+		end
 		if payload.roundComplete then
 			task.delay(0.45, function()
 				showRoundComplete(payload)
 			end)
 		end
 		task.delay(payload.reloadDelay or 0.35, function()
-			ready = true
+			local status = recordStatus()
+			ready = status == "idle" or status == "running"
 			fireButton.Text = "HOLD\nLAUNCH"
 			fireButton.BackgroundColor3 = COLORS.red
 		end)
+	elseif state.event == "recordCountdown" then
+		ready = true
+		charging = false
+		showFeedback("RECORD RUN!", COLORS.yellow, "Far tables score more - keep the combo alive")
+	elseif state.event == "recordStarted" then
+		ready = true
+		showFeedback("LAUNCH!", COLORS.green, "60 seconds - hit the glowing order")
+	elseif state.event == "recordEnding" then
+		ready = false
+		charging = false
+		fireButton.Text = "TIME!"
+	elseif state.event == "recordFinished" then
+		ready = false
+		charging = false
 	elseif state.event == "purchaseResult" and state.payload then
 		showFeedback(state.payload.result, state.payload.success and COLORS.green or COLORS.orange, state.payload.success and "Upgrade equipped!" or "Deliver more pizzas!")
 	elseif state.event == "modeChanged" and state.payload then
@@ -899,6 +1089,28 @@ end)
 RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
 	if not operating then
 		return
+	end
+	local run = state.recordRun or { status = "idle" }
+	local status = run.status or "idle"
+	if status == "countdown" then
+		local remaining = math.max(1, math.ceil((run.countdownEndsAt or 0) - Workspace:GetServerTimeNow()))
+		countdownLabel.Text = tostring(remaining)
+		countdownLabel.Visible = true
+		recordTimer.Text = "1:00"
+		recordTimer.TextColor3 = Color3.new(1, 1, 1)
+	elseif status == "running" then
+		local remaining = math.max(0, (run.endsAt or 0) - Workspace:GetServerTimeNow())
+		recordTimer.Text = string.format("0:%02d", math.ceil(remaining))
+		recordTimer.TextColor3 = remaining <= 10 and COLORS.orange or Color3.new(1, 1, 1)
+		countdownLabel.Visible = false
+	elseif status == "saving" or status == "finished" then
+		recordTimer.Text = "0:00"
+		countdownLabel.Visible = false
+	else
+		countdownLabel.Visible = false
+	end
+	if status ~= "idle" then
+		recordTitle.Text = string.format("RECORD RUN  -  %s / TABLE %d", string.upper(state.targetCustomer or "CUSTOMER"), state.targetId or 1)
 	end
 	local horizontalInput = ((keyboardHeld.right or touchHeld.right) and 1 or 0) - ((keyboardHeld.left or touchHeld.left) and 1 or 0)
 	local verticalInput = ((keyboardHeld.up or touchHeld.up) and 1 or 0) - ((keyboardHeld.down or touchHeld.down) and 1 or 0)
@@ -924,7 +1136,8 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	arcText.Text = "ARC  " .. arcName
 
 	local direction = currentDirection()
-	local speed = Config.speedFromCharge(charge, state.upgrades and state.upgrades.power or 0)
+	local powerLevel = status ~= "idle" and 0 or (state.upgrades and state.upgrades.power or 0)
+	local speed = Config.speedFromCharge(charge, powerLevel)
 	local landing, flightTime = Config.landingPoint(direction, speed, 6.85)
 	local target = tableDefinition(state.targetId)
 	local missDistance = Vector3.new(landing.X - target.position.X, 0, landing.Z - target.position.Z).Magnitude

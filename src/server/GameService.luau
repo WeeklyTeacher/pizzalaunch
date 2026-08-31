@@ -8,6 +8,7 @@ local CustomerService = require(script.Parent.CustomerService)
 local InteractionService = require(script.Parent.InteractionService)
 local LayoutService = require(script.Parent.LayoutService)
 local PropService = require(script.Parent.PropService)
+local RecordRunService = require(script.Parent.RecordRunService)
 
 local GameService = {}
 
@@ -116,6 +117,7 @@ local function sendState(player: Player, eventName: string?, payload: { [string]
 		roundColor = round.color,
 		upgrades = state.upgrades,
 		mode = state.mode,
+		recordRun = RecordRunService.getSnapshot(player),
 		payload = payload,
 	})
 end
@@ -403,20 +405,22 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 	end
 	pizza:SetAttribute("Resolved", true)
 	state.shotActive = false
+	local recordSession = RecordRunService.isSession(player)
 	local payload = {
 		result = result,
 		position = hitPosition,
 		tableId = tableId,
 		coinsEarned = 0,
 		comboBonus = 0,
-		reloadDelay = math.max(0.12, 0.48 - state.upgrades.reload * 0.1),
+		reloadDelay = recordSession and 0.3 or math.max(0.12, 0.48 - state.upgrades.reload * 0.1),
+		recordRun = recordSession,
 	}
 
 	if result == "delivery" and tableId == state.targetId and hitPosition then
 		local definition = tableDefinition(tableId)
 		local horizontal = Vector3.new(hitPosition.X - definition.position.X, 0, hitPosition.Z - definition.position.Z)
 		local round = roundDefinition(state.round)
-		local assistScale = (1 + state.upgrades.assist * 0.12) * round.accuracyScale
+		local assistScale = recordSession and 1.12 or (1 + state.upgrades.assist * 0.12) * round.accuracyScale
 		local accuracy = Config.ACCURACY[#Config.ACCURACY]
 		for _, tier in Config.ACCURACY do
 			if horizontal.Magnitude <= tier.radius * assistScale then
@@ -424,23 +428,43 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 				break
 			end
 		end
-		state.combo += 1
-		state.bestCombo = math.max(state.bestCombo, state.combo)
-		state.roundProgress += 1
-		local comboBonus = math.min((state.combo - 1) * 2, 12)
-		local earned = math.floor((accuracy.coins + comboBonus) * (1 + state.upgrades.tips * 0.25) + 0.5)
-		state.coins += earned
 		payload.result = accuracy.name
 		payload.color = accuracy.color
-		payload.coinsEarned = earned
-		payload.comboBonus = comboBonus
 		payload.accuracy = math.floor(horizontal.Magnitude * 10 + 0.5) / 10
+
+		if recordSession then
+			local recordResult = RecordRunService.recordSuccess(player, tableId, accuracy.name)
+			if recordResult then
+				state.targetId = recordResult.targetId
+				payload.recordPoints = recordResult.lastPoints
+				payload.recordScore = recordResult.score
+				payload.recordCombo = recordResult.combo
+				payload.recordMultiplier = recordResult.multiplier
+				if recordResult.combo == 4 or recordResult.combo == 7 or recordResult.combo == 10 then
+					payload.recordComboMilestone = true
+				end
+			else
+				payload.result = "TIME!"
+				payload.color = Color3.fromRGB(255, 203, 55)
+			end
+		else
+			state.combo += 1
+			state.bestCombo = math.max(state.bestCombo, state.combo)
+			state.roundProgress += 1
+			local comboBonus = math.min((state.combo - 1) * 2, 12)
+			local earned = math.floor((accuracy.coins + comboBonus) * (1 + state.upgrades.tips * 0.25) + 0.5)
+			state.coins += earned
+			payload.coinsEarned = earned
+			payload.comboBonus = comboBonus
+		end
+
 		pizza.Anchored = true
 		pizza.CFrame = CFrame.new(definition.position + Vector3.new(0, 4.95, 0)) * CFrame.Angles(0, 0, math.pi / 2)
 		customerReaction(tableId, "success")
 		CustomerService.served(tableId)
-		if state.combo == 3 or state.combo == 5 or state.combo % 10 == 0 then
-			payload.comboMilestone = state.combo
+		local crowdMilestone = (recordSession and payload.recordComboMilestone) or (not recordSession and (state.combo == 3 or state.combo == 5 or state.combo % 10 == 0))
+		if crowdMilestone then
+			payload.comboMilestone = recordSession and payload.recordCombo or state.combo
 			for _, tableData in Config.TABLES do
 				if tableData.id ~= tableId then
 					customerReaction(tableData.id, "crowd")
@@ -465,27 +489,37 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			end
 		end)
 
-		if state.roundProgress >= round.goal then
-			state.coins += round.reward
-			payload.roundComplete = true
-			payload.roundReward = round.reward
-			payload.completedRound = state.round
-			payload.completedRoundName = round.name
-			state.roundProgress = 0
-			if state.round < #Config.ROUNDS then
-				state.round += 1
+		if not recordSession then
+			if state.roundProgress >= round.goal then
+				state.coins += round.reward
+				payload.roundComplete = true
+				payload.roundReward = round.reward
+				payload.completedRound = state.round
+				payload.completedRoundName = round.name
+				state.roundProgress = 0
+				if state.round < #Config.ROUNDS then
+					state.round += 1
+				end
+				LayoutService.setRound(state.round)
 			end
-			LayoutService.setRound(state.round)
+			state.targetId = nextTarget(state.targetId, state.round)
 		end
-		state.targetId = nextTarget(state.targetId, state.round)
 	elseif tableId then
-		state.combo = 0
+		if recordSession then
+			RecordRunService.recordMiss(player)
+		else
+			state.combo = 0
+		end
 		payload.result = tableId == state.targetId and result or "WRONG TABLE!"
 		payload.color = Color3.fromRGB(255, 139, 95)
 		customerReaction(tableId, tableId == state.targetId and "dodge" or "wrong")
 		playSound(pizza, SOUND.miss, 0.38, 1.25)
 	else
-		state.combo = 0
+		if recordSession then
+			RecordRunService.recordMiss(player)
+		else
+			state.combo = 0
+		end
 		payload.color = Color3.fromRGB(255, 139, 95)
 		playSound(pizza, SOUND.splat, 0.5, math.random(85, 115) / 100)
 	end
@@ -534,7 +568,8 @@ local function makePizza(player: Player, direction: Vector3, charge: number): Ba
 		weld.Parent = topping
 	end
 
-	local speed = Config.speedFromCharge(charge, state.upgrades.power)
+	local powerLevel = RecordRunService.isSession(player) and 0 or state.upgrades.power
+	local speed = Config.speedFromCharge(charge, powerLevel)
 	pizza.AssemblyLinearVelocity = direction.Unit * speed
 	pizza.AssemblyAngularVelocity = Vector3.new(direction.Z * 17, 5, -direction.X * 17)
 	pizza:SetNetworkOwner(nil)
@@ -556,6 +591,9 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 	if not state or state.shotActive or state.mode ~= "launcher" or launcherOccupant ~= player then
 		return
 	end
+	if not RecordRunService.canLaunch(player) then
+		return
+	end
 	if typeof(directionValue) ~= "Vector3" or typeof(chargeValue) ~= "number" then
 		return
 	end
@@ -572,7 +610,7 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 		return
 	end
 	local now = Workspace:GetServerTimeNow()
-	local reloadTime = Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12)
+	local reloadTime = RecordRunService.isSession(player) and Config.RELOAD_TIME or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12)
 	if now - state.lastLaunch < reloadTime then
 		return
 	end
@@ -629,6 +667,10 @@ local function onPurchase(player: Player, upgradeId: any)
 	local state = states[player]
 	local definition = typeof(upgradeId) == "string" and Config.UPGRADES[upgradeId] or nil
 	if not state or not definition then
+		return
+	end
+	if RecordRunService.isSession(player) then
+		sendState(player, "purchaseResult", { result = "FINISH THE RECORD RUN FIRST", success = false })
 		return
 	end
 	local level = state.upgrades[upgradeId]
@@ -700,6 +742,13 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		sendState(player, "modeChanged", { result = "READY TO LAUNCH!", mode = "launcher" })
 	elseif requestedMode == "walk" then
 		local wasOperating = state.mode == "launcher"
+		if RecordRunService.isSession(player) then
+			RecordRunService.cancel(player)
+			if state.resumeTargetId then
+				state.targetId = state.resumeTargetId
+				state.resumeTargetId = nil
+			end
+		end
 		state.mode = "walk"
 		if launcherOccupant == player then
 			launcherOccupant = nil
@@ -715,6 +764,11 @@ end
 local function initializeCharacter(player: Player, character: Model)
 	local state = states[player]
 	if state then
+		RecordRunService.cancel(player)
+		if state.resumeTargetId then
+			state.targetId = state.resumeTargetId
+			state.resumeTargetId = nil
+		end
 		state.mode = "walk"
 	end
 	if launcherOccupant == player then
@@ -745,6 +799,7 @@ local function addPlayer(player: Player)
 		mode = "walk",
 		upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 	}
+	RecordRunService.addPlayer(player)
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -780,9 +835,39 @@ function GameService.start()
 	local world = Workspace:WaitForChild("PizzaLaunchWorld")
 	CustomerService.start(world)
 	LayoutService.start(world)
+	RecordRunService.start(world, function(player, eventName)
+		local state = states[player]
+		if not state then
+			return
+		end
+		local snapshot = RecordRunService.getSnapshot(player)
+		if snapshot.targetId then
+			state.targetId = snapshot.targetId
+		end
+		sendState(player, eventName, nil)
+	end)
 	InteractionService.start(world, {
 		launcher = function(player)
 			setPlayerMode(player, "launcher")
+		end,
+		recordRun = function(player)
+			local state = states[player]
+			if not state or state.shotActive then
+				return
+			end
+			setPlayerMode(player, "launcher")
+			if state.mode ~= "launcher" or launcherOccupant ~= player then
+				return
+			end
+			state.resumeTargetId = state.targetId
+			local started, reason = RecordRunService.begin(player)
+			if started then
+				local snapshot = RecordRunService.getSnapshot(player)
+				state.targetId = snapshot.targetId or state.targetId
+				sendState(player, "recordCountdown", nil)
+			else
+				sendState(player, "notice", { result = "RECORD RUN BUSY", detail = reason })
+			end
 		end,
 		register = function(player)
 			local state = states[player]
@@ -813,6 +898,7 @@ function GameService.start()
 			launcherOccupant = nil
 			InteractionService.setLauncherAvailable(true)
 		end
+		RecordRunService.removePlayer(player)
 		states[player] = nil
 	end)
 	for _, player in Players:GetPlayers() do
