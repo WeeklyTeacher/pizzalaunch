@@ -14,8 +14,6 @@ local legendsLabel: TextLabel?
 local nameCache = {}
 local refreshBusy = false
 
-local TARGET_SEQUENCE = { 1, 2, 3, 4, 2, 5, 3, 6, 1, 4, 5, 6 }
-
 local function getOrderedStore()
 	if not storeChecked then
 		storeChecked = true
@@ -117,11 +115,6 @@ local function multiplierForCombo(combo: number): number
 	return math.min(2, 1 + math.floor(math.max(0, combo - 1) / 3) * 0.25)
 end
 
-local function nextTarget(run): number
-	run.targetStep += 1
-	return TARGET_SEQUENCE[(run.targetStep - 1) % #TARGET_SEQUENCE + 1]
-end
-
 function RecordRunService.start(world: Instance, onChanged)
 	notifyChanged = onChanged
 	local board = world:FindFirstChild("LegendsBoard", true)
@@ -146,8 +139,6 @@ function RecordRunService.addPlayer(player: Player)
 		combo = 0,
 		multiplier = 1,
 		personalBest = 0,
-		targetId = nil,
-		targetStep = 0,
 		countdownEndsAt = 0,
 		endsAt = 0,
 		lastPoints = 0,
@@ -200,7 +191,6 @@ function RecordRunService.getSnapshot(player: Player)
 		combo = run.combo,
 		multiplier = run.multiplier,
 		personalBest = run.personalBest,
-		targetId = run.targetId,
 		countdownEndsAt = run.countdownEndsAt,
 		endsAt = run.endsAt,
 		lastPoints = run.lastPoints,
@@ -237,8 +227,6 @@ function RecordRunService.begin(player: Player): (boolean, string?)
 	run.rank = nil
 	run.madeTopTen = false
 	run.isNewBest = false
-	run.targetStep = 0
-	run.targetId = nextTarget(run)
 	run.countdownEndsAt = now() + Config.RECORD_RUN_COUNTDOWN
 	run.endsAt = run.countdownEndsAt + Config.RECORD_RUN_DURATION
 	notify(player, "recordCountdown")
@@ -265,7 +253,7 @@ end
 
 function RecordRunService.recordSuccess(player: Player, tableId: number, accuracyName: string)
 	local run = runs[player]
-	if not run or run.status ~= "running" or now() >= run.endsAt or tableId ~= run.targetId then
+	if not run or run.status ~= "running" or now() >= run.endsAt then
 		return nil
 	end
 	run.combo += 1
@@ -274,7 +262,6 @@ function RecordRunService.recordSuccess(player: Player, tableId: number, accurac
 	local accuracyBonus = Config.RECORD_RUN_ACCURACY_BONUS[accuracyName] or 0
 	run.lastPoints = math.floor((basePoints + accuracyBonus) * run.multiplier + 0.5)
 	run.score += run.lastPoints
-	run.targetId = nextTarget(run)
 	return RecordRunService.getSnapshot(player)
 end
 
@@ -350,7 +337,6 @@ function RecordRunService.cancel(player: Player)
 	run.score = 0
 	run.combo = 0
 	run.multiplier = 1
-	run.targetId = nil
 	run.countdownEndsAt = 0
 	run.endsAt = 0
 end

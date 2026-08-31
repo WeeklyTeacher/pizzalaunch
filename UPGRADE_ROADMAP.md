@@ -2,6 +2,69 @@
 
 Updated: 2026-08-30
 
+## Living restaurant council build — current focus
+
+### Baseline issues observed at the start of this run
+
+- Free Play still behaves like a single prescribed target course: one table is highlighted prominently and fixed customers never truly leave.
+- Customer `served` motion is a short side-step and reset, not a readable enter → wait → eat → leave → replacement lifecycle.
+- Customer availability is not authoritative, so a future turnover system could accidentally reward the same seat twice or expose an empty table as valid.
+- Record Run offers one forced deterministic target at a time. It does not yet let skilled players choose safe nearby points or risk farther high-value tables.
+- Target visuals are shared with Free Play instead of being an unmistakable competition-only layer.
+- Customer-hit reactions and prop resets work, but lack explicit state ownership, reset-all support, and enough restaurant-specific feedback variety.
+
+### Prioritized feature list
+
+#### Priority 1 — implement in this run
+
+- [x] Replace fixed served-reset behavior with reusable authoritative customer states: Entering, WalkingToSeat, SeatedWaiting, Served, HappyReaction, Leaving, and replacement.
+- [x] Claim a waiting table atomically before awarding coins or record points; reject empty/leaving seats without duplicate rewards.
+- [x] Let Free Play serve any seated waiting customer while retaining coins, combos, rounds, upgrades, and accuracy tiers.
+- [x] Remove large Free Play world targets; keep only compact hungry markers and a calm “serve any hungry customer” HUD instruction.
+- [x] Animate customers along safe authored entrance/side-aisle routes without pathfinding through the launcher or shot lanes.
+- [x] Refresh customer name, shirt, skin tone, face/personality copy, and marker color for replacements.
+- [x] Make Record Run accept any occupied eligible table and show rings plus distance-value tags only during countdown/running.
+- [x] Keep table availability stable during a shot and use fixed competitive launcher values.
+- [x] Add explicit customer-hit recovery and centralized prop reset/cleanup controls.
+
+#### Priority 2 — polish after the lifecycle is stable
+
+- [x] Add readable eating/take-pizza timing before departure and a small arrival/exit visual cue.
+- [x] Add impatience gestures that never auto-remove or invalidate a live target.
+- [x] Expand safe counter/table props and vary reset timing/impulses by prop size.
+- [x] Verify lifecycle, target visuals, scoring choices, hit recovery, and cleanup in live Studio.
+- [x] Verify Record Run and Free Play layouts on phone landscape.
+
+#### Priority 3 — future upgrades
+
+- [ ] Add real two-seat family tables only after single-seat ownership survives multiplayer testing.
+- [ ] Add a record strategy bonus for consecutive far-table deliveries after score distribution telemetry exists.
+- [ ] Add a bounded host/queue NPC and short visible wait line outside active shot lanes.
+- [ ] Add authored walk cycles or Roblox animation assets after primitive tween motion is proven reliable.
+- [ ] Add per-player launcher stations if multiplayer contention testing shows the shared station is too restrictive.
+
+### Council decisions and tradeoffs
+
+- **Gameplay designer:** Make every occupied table valid in Free Play and every occupied table a scored choice in Record Run. This creates restaurant freedom in one mode and meaningful risk/reward in the other.
+- **Systems engineer:** Table state is global and server-owned; the first valid delivery claims the seat before rewards. Authored anchored-part movement is more deterministic here than pathfinding or ragdolls.
+- **Environment/NPC designer:** Customers use the visible front entrance and side aisles, then return to exact authored seats. Identity refresh and a brief empty-seat beat sell turnover without rebuilding all NPC rigs.
+- **Child playtester:** Free Play says “serve any hungry customer” and uses tiny pizza markers. Record Run alone gets glowing rings, point tags, timer, score, and combo.
+- **Tradeoff:** Customers remain stylized anchored rigs rather than full Motor6D avatars. That sacrifices sophisticated walk animation but prevents seat drift, collisions, and launcher obstruction while still providing clear motion and personality.
+
+### Implemented in this run
+
+- Free Play is now a calm restaurant shift: any visible waiting customer is valid, with no timer, point labels, highlights, or large world targets.
+- Customers are claimed on the server, celebrate and eat after service, leave through safe side aisles, disappear briefly, then return through visible doors with a refreshed identity and alternating family-table seat.
+- Record Run now exposes every occupied table as a deliberate choice. Fixed near/middle/far values, run-only rings and compact value plaques support safe-versus-skillful routing without changing the existing persistence schema.
+- Direct customer hits enter a bounded hit-recovery state without rewards. Table parmesan, sauce, and menu props join the reset-safe comedy system; active loose props are capped and all mess can be cleared at mode/round boundaries.
+- Desktop and iPhone 17 Pro landscape Studio sessions verified mode cleanup, full customer turnover, repeat far-table scoring, hit recovery, prop restoration, and error-free Output.
+
+### Intentionally deferred
+
+- Uncontrolled ragdolls, random table relocation, and cross-lane pathfinding: too likely to obstruct fair shots.
+- DataStore schema changes: the existing personal-best and OrderedDataStore behavior is already correct and out of scope.
+- Additional modes, maps, jobs, pets, economy expansion, or dialogue trees: they dilute this focused restaurant-life pass.
+
 ## Council review
 
 The current build has a satisfying, server-authoritative launch and reward loop, a colorful generated room, responsive trajectory guidance, and reliable temporary mess. Its largest weakness is framing: players spawn as an invisible camera attached to a permanently active cannon, so the decorated room still reads as a target gallery rather than a restaurant they inhabit.

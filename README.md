@@ -1,6 +1,6 @@
 # Pizza Launch
 
-Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through the pizzeria, greet customers, step behind the counter to operate the pizza cannon, and land dinner on the highlighted table. Accurate deliveries earn coins, combo bonuses, and session upgrades; misses create harmless, temporary restaurant chaos.
+Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through the pizzeria, greet a changing cast of customers, step behind the counter to operate the pizza cannon, and land dinner on any hungry table. Accurate deliveries earn coins, combo bonuses, and session upgrades; misses create harmless, temporary restaurant chaos.
 
 ## Play the game
 
@@ -14,13 +14,14 @@ Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through th
 - Press `Q` or the visible **Exit Launcher** button to return to walking.
 - Walk up to customers for a short mood/order line, or check the front register for shift progress.
 - Follow the dotted arc and landing ring. Green is lined up, yellow is close, and orange needs adjustment.
+- In Free Play, serve any visible hungry customer. Customers celebrate, eat, leave through the side entrances, and return as new guests.
 - Deliver the round's orders, build combos, earn accuracy bonuses, and spend coins on earnings, precision, reload, and power upgrades.
 
 Mobile play is landscape-only. Normal touch movement appears while walking; it is replaced by the dedicated aim pad and launch controls only while operating the cannon.
 
 ## One-minute Record Run
 
-The red console beside the normal launcher starts an in-restaurant record attempt: a three-second countdown followed by 60 seconds of launches. The target sequence is the same for every attempt. Near, middle, and far tables pay progressively more points; Perfect and Great accuracy add bonuses. Consecutive correct deliveries raise a stepped multiplier from 1x to 2x, while misses and wrong tables reset the run combo.
+The red console beside the normal launcher starts an in-restaurant record attempt: a three-second countdown followed by 60 seconds of launches. Every currently occupied table becomes a glowing choice only during the run. Near, middle, and far tables pay progressively more points, so players can repeat a difficult far table after its next customer arrives or take safer nearby deliveries. Perfect and Great accuracy add bonuses. Consecutive correct deliveries raise a stepped multiplier from 1x to 2x, while misses and wrong hits reset the run combo.
 
 Record scoring is calculated entirely by the server. Record runs use fixed launch power, reload timing, and accuracy assistance so session upgrades cannot affect the all-time competition. The end card shows final score, personal best, and top-10 status. The wall-mounted **Pizza Launch Legends** board reads the ten highest saved personal records from an `OrderedDataStore`.
 
@@ -68,9 +69,9 @@ src/
   server/WorldBuilder.luau    Pizzeria, NPCs, kitchen, props, lighting, spawn
   server/GameService.luau     Physics, validation, reactions, mess, progression
   server/InteractionService.luau  Launcher/register/customer prompt routing
-  server/CustomerService.luau     Bounded idle and served-seat choreography
+  server/CustomerService.luau     Server-owned seating, service, departure, arrival, and hit states
   server/LayoutService.luau       Deterministic round seating/obstacle dressing
-  server/PropService.luau         Knockable-prop impulse and reliable restoration
+  server/PropService.luau         Capped knockable props, exact restoration, and mode cleanup
   server/RecordRunService.luau    Timed scoring, personal bests, OrderedDataStore top 10
   server/init.server.luau     Server bootstrap
   client/init.client.luau     Camera, controls, trajectory, HUD, touch layout
@@ -89,4 +90,4 @@ All five IDs were preloaded successfully in Studio during the 2026-08-30 quality
 
 ## Current scope
 
-Record Run personal bests and the all-time top 10 persist through an OrderedDataStore when Roblox services are available. Coins and upgrades still last for the current server session only; economy persistence remains deferred until broader balance testing. Furniture positions are authored and stable for predictable physics; occupied seats and safe reactive obstacles change deterministically by round.
+Record Run personal bests and the all-time top 10 persist through an OrderedDataStore when Roblox services are available. Coins and upgrades still last for the current server session only; economy persistence remains deferred until broader balance testing. Furniture positions are authored and stable for predictable physics. Customer occupancy changes through deterministic, server-owned entrance and seating routes that stay outside the launcher and target lanes.

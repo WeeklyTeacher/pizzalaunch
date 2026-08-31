@@ -48,6 +48,8 @@ local ready = true
 local activeFireInput: InputObject? = nil
 local targetHighlight: Highlight? = nil
 local yourOrderBillboard: BillboardGui? = nil
+local recordTargetBillboards = {}
+local tableAvailabilityConnections = {}
 local trajectoryParts = {}
 local keyboardHeld = {}
 local touchHeld = {}
@@ -572,6 +574,7 @@ local function updateRecordUI()
 		local canAim = operating and (status == "countdown" or status == "running")
 		controls.Visible = canAim
 		touchAimPad.Visible = canAim and UserInputService.TouchEnabled
+		tutorial.Visible = false
 	end
 	if status == "saving" then
 		recordSummary.Visible = true
@@ -614,8 +617,9 @@ local function updateShop(upgrades)
 end
 
 local function updateTargetVisuals()
-	local definition = tableDefinition(state.targetId)
 	local round = Config.ROUNDS[math.clamp(state.round or 1, 1, #Config.ROUNDS)]
+	local status = recordStatus()
+	local recordVisuals = status == "countdown" or status == "running"
 	local activeTables = {}
 	if isRecordSession() then
 		for _, tableData in Config.TABLES do
@@ -631,70 +635,79 @@ local function updateTargetVisuals()
 	end
 	if yourOrderBillboard then
 		yourOrderBillboard:Destroy()
+		yourOrderBillboard = nil
 	end
-	local model = findTargetModel(state.targetId)
+	for _, billboardGui in recordTargetBillboards do
+		billboardGui:Destroy()
+	end
+	table.clear(recordTargetBillboards)
 	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
 	if world then
 		for _, tableModel in world:GetChildren() do
 			if tableModel:IsA("Model") and tableModel:GetAttribute("TableId") then
 				local tableId = tableModel:GetAttribute("TableId")
 				local isActive = activeTables[tableId] == true
+				local available = tableModel:GetAttribute("DeliveryAvailable") == true
 				local targetRing = tableModel:FindFirstChild("TargetRing")
-				local isTarget = tableId == state.targetId
 				local customer = tableModel:FindFirstChild("Customer")
 				if customer then
 					for _, descendant in customer:GetDescendants() do
 						if descendant:IsA("BasePart") then
 							descendant.LocalTransparencyModifier = isActive and 0 or 1
 						elseif descendant:IsA("SurfaceGui") and descendant.Name == "Face" then
-							descendant.Enabled = isActive
+							descendant.Enabled = isActive and tableModel:GetAttribute("Occupied") ~= false
 						elseif descendant:IsA("ProximityPrompt") then
-							descendant.Enabled = isActive and not operating
+							descendant.Enabled = isActive and available and not operating
 						end
 					end
 					local waitingMarker = customer:FindFirstChild("WaitingMarker", true)
 					if waitingMarker and waitingMarker:IsA("BillboardGui") then
-						waitingMarker.Enabled = isActive and not isTarget
+						waitingMarker.Enabled = isActive and available and not isRecordSession()
 					end
 				end
 				if targetRing and targetRing:IsA("BasePart") then
-					targetRing.LocalTransparencyModifier = isTarget and 0 or 1
+					targetRing.Size = Vector3.new(0.15, 8 * 1.12, 8 * 1.12)
+					targetRing.Transparency = 0.55
+					targetRing.LocalTransparencyModifier = recordVisuals and available and 0 or 1
+				end
+				local top = tableModel:FindFirstChild("TableTop")
+				if recordVisuals and available and top and top:IsA("BasePart") then
+					local definition = tableDefinition(tableId)
+					local value = Config.RECORD_RUN_TABLE_POINTS[tableId] or 100
+					-- A small physical score plaque is more legible than a BillboardGui at
+					-- shallow launcher-camera angles and never scales into a giant speech bubble.
+					local tag = Instance.new("Part")
+					tag.Name = "RecordValue"
+					tag.Size = Vector3.new(4.6, 1.45, 0.14)
+					tag.Color = COLORS.darkRed
+					tag.Material = Enum.Material.SmoothPlastic
+					tag.Anchored = true
+					tag.CanCollide = false
+					tag.CanQuery = false
+					tag.CanTouch = false
+					tag.CastShadow = false
+					local position = top.Position + Vector3.new(0, 3.25, 0)
+					tag.CFrame = CFrame.lookAt(position, Vector3.new(0, position.Y, 74))
+					tag.Parent = Workspace
+					local surface = Instance.new("SurfaceGui")
+					surface.Name = "ScoreFace"
+					surface.Face = Enum.NormalId.Front
+					surface.CanvasSize = Vector2.new(460, 145)
+					surface.AlwaysOnTop = true
+					surface.LightInfluence = 0
+					surface.Adornee = tag
+					surface.Parent = tag
+					local label = makeLabel(surface, "Label", string.format("%d PTS", value), UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), 70)
+					label.BackgroundTransparency = 0
+					label.BackgroundColor3 = COLORS.darkRed
+					label.TextColor3 = Color3.new(1, 1, 1)
+					label.TextStrokeColor3 = definition.color
+					label.TextStrokeTransparency = 0.4
+					addStroke(label, definition.color, 7)
+					table.insert(recordTargetBillboards, tag)
 				end
 			end
 		end
-	end
-	if not model then
-		return
-	end
-	targetHighlight = Instance.new("Highlight")
-	targetHighlight.Name = "YourOrderHighlight"
-	targetHighlight.Adornee = model
-	targetHighlight.FillColor = definition.color
-	targetHighlight.FillTransparency = 0.82
-	targetHighlight.OutlineColor = Color3.new(1, 1, 1)
-	targetHighlight.OutlineTransparency = 0
-	targetHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	targetHighlight.Parent = model
-
-	local top = model:FindFirstChild("TableTop")
-	if top and top:IsA("BasePart") then
-		yourOrderBillboard = Instance.new("BillboardGui")
-		yourOrderBillboard.Name = "YourOrder"
-		yourOrderBillboard.Adornee = top
-		yourOrderBillboard.Size = UDim2.fromOffset(150, 40)
-		yourOrderBillboard.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
-		yourOrderBillboard.AlwaysOnTop = true
-		yourOrderBillboard.Parent = top
-		local label = makeLabel(yourOrderBillboard, "Label", "DELIVER HERE!", UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), 19)
-		label.TextColor3 = definition.color
-		label.TextStrokeColor3 = COLORS.ink
-		label.TextStrokeTransparency = 0.1
-	end
-
-	local ring = model:FindFirstChild("TargetRing")
-	if ring and ring:IsA("BasePart") then
-		local scale = isRecordSession() and 1.12 or round.accuracyScale * (1 + (state.upgrades.assist or 0) * 0.12)
-		ring.Size = Vector3.new(0.15, 8 * scale, 8 * scale)
 	end
 end
 
@@ -997,7 +1010,7 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	coinsLabel.Text = string.format("COINS  %d", state.coins or 0)
 	comboLabel.Text = string.format("COMBO  x%d", state.combo or 0)
 	roundTitle.Text = string.format("ROUND %d • %s", state.round or 1, state.roundName or "FIRST ORDERS")
-	targetLabel.Text = string.format("%s • TABLE %d", string.upper(state.targetCustomer or "CUSTOMER"), state.targetId or 1)
+	targetLabel.Text = "SERVE ANY HUNGRY CUSTOMER"
 	progressFill.Size = UDim2.fromScale(math.clamp((state.roundProgress or 0) / math.max(state.roundGoal or 1, 1), 0, 1), 1)
 	roundCard.BackgroundColor3 = state.roundColor or COLORS.green
 	updateShop(state.upgrades)
@@ -1100,7 +1113,8 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 		recordTimer.TextColor3 = Color3.new(1, 1, 1)
 	elseif status == "running" then
 		local remaining = math.max(0, (run.endsAt or 0) - Workspace:GetServerTimeNow())
-		recordTimer.Text = string.format("0:%02d", math.ceil(remaining))
+		local wholeSeconds = math.ceil(remaining)
+		recordTimer.Text = wholeSeconds >= 60 and "1:00" or string.format("0:%02d", wholeSeconds)
 		recordTimer.TextColor3 = remaining <= 10 and COLORS.orange or Color3.new(1, 1, 1)
 		countdownLabel.Visible = false
 	elseif status == "saving" or status == "finished" then
@@ -1110,7 +1124,7 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 		countdownLabel.Visible = false
 	end
 	if status ~= "idle" then
-		recordTitle.Text = string.format("RECORD RUN  -  %s / TABLE %d", string.upper(state.targetCustomer or "CUSTOMER"), state.targetId or 1)
+		recordTitle.Text = "RECORD RUN  -  CHOOSE A GLOWING TABLE"
 	end
 	local horizontalInput = ((keyboardHeld.right or touchHeld.right) and 1 or 0) - ((keyboardHeld.left or touchHeld.left) and 1 or 0)
 	local verticalInput = ((keyboardHeld.up or touchHeld.up) and 1 or 0) - ((keyboardHeld.down or touchHeld.down) and 1 or 0)
@@ -1139,8 +1153,18 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	local powerLevel = status ~= "idle" and 0 or (state.upgrades and state.upgrades.power or 0)
 	local speed = Config.speedFromCharge(charge, powerLevel)
 	local landing, flightTime = Config.landingPoint(direction, speed, 6.85)
-	local target = tableDefinition(state.targetId)
-	local missDistance = Vector3.new(landing.X - target.position.X, 0, landing.Z - target.position.Z).Magnitude
+	local missDistance = math.huge
+	local activeRound = Config.ROUNDS[math.clamp(state.round or 1, 1, #Config.ROUNDS)]
+	local activeIds = {}
+	for _, tableId in activeRound.tables do activeIds[tableId] = true end
+	for _, candidate in Config.TABLES do
+		local model = findTargetModel(candidate.id)
+		local eligible = model and model:GetAttribute("DeliveryAvailable") == true and (status ~= "idle" or activeIds[candidate.id])
+		if eligible then
+			local distance = Vector3.new(landing.X - candidate.position.X, 0, landing.Z - candidate.position.Z).Magnitude
+			missDistance = math.min(missDistance, distance)
+		end
+	end
 	local guideColor = missDistance < 4.5 and COLORS.green or (missDistance < 10 and COLORS.yellow or COLORS.orange)
 	for index, dot in trajectoryParts do
 		local t = flightTime * index / (#trajectoryParts + 1)
@@ -1165,8 +1189,23 @@ end)
 task.defer(function()
 	local world = Workspace:WaitForChild("PizzaLaunchWorld", 10)
 	if world then
+		local function watchTable(tableModel)
+			if tableModel:IsA("Model") and tableModel:GetAttribute("TableId") then
+				table.insert(tableAvailabilityConnections, tableModel:GetAttributeChangedSignal("DeliveryAvailable"):Connect(function()
+					updateTargetVisuals()
+				end))
+			end
+		end
+		for _, tableModel in world:GetChildren() do
+			watchTable(tableModel)
+		end
+		world.ChildAdded:Connect(function(child)
+			watchTable(child)
+			task.defer(updateTargetVisuals)
+		end)
 		applyMode()
 		updateTargetVisuals()
+		for _, delaySeconds in { 0.75, 1.5, 2.5 } do task.delay(delaySeconds, updateTargetVisuals) end
 	end
 end)
 

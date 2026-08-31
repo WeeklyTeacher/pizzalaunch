@@ -207,3 +207,47 @@ The earlier build was treated as a prototype. This pass replaced weak systems in
 - Run a dedicated two-player contention/play-observation session before deciding whether one shared launcher is sufficient or each player needs a station.
 - Add shift results/timing only after human playtesting confirms walking does not slow the desired arcade cadence.
 - Add DataStore persistence only after the larger reward totals and upgrade prices are rebalanced with real players.
+
+## 2026-08-30 — Living restaurant and Record Run choice pass
+
+### Council decision
+
+- **Gameplay designer:** Free Play should reward serving any waiting guest; Record Run should turn the same room into a clear risk/reward route where farther occupied tables pay more.
+- **Systems engineer:** Claim each seat on the server before granting coins or points. Keep customer state, competitive scoring, prop limits, and cleanup authoritative; preserve the existing OrderedDataStore schema.
+- **Environment/NPC designer:** Sell turnover with visible side doors, safe aisle travel, a short eating beat, refreshed names/colors, and alternating family-table seats rather than pathfinding through shot lanes.
+- **Child playtester:** Keep Free Play calm with tiny pizza markers and one short instruction. Show glowing rings, values, timer, score, and combo only after explicitly starting Record Run.
+
+### Pass 1 — customer flow and serving
+
+- Replaced the fixed served side-step with explicit `SeatedWaiting → Served → HappyReaction → Eating → Leaving → Despawn → Entering → WalkingToSeat → SeatedWaiting` states.
+- Added atomic delivery claims, per-table availability/occupancy attributes, one- or two-seat capacity metadata, safe anchored entrance/side-aisle routes, and a brief empty-seat replacement beat.
+- Added twelve rotating customer identities with names, moods, short lines, skin/shirt/accent variation, idle looks/gestures, and refreshed walk-up prompts.
+- Free Play now accepts any waiting customer in the active restaurant layout. Empty/leaving seats award nothing, while existing coins, combos, rounds, accuracy, upgrades, and quick reload remain intact.
+
+### Pass 2 — distinct Record Run targets
+
+- Removed the forced Record Run target sequence. Every occupied table is a valid server-scored choice; fixed values remain 100/110 near, 140/150 middle, and 180/200 far plus existing accuracy/combo bonuses.
+- Free Play has no target rings, highlights, value labels, score, or timer. Record Run countdown/running alone reveals all eligible customers, glowing delivery rings, compact point plaques, and the competitive HUD.
+- The trajectory guide evaluates the nearest currently deliverable table, and customer availability changes add/remove run markers without stale overlays.
+- Fixed the opening timer display from `0:60` to `1:00`; exiting or completing a run removes all competition visuals and restores walking/free play.
+
+### Pass 3 — controlled pizza chaos
+
+- Direct customer hits now create a server-owned temporary hit state, splat/impact feedback, no delivery reward, combo loss, and a clean return to waiting.
+- Added parmesan shakers, sauce bottles, and menus to table edges. Reactive props have a server cap, size-aware impulses/reset delays, exact pose/collision restoration, and reset-all cleanup at round/Record Run boundaries.
+- Added visible customer arrival doors, welcome signs, and mats without changing the established counter, launcher, or restaurant floor plan.
+
+### Studio and build validation
+
+- Live Free Play delivery to Table 1 returned `PERFECT`, paid 20 coins, and began the customer turnover cycle with no timer or competition overlay.
+- A full Table 2 lifecycle produced the complete expected state history, changed the replacement identity to Rex, and returned the seat to a deliverable state.
+- Record Run started only from the red prompt, displayed `1:00`, six eligible rings/value objects, and no Free Play target card. Two repeated Perfect deliveries to far Table 6 paid 240 each and built score/combo to 480/2 after replacement.
+- A direct customer-head hit returned `TOO HUNGRY!`, paid no coins, reset combo, and recorded `SeatedWaiting → HitReaction → SeatedWaiting`.
+- A pizza hit on table sauce returned `PIZZA CHAOS!`; the prop unanchored/moved, then returned to its exact position with `PropState=Ready`, `RecentlyHit=false`, and zero active loose props.
+- iPhone 17 Pro landscape (750×361 viewport) showed unclipped Free Play movement HUD and Record Run timer/aim pad/launch/exit controls. Six run rings/value objects were active; Output was empty. Studio was restored to the default viewport.
+- Repeated `rojo build default.project.json -o pizzalaunch.rbxlx` and `git diff --check` completed successfully during development.
+
+### Deliberately deferred
+
+- Full Motor6D walk cycles, multiple simultaneous NPCs per table, random table relocation, and cross-lane pathfinding remain deferred until dedicated multiplayer observation proves they improve the game without obstructing shots.
+- Record score persistence, personal-best behavior, and the global top-10 schema were intentionally left unchanged.

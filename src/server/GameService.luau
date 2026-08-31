@@ -415,8 +415,10 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		reloadDelay = recordSession and 0.3 or math.max(0.12, 0.48 - state.upgrades.reload * 0.1),
 		recordRun = recordSession,
 	}
+	local tableEligible = tableId ~= nil and (recordSession or table.find(roundDefinition(state.round).tables, tableId) ~= nil)
+	local acceptedDelivery = result == "delivery" and tableEligible and hitPosition ~= nil and CustomerService.claimDelivery(tableId)
 
-	if result == "delivery" and tableId == state.targetId and hitPosition then
+	if acceptedDelivery and tableId and hitPosition then
 		local definition = tableDefinition(tableId)
 		local horizontal = Vector3.new(hitPosition.X - definition.position.X, 0, hitPosition.Z - definition.position.Z)
 		local round = roundDefinition(state.round)
@@ -435,7 +437,6 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		if recordSession then
 			local recordResult = RecordRunService.recordSuccess(player, tableId, accuracy.name)
 			if recordResult then
-				state.targetId = recordResult.targetId
 				payload.recordPoints = recordResult.lastPoints
 				payload.recordScore = recordResult.score
 				payload.recordCombo = recordResult.combo
@@ -501,6 +502,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 					state.round += 1
 				end
 				LayoutService.setRound(state.round)
+				PropService.resetAll()
 			end
 			state.targetId = nextTarget(state.targetId, state.round)
 		end
@@ -510,9 +512,11 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		else
 			state.combo = 0
 		end
-		payload.result = tableId == state.targetId and result or "WRONG TABLE!"
+		payload.result = result == "delivery" and "TABLE IS CLEARING!" or "TOO HUNGRY!"
 		payload.color = Color3.fromRGB(255, 139, 95)
-		customerReaction(tableId, tableId == state.targetId and "dodge" or "wrong")
+		if result ~= "delivery" then
+			customerReaction(tableId, "dodge")
+		end
 		playSound(pizza, SOUND.miss, 0.38, 1.25)
 	else
 		if recordSession then
@@ -638,6 +642,8 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 		elseif hit:GetAttribute("CustomerPart") then
 			local tableId = hit:GetAttribute("TableId")
 			createSplat(hit, pizza.Position, Color3.fromRGB(255, 187, 58))
+			impactRing(pizza.Position, Color3.fromRGB(255, 132, 76))
+			CustomerService.hit(tableId)
 			customerReaction(tableId, "dodge")
 			connection:Disconnect()
 			finishShot(player, pizza, "TOO HUNGRY!", pizza.Position, tableId)
@@ -835,6 +841,7 @@ function GameService.start()
 	local world = Workspace:WaitForChild("PizzaLaunchWorld")
 	CustomerService.start(world)
 	LayoutService.start(world)
+	PropService.start(world)
 	RecordRunService.start(world, function(player, eventName)
 		local state = states[player]
 		if not state then
@@ -843,6 +850,9 @@ function GameService.start()
 		local snapshot = RecordRunService.getSnapshot(player)
 		if snapshot.targetId then
 			state.targetId = snapshot.targetId
+		end
+		if eventName == "recordEnding" then
+			PropService.resetAll()
 		end
 		sendState(player, eventName, nil)
 	end)
@@ -860,6 +870,7 @@ function GameService.start()
 				return
 			end
 			state.resumeTargetId = state.targetId
+			PropService.resetAll()
 			local started, reason = RecordRunService.begin(player)
 			if started then
 				local snapshot = RecordRunService.getSnapshot(player)
@@ -881,13 +892,12 @@ function GameService.start()
 		end,
 		customer = function(player, tableId)
 			local state = states[player]
-			local definition = typeof(tableId) == "number" and tableDefinition(tableId) or nil
-			if state and state.mode == "walk" and definition then
-				local isOrder = tableId == state.targetId
+			local info = typeof(tableId) == "number" and CustomerService.getInfo(tableId) or nil
+			if state and state.mode == "walk" and info then
 				sendState(player, "notice", {
-					result = string.format("%s • %s", string.upper(definition.customer), definition.mood),
-					detail = isOrder and "That's my order! Meet me at the launcher!" or definition.line,
-					color = definition.color,
+					result = string.format("%s - %s", string.upper(info.name), info.mood),
+					detail = info.state == "SeatedWaiting" and info.line or "I'll be ready again in a moment!",
+					color = info.color,
 				})
 			end
 		end,

@@ -213,6 +213,33 @@ local function buildHangingLight(world: Folder, position: Vector3)
 	light.Parent = bulb
 end
 
+local function buildCustomerEntrances(world: Folder)
+	local entranceModel = Instance.new("Model")
+	entranceModel.Name = "CustomerEntrances"
+	entranceModel.Parent = world
+	for _, side in { -1, 1 } do
+		local x = side * 54
+		local glass = makePart(entranceModel, "FrontGlassDoor", Vector3.new(10, 13, 0.45), CFrame.new(x, 6, 71), Color3.fromRGB(134, 211, 232), Enum.Material.Glass)
+		glass.Transparency = 0.34
+		glass.CanCollide = false
+		for _, frameX in { x - 5.4, x + 5.4 } do
+			local frame = makePart(entranceModel, "DoorFrame", Vector3.new(0.8, 14, 1), CFrame.new(frameX, 6, 71), COLORS.darkWood, Enum.Material.Wood)
+			frame.CanCollide = false
+		end
+		local sign = makePart(entranceModel, "WelcomeSign", Vector3.new(10, 3, 0.7), CFrame.new(x, 14.2, 70.7), COLORS.green, Enum.Material.Wood)
+		sign.CanCollide = false
+		surfaceText(sign, "Welcome", Enum.NormalId.Back, "CUSTOMERS\nWELCOME!", COLORS.cream, nil, 18)
+		local mat = makePart(entranceModel, "WelcomeMat", Vector3.new(11, 0.14, 6), CFrame.new(x, -0.35, 67.5), COLORS.darkRed, Enum.Material.Fabric)
+		mat.CanCollide = false
+		mat.CanTouch = false
+		local point = makePart(entranceModel, side < 0 and "CustomerEntranceLeft" or "CustomerEntranceRight", Vector3.new(1, 1, 1), CFrame.new(x, 0.2, 69), Color3.new(1, 1, 1))
+		point.Transparency = 1
+		point.CanCollide = false
+		point.CanTouch = false
+		point.CanQuery = false
+	end
+end
+
 local function buildPizzaArt(world: Folder, position: Vector3, accent: Color3)
 	local frame = makePart(world, "PizzaArtFrame", Vector3.new(15, 12, 0.7), CFrame.new(position), COLORS.darkWood, Enum.Material.Wood)
 	local canvas = makePart(world, "PizzaArtCanvas", Vector3.new(13.5, 10.5, 0.25), CFrame.new(position + Vector3.new(0, 0, 0.5)), Color3.fromRGB(255, 243, 209))
@@ -384,6 +411,16 @@ local function buildTable(world: Folder, definition)
 	local boothBack = makePart(model, "BoothBack", Vector3.new(topWidth - 1, definition.id <= 2 and 6 or 7, 1.5), CFrame.new(p + Vector3.new(0, 5, -seatOffset - 2.2)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
 	boothSeat:SetAttribute("SplatSurface", true)
 	boothBack:SetAttribute("SplatSurface", true)
+
+	local edge = topWidth * 0.5 - 1.15
+	local shaker = makeReactive(model, "TableParmesan", Vector3.new(1.15, 2.1, 1.15), CFrame.new(p + Vector3.new(-edge, 5.75, -0.6)), Color3.fromRGB(247, 235, 187))
+	shaker.Shape = Enum.PartType.Cylinder
+	local sauce = makeReactive(model, "TableSauce", Vector3.new(1.2, 2.5, 1.2), CFrame.new(p + Vector3.new(edge, 5.95, 0.7)), definition.id % 2 == 0 and Color3.fromRGB(211, 48, 47) or Color3.fromRGB(237, 169, 43))
+	sauce.Shape = Enum.PartType.Cylinder
+	if definition.id >= 3 then
+		local menu = makeReactive(model, "TableMenu", Vector3.new(2.8, 2.2, 0.35), CFrame.new(p + Vector3.new(edge - 1.2, 6.0, -2.7)) * CFrame.Angles(0, math.rad(-12), 0), COLORS.green, Enum.Material.Wood)
+		menu.CanCollide = false
+	end
 
 	buildCustomer(model, definition, p + Vector3.new(0, 0, -seatOffset))
 	return model
@@ -562,6 +599,7 @@ function WorldBuilder.build()
 	world.Parent = Workspace
 
 	buildShell(world)
+	buildCustomerEntrances(world)
 	buildKitchen(world)
 	buildDecor(world)
 	buildLauncher(world)
