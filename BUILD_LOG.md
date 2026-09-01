@@ -1,5 +1,21 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — launcher-sightline/onboarding restore checkpoint
+
+- Clean baseline commit: `9f41fe56dc2a66998cebc0954dc42a220db7c0cc` on the pushed `feature/customer-events-progression-20260831` branch.
+- Pushed annotated restore tag: `checkpoint/before-sightline-onboarding-20260831`.
+- Focused working branch: `feature/sightline-onboarding-20260831`.
+- Pre-edit source/contracts confirm the existing free-walk spawn, canonical launcher enter/exit and server-authoritative launch paths, customers and six tables, scoring/coins/upgrades, splats/reactive props, free play, and the one-minute Record Run remain present. This is source verification only; no new Studio runtime claim is made at the checkpoint.
+- Scope boundary: relocate the obstructing progression sign without changing gameplay coordinates, and add a client-local, non-colliding first-time path tutorial. `Workspace`, restaurant/gameplay models, server services, and `default.project.json` remain protected.
+
+### Focused sightline and first-pizza onboarding changes
+
+- Relocated the full-size `NEIGHBORHOOD FAVORITE` progression sign from the launcher axis at `(0, 24, 70.8)` to the right exterior façade at `(42, 27.2, 73.4)`. Its nearest edge is approximately 72.9 degrees off the camera axis, outside the mounted camera's 28.5-degree horizontal half-frustum; the same clearance applies at low, medium, and high aim because those angles move the cosmetic aim rig/trajectory, not the fixed launcher camera. Added the permanent source rule that future décor must stay outside the camera-to-playfield corridor. No other world geometry moved.
+- Added seven client-only cheese-arrow/pepperoni trail markers along the real exterior walk route from `WALK_SPAWN_CFRAME` to the regular launcher console. Every part is anchored, non-colliding, non-touching, non-queryable, shadowless, and locally pulsed; the last markers sit on top of the cannon platform. A distance-updating launcher beacon, compact bottom hint, and console highlight advance from follow-trail to `E`/tap interaction range.
+- Reworked the existing tutorial card into a compact, non-active first-pizza corner hint with separate desktop and touch instructions. Onboarding completes only after the server accepts a launch, then fades into the non-modal `YOU'RE COOKING!` banner. Completion remains session-local, launcher exit/re-entry does not restart it, incomplete respawns restore it, and the `? HELP` button can explicitly replay it.
+- Verified: `rojo build default.project.json` produced a 233,985-byte place with SHA-256 `CA26CB7F521D541FA4F99D132461A837E55634F4B5568F7B7273AAB6457ABB16`; recovery safety and all recovery/onboarding contracts passed; the old centered sign coordinate is absent; `default.project.json`, shared gameplay config, launcher/customer/Record Run/DataStore services, and protected Transfer-invariant services have no diff; `git diff --check` passed. Recovery/Transfer artifacts remain unchanged.
+- Roblox Studio is installed but was not interactively driven by this command-line run. Manual Studio verification remains required for actual arrow orientation/pulse and UI composition on desktop/touch, walking the route, low/medium/high mounted views, accepted first launch, exit/re-enter launch, respawn restoration, and the complete free-play/Record Run regression sequence. No runtime or live DataStore claim is made.
+
 ## 2026-08-31 — customer/events progression checkpoint
 
 - Clean starting commit: `2216dd19fc8dbe5e4b90c9f4bd977bc193542183` on `visual/protected-world-expansion-20260831`, matching its pushed remote.

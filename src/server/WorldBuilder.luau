@@ -868,7 +868,11 @@ local function buildRestaurantArtPass(world: Folder)
 	local badgeGui = surfaceText(ovenBadge, "OvenBadgeText", Enum.NormalId.Back, "GOLDEN OVEN", COLORS.darkRed, nil, 18)
 	badgeGui.Enabled = false
 	badgeGui:SetAttribute("ProgressionMilestone", 3)
-	local streetAward = makePart(progression, "StreetAwardSign", Vector3.new(28, 5, 0.55), CFrame.new(0, 24, 70.8), COLORS.green, Enum.Material.Wood)
+	-- Permanent launcher-sightline rule: no decorative geometry belongs in the
+	-- center corridor between the camera at Z=82 and the customer playfield.
+	-- This earned sign stays full-sized on the exterior facade, beside the main
+	-- marquee where walking players can appreciate it without blocking any arc.
+	local streetAward = makePart(progression, "StreetAwardSign", Vector3.new(28, 5, 0.55), CFrame.new(42, 27.2, 73.4), COLORS.green, Enum.Material.Wood)
 	streetAward.Transparency = 1
 	streetAward.CanCollide = false
 	streetAward:SetAttribute("ProgressionMilestone", 6)

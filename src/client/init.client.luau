@@ -59,8 +59,18 @@ local touchHeld = {}
 local shakeUntil = 0
 local shakeStrength = 0
 local operating = false
-local hasLaunched = false
 local playerControls
+local onboardingCompleted = false
+local onboardingReplayActive = false
+local onboardingReachedLauncher = false
+local onboardingTrailActive = true
+local onboardingTrailFolder: Folder? = nil
+local onboardingTrailParts = {}
+local onboardingBeacon: BillboardGui? = nil
+local onboardingBeaconText: TextLabel? = nil
+local onboardingHighlight: Highlight? = nil
+local onboardingNextDistanceCheck = 0
+local restoreTutorialAppearance
 
 local function addCorner(parent: GuiObject, radius: number)
 	local corner = Instance.new("UICorner")
@@ -177,16 +187,18 @@ addCorner(progressFill, 8)
 
 local tutorial = Instance.new("Frame")
 tutorial.Name = "Tutorial"
-tutorial.Size = UDim2.fromOffset(294, 145)
-tutorial.Position = UDim2.new(0, 18, 0, 94)
+tutorial.Size = UDim2.fromOffset(276, 92)
+tutorial.Position = UDim2.new(0, 18, 0, 126)
 tutorial.BackgroundColor3 = COLORS.cream
 tutorial.BackgroundTransparency = 0.03
+tutorial.Active = false
+tutorial.Visible = false
 tutorial.Parent = gui
 addCorner(tutorial, 18)
 addStroke(tutorial, COLORS.darkRed, 2)
-local tutorialTitle = makeLabel(tutorial, "Title", "WELCOME, PIZZA CHEF!", UDim2.new(1, -20, 0, 28), UDim2.fromOffset(10, 9), 16)
+local tutorialTitle = makeLabel(tutorial, "Title", "AIM  •  CHARGE  •  LAUNCH!", UDim2.new(1, -20, 0, 25), UDim2.fromOffset(10, 7), 15)
 tutorialTitle.TextColor3 = COLORS.red
-local tutorialText = makeLabel(tutorial, "Steps", "1  WALK around the restaurant\n2  FIND the glowing launcher\n3  PRESS E to start serving!", UDim2.new(1, -28, 0, 92), UDim2.fromOffset(14, 41), 16)
+local tutorialText = makeLabel(tutorial, "Steps", "MOUSE / W A S D TO AIM\nHOLD SPACE OR CLICK, THEN RELEASE", UDim2.new(1, -24, 0, 50), UDim2.fromOffset(12, 35), 12)
 tutorialText.TextXAlignment = Enum.TextXAlignment.Left
 tutorialText.TextYAlignment = Enum.TextYAlignment.Top
 
@@ -512,6 +524,14 @@ end
 
 if UserInputService.TouchEnabled then
 	tutorial.Visible = false
+	tutorial.Size = UDim2.fromOffset(180, 60)
+	tutorial.Position = UDim2.new(0, 8, 0, 86)
+	tutorialTitle.Size = UDim2.new(1, -16, 0, 22)
+	tutorialTitle.Position = UDim2.fromOffset(8, 5)
+	tutorialTitle.TextSize = 11
+	tutorialText.Size = UDim2.new(1, -16, 0, 30)
+	tutorialText.Position = UDim2.fromOffset(8, 26)
+	tutorialText.TextSize = 9
 	dialogueCard.Size = UDim2.fromOffset(320, 110)
 	dialogueCard.Position = UDim2.new(0, 10, 0.55, 0)
 	dialogueName.Size = UDim2.new(1, -108, 0, 21)
@@ -634,6 +654,235 @@ if UserInputService.TouchEnabled then
 	walkHint.TextSize = 11
 end
 
+local onboardingHelpButton = makeButton(gui, "PizzaTrailHelp", "?  HELP", UDim2.fromOffset(92, 38), UDim2.new(1, -110, 0, 140), COLORS.yellow)
+onboardingHelpButton.TextColor3 = COLORS.darkRed
+onboardingHelpButton.TextSize = 13
+onboardingHelpButton.ZIndex = 4
+if UserInputService.TouchEnabled then
+	onboardingHelpButton.Size = UDim2.fromOffset(76, 34)
+	onboardingHelpButton.Position = UDim2.new(1, -86, 0, 104)
+	onboardingHelpButton.TextSize = 11
+end
+
+local PIZZA_TRAIL_POINTS = {
+	Vector3.new(-16, -0.39, 83.5),
+	Vector3.new(-13, -0.39, 82.5),
+	Vector3.new(-10, -0.39, 81.5),
+	Vector3.new(-7, -0.39, 80.5),
+	Vector3.new(-4.5, -0.39, 78.5),
+	Vector3.new(-2, 0.46, 76),
+	Vector3.new(0, 0.46, 74.5),
+}
+
+local function registerTrailPart(part: BasePart, baseTransparency: number)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.CastShadow = false
+	part:SetAttribute("TrailBaseTransparency", baseTransparency)
+	part.Transparency = baseTransparency
+	table.insert(onboardingTrailParts, part)
+end
+
+local function makePizzaArrow(parent: Instance, position: Vector3, nextPosition: Vector3, index: number)
+	local direction = Vector3.new(nextPosition.X - position.X, 0, nextPosition.Z - position.Z)
+	if direction.Magnitude < 0.01 then
+		direction = Vector3.new(0, 0, -1)
+	end
+	local arrowFrame = CFrame.lookAt(position, position + direction.Unit)
+	local model = Instance.new("Model")
+	model.Name = string.format("PizzaArrow%02d", index)
+	model.Parent = parent
+
+	local shaft = Instance.new("Part")
+	shaft.Name = "CheeseShaft"
+	shaft.Size = Vector3.new(0.9, 0.09, 2.15)
+	shaft.CFrame = arrowFrame * CFrame.new(0, 0, 0.25)
+	shaft.Color = COLORS.yellow
+	shaft.Material = Enum.Material.Neon
+	shaft.Parent = model
+	registerTrailPart(shaft, 0.12)
+
+	for side = -1, 1, 2 do
+		local arrowHead = Instance.new("Part")
+		arrowHead.Name = "CheeseArrowHead"
+		arrowHead.Size = Vector3.new(0.72, 0.09, 1.85)
+		arrowHead.CFrame = arrowFrame * CFrame.new(side * 0.62, 0, -1.12) * CFrame.Angles(0, math.rad(side * 42), 0)
+		arrowHead.Color = COLORS.yellow
+		arrowHead.Material = Enum.Material.Neon
+		arrowHead.Parent = model
+		registerTrailPart(arrowHead, 0.12)
+	end
+
+	for pepperoniIndex, offset in { -0.48, 0.38 } do
+		local pepperoni = Instance.new("Part")
+		pepperoni.Name = "Pepperoni"
+		pepperoni.Shape = Enum.PartType.Cylinder
+		pepperoni.Size = Vector3.new(0.08, 0.44, 0.44)
+		pepperoni.CFrame = arrowFrame * CFrame.new((pepperoniIndex - 1.5) * 0.22, 0.075, offset) * CFrame.Angles(0, 0, math.pi / 2)
+		pepperoni.Color = COLORS.red
+		pepperoni.Material = Enum.Material.SmoothPlastic
+		pepperoni.Parent = model
+		registerTrailPart(pepperoni, 0.04)
+	end
+end
+
+local function ensurePizzaTrailWorld()
+	if onboardingTrailFolder and onboardingTrailFolder.Parent then
+		return
+	end
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local station = world and world:FindFirstChild("LauncherStation")
+	local console = station and station:FindFirstChild("OperatorConsole")
+	if not console or not console:IsA("BasePart") then
+		return
+	end
+
+	onboardingTrailParts = {}
+	local folder = Instance.new("Folder")
+	folder.Name = "LocalPizzaTrail"
+	folder:SetAttribute("ClientOnly", true)
+	folder.Parent = Workspace
+	onboardingTrailFolder = folder
+	for index, position in PIZZA_TRAIL_POINTS do
+		local nextPosition = PIZZA_TRAIL_POINTS[index + 1] or console.Position
+		makePizzaArrow(folder, position, nextPosition, index)
+	end
+
+	local beacon = Instance.new("BillboardGui")
+	beacon.Name = "PizzaCannonBeacon"
+	beacon.Adornee = console
+	beacon.AlwaysOnTop = true
+	beacon.LightInfluence = 0
+	beacon.MaxDistance = 150
+	beacon.Size = UDim2.fromOffset(UserInputService.TouchEnabled and 190 or 228, UserInputService.TouchEnabled and 40 or 46)
+	beacon.StudsOffsetWorldSpace = Vector3.new(0, 6.5, 0)
+	-- Parent to the authored console on this client so the beacon survives a
+	-- character respawn without ever becoming a server-owned world object.
+	beacon.Parent = console
+	local beaconFrame = Instance.new("Frame")
+	beaconFrame.Size = UDim2.fromScale(1, 1)
+	beaconFrame.BackgroundColor3 = COLORS.darkRed
+	beaconFrame.BackgroundTransparency = 0.06
+	beaconFrame.Parent = beacon
+	addCorner(beaconFrame, 13)
+	addStroke(beaconFrame, COLORS.yellow, 3)
+	local beaconLabel = makeLabel(beaconFrame, "Label", "PIZZA CANNON", UDim2.new(1, -12, 1, -8), UDim2.fromOffset(6, 4), UserInputService.TouchEnabled and 12 or 14)
+	beaconLabel.TextColor3 = COLORS.cream
+	onboardingBeacon = beacon
+	onboardingBeaconText = beaconLabel
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "PizzaCannonInteractionHighlight"
+	highlight.Adornee = console
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillColor = COLORS.yellow
+	highlight.FillTransparency = 0.82
+	highlight.OutlineColor = COLORS.red
+	highlight.OutlineTransparency = 0.05
+	highlight.Enabled = false
+	highlight.Parent = folder
+	onboardingHighlight = highlight
+end
+
+local function updateOnboardingWalkHint()
+	if onboardingTrailActive then
+		walkHint.Text = "FOLLOW THE PIZZA TRAIL TO THE PIZZA CANNON."
+	elseif onboardingReachedLauncher then
+		walkHint.Text = "PRESS E OR TAP TO OPERATE THE PIZZA CANNON."
+	else
+		walkHint.Text = UserInputService.TouchEnabled and "WALK TO THE PIZZA CANNON • TAP OPERATE" or "WALK TO THE PIZZA CANNON • PRESS E / TAP TO OPERATE"
+	end
+end
+
+local function setPizzaTrailVisible(visible: boolean, immediate: boolean?)
+	ensurePizzaTrailWorld()
+	onboardingTrailActive = visible
+	for _, part in onboardingTrailParts do
+		local target = visible and (part:GetAttribute("TrailBaseTransparency") or 0.1) or 1
+		if immediate then
+			part.Transparency = target
+		else
+			TweenService:Create(part, TweenInfo.new(0.35), { Transparency = target }):Play()
+		end
+	end
+	if onboardingBeacon then
+		onboardingBeacon.Enabled = visible or onboardingReachedLauncher
+	end
+	if onboardingHighlight then
+		onboardingHighlight.Enabled = onboardingReachedLauncher and not operating
+	end
+	updateOnboardingWalkHint()
+end
+
+local function beginPizzaTrail(replay: boolean)
+	if onboardingCompleted and not replay then
+		return
+	end
+	onboardingReplayActive = replay
+	onboardingReachedLauncher = false
+	tutorial.Visible = false
+	setPizzaTrailVisible(not operating, true)
+	if onboardingBeacon then
+		onboardingBeacon.Enabled = not operating
+	end
+end
+
+local function showFirstPizzaHint()
+	tutorialTitle.Text = "AIM  •  CHARGE  •  LAUNCH!"
+	tutorialText.Text = UserInputService.TouchEnabled
+		and "DRAG / ARROWS • AIM\nHOLD + RELEASE"
+		or "MOUSE / W A S D TO AIM\nHOLD SPACE OR CLICK, THEN RELEASE"
+	restoreTutorialAppearance()
+	tutorial.Visible = true
+end
+
+local function updatePizzaTrail()
+	ensurePizzaTrailWorld()
+	if onboardingTrailActive then
+		local pulse = math.sin(os.clock() * 3.4) * 0.08
+		for _, part in onboardingTrailParts do
+			local baseTransparency = part:GetAttribute("TrailBaseTransparency") or 0.1
+			part.Transparency = math.clamp(baseTransparency + pulse, 0.02, 0.28)
+		end
+	end
+	if operating or (onboardingCompleted and not onboardingReplayActive) then
+		return
+	end
+	if os.clock() < onboardingNextDistanceCheck then
+		return
+	end
+	onboardingNextDistanceCheck = os.clock() + 0.1
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local console = world and world:FindFirstChild("OperatorConsole", true)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not console or not console:IsA("BasePart") or not root or not root:IsA("BasePart") then
+		return
+	end
+	local distance = (root.Position - console.Position).Magnitude
+	if onboardingBeaconText then
+		onboardingBeaconText.Text = onboardingReachedLauncher
+			and "PIZZA CANNON  •  E / TAP"
+			or string.format("PIZZA CANNON  •  %d STUDS", math.max(0, math.floor(distance + 0.5)))
+	end
+	if onboardingTrailActive and distance <= 12 then
+		onboardingReachedLauncher = true
+		setPizzaTrailVisible(false, false)
+	elseif onboardingReachedLauncher and distance > 18 then
+		onboardingReachedLauncher = false
+		setPizzaTrailVisible(true, false)
+	end
+end
+
+onboardingHelpButton.Activated:Connect(function()
+	beginPizzaTrail(true)
+	if operating then
+		showFirstPizzaHint()
+	end
+end)
+
 local trajectoryFolder = Instance.new("Folder")
 trajectoryFolder.Name = "LocalAimGuide"
 trajectoryFolder.Parent = Workspace
@@ -727,11 +976,14 @@ local function updateRecordUI()
 	roundCard.Visible = not session
 	stats.Visible = not session
 	shopToggle.Visible = not session
+	onboardingHelpButton.Visible = not session
 	if session then
 		local canAim = operating and (status == "countdown" or status == "running")
 		controls.Visible = canAim
 		touchAimPad.Visible = canAim and UserInputService.TouchEnabled
-		tutorial.Visible = false
+		if onboardingCompleted and not onboardingReplayActive then
+			tutorial.Visible = false
+		end
 	end
 	if status == "saving" then
 		recordSummary.Visible = true
@@ -1169,7 +1421,7 @@ local function setMovementLocked(locked: boolean)
 	end
 end
 
-local function restoreTutorialAppearance()
+restoreTutorialAppearance = function()
 	tutorial.BackgroundTransparency = 0.03
 	for _, descendant in tutorial:GetDescendants() do
 		if descendant:IsA("TextLabel") then
@@ -1215,24 +1467,26 @@ local function applyMode()
 	setMovementLocked(operating)
 
 	if operating then
-		tutorialTitle.Text = recordSession and "60 SECONDS. CHASE THE RECORD!" or "DELIVER SOME HAPPINESS!"
-		tutorialText.Text = recordSession and "1  HIT the glowing order\n2  FAR tables score more\n3  KEEP the combo alive!" or "1  AIM the landing ring\n2  ADJUST the arc up or down\n3  HOLD power, then RELEASE!"
-		tutorial.Visible = not recordSession and not UserInputService.TouchEnabled and not hasLaunched
-		if tutorial.Visible then
-			restoreTutorialAppearance()
+		onboardingReachedLauncher = true
+		setPizzaTrailVisible(false, true)
+		if onboardingBeacon then onboardingBeacon.Enabled = false end
+		if onboardingHighlight then onboardingHighlight.Enabled = false end
+		if not onboardingCompleted or onboardingReplayActive then
+			showFirstPizzaHint()
+		else
+			tutorial.Visible = false
 		end
 	else
 		resetLauncherInput()
 		controls.Visible = false
 		touchAimPad.Visible = false
 		exitButton.Visible = false
-		if not hasLaunched and not UserInputService.TouchEnabled then
-			tutorialTitle.Text = "WELCOME, PIZZA CHEF!"
-			tutorialText.Text = "1  WALK around the restaurant\n2  FIND the glowing launcher\n3  PRESS E to start serving!"
-			tutorial.Visible = true
-			restoreTutorialAppearance()
+		tutorial.Visible = false
+		if not onboardingCompleted or onboardingReplayActive then
+			beginPizzaTrail(onboardingReplayActive)
 		else
-			tutorial.Visible = false
+			onboardingReachedLauncher = false
+			setPizzaTrailVisible(false, true)
 		end
 		for _, dot in trajectoryParts do
 			dot.Transparency = 1
@@ -1312,7 +1566,6 @@ local function launch()
 	charging = false
 	activeFireInput = nil
 	ready = false
-	hasLaunched = true
 	launchRemote:FireServer(currentDirection(), charge)
 	fireButton.Text = "OVEN\nRELOAD"
 	fireButton.BackgroundColor3 = Color3.fromRGB(142, 128, 119)
@@ -1324,14 +1577,8 @@ local function launch()
 	task.delay(0.1, function()
 		TweenService:Create(screenTint, TweenInfo.new(0.18), { BackgroundTransparency = 1 }):Play()
 	end)
-	TweenService:Create(tutorial, TweenInfo.new(0.35), { BackgroundTransparency = 1 }):Play()
-	for _, descendant in tutorial:GetDescendants() do
-		if descendant:IsA("TextLabel") then
-			TweenService:Create(descendant, TweenInfo.new(0.35), { TextTransparency = 1 }):Play()
-		elseif descendant:IsA("UIStroke") then
-			TweenService:Create(descendant, TweenInfo.new(0.35), { Transparency = 1 }):Play()
-		end
-	end
+	-- The first-pizza card waits for the server-accepted `launched` event so a
+	-- rejected input can never falsely complete onboarding.
 end
 
 shopToggle.Activated:Connect(function()
@@ -1436,6 +1683,24 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		local reloadTime = state.payload and state.payload.reloadTime or Config.RELOAD_TIME
 		reloadReadyAt = os.clock() + reloadTime
 		playLauncherFire(reloadTime)
+		if not onboardingCompleted or onboardingReplayActive then
+			onboardingCompleted = true
+			onboardingReplayActive = false
+			onboardingReachedLauncher = false
+			setPizzaTrailVisible(false, true)
+			if onboardingBeacon then onboardingBeacon.Enabled = false end
+			if onboardingHighlight then onboardingHighlight.Enabled = false end
+			TweenService:Create(tutorial, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+			for _, descendant in tutorial:GetDescendants() do
+				if descendant:IsA("TextLabel") then
+					TweenService:Create(descendant, TweenInfo.new(0.2), { TextTransparency = 1 }):Play()
+				elseif descendant:IsA("UIStroke") then
+					TweenService:Create(descendant, TweenInfo.new(0.2), { Transparency = 1 }):Play()
+				end
+			end
+			task.delay(0.26, function() tutorial.Visible = false end)
+			showEventBanner({ title = "YOU'RE COOKING!", icon = "OK", detail = "Serve hungry customers for coins." })
+		end
 	elseif state.event == "shotResult" and state.payload then
 		local payload = state.payload
 		local detail
@@ -1527,16 +1792,19 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	elseif state.event == "shiftEventEnded" and state.payload then
 		showEventBanner({ title = state.payload.title or "SHIFT EVENT", icon = "OK", detail = state.payload.detail })
 	elseif state.event == "modeChanged" and state.payload then
-		showFeedback(state.payload.result or (operating and "READY!" or "LET'S WALK!"), operating and COLORS.green or COLORS.yellow,
-			operating and "Aim for the glowing delivery plate" or "Explore, greet customers, or check the register")
+		if onboardingCompleted and not onboardingReplayActive then
+			showFeedback(state.payload.result or (operating and "READY!" or "LET'S WALK!"), operating and COLORS.green or COLORS.yellow,
+				operating and "Aim for the glowing delivery plate" or "Explore, greet customers, or check the register")
+		end
 	elseif state.event == "notice" and state.payload then
 		showFeedback(state.payload.result or "PIZZA PLACE", state.payload.color or COLORS.yellow, state.payload.detail)
 	elseif state.event == "welcome" then
-		showFeedback("WELCOME, CHEF!", COLORS.yellow, "Walk to the glowing launcher and press E")
+		beginPizzaTrail(false)
 	end
 end)
 
 RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
+	updatePizzaTrail()
 	if not operating then
 		return
 	end
@@ -1652,6 +1920,10 @@ end)
 task.defer(function()
 	local world = Workspace:WaitForChild("PizzaLaunchWorld", 10)
 	if world then
+		ensurePizzaTrailWorld()
+		if not onboardingCompleted then
+			beginPizzaTrail(false)
+		end
 		local function watchTable(tableModel)
 			if tableModel:IsA("Model") and tableModel:GetAttribute("TableId") then
 				table.insert(tableAvailabilityConnections, tableModel:GetAttributeChangedSignal("DeliveryAvailable"):Connect(function()
@@ -1679,6 +1951,11 @@ player.CharacterAdded:Connect(function(character)
 			camera.CameraType = Enum.CameraType.Custom
 			camera.CameraSubject = humanoid
 			camera.FieldOfView = 70
+		end
+		if not onboardingCompleted then
+			task.defer(function()
+				beginPizzaTrail(false)
+			end)
 		end
 	end
 end)

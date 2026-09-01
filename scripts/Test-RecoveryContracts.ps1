@@ -53,6 +53,12 @@ Assert-True ($world.Contains('buildNeighborhoodStreet(world)')) 'isolated neighb
 Assert-True ($world.Contains('RemovableWithoutGameplayImpact')) 'visual expansion models declare their gameplay-safe ownership boundary'
 Assert-True ($world.Contains('CFrame.new(x, 0.2, 83)')) 'customer spawn points begin outside the front doors'
 Assert-True (-not $world.Contains('StudioRestaurant:Destroy')) 'runtime world does not delete StudioRestaurant'
+Assert-True ($world.Contains('Permanent launcher-sightline rule')) 'future world art carries the permanent launcher-sightline rule'
+Assert-True (-not $world.Contains('CFrame.new(0, 24, 70.8)')) 'blocking centered Neighborhood Favorite sign placement is absent'
+Assert-True ($world.Contains('CFrame.new(42, 27.2, 73.4)')) 'Neighborhood Favorite sign is relocated full-size to the exterior facade'
+$signNearestHorizontalEdge = 42 - (28 / 2)
+$signHorizontalAngle = [Math]::Atan2($signNearestHorizontalEdge, [Math]::Abs(82 - 73.4)) * 180 / [Math]::PI
+Assert-True ($signHorizontalAngle -gt 28.5) 'relocated sign stays outside the 57-degree launcher-camera horizontal frustum'
 Assert-True ($config.Contains('Config.RECORD_RUN_STORE = "PizzaLaunch_RecordRun_AllTime_v1"')) 'OrderedDataStore name is unchanged'
 Assert-True ($config.Contains('Config.LAUNCH_ORIGIN = Vector3.new(0, 12, 50)')) 'Transfer launcher origin is unchanged'
 Assert-True ($config.Contains('Vector3.new(-24, 2.5, 2)') -and $config.Contains('Vector3.new(24, 2.5, -55)')) 'Transfer near/far table geometry is present'
@@ -70,6 +76,23 @@ Assert-True ($client.Contains('dialogueCard.Name = "CustomerDialogueCard"')) 'cu
 Assert-True ($client.Contains('dialogueText.TextScaled = false')) 'customer dialogue never uses oversized TextScaled rendering'
 Assert-True ($client.Contains('dialogueCard.Active = false')) 'customer dialogue card is non-modal'
 Assert-True ($client.Contains('eventBanner.Name = "ShiftEventBanner"')) 'shift events use a compact side banner'
+$trailBlock = [regex]::Match($client, 'local PIZZA_TRAIL_POINTS = \{([\s\S]*?)\r?\n\}')
+Assert-True ($trailBlock.Success) 'client defines an isolated Pizza Trail route'
+Assert-True (([regex]::Matches($trailBlock.Groups[1].Value, 'Vector3\.new\(')).Count -eq 7) 'Pizza Trail contains seven low-profile path arrows'
+Assert-True ($trailBlock.Groups[1].Value.Contains('Vector3.new(-16, -0.39, 83.5)')) 'Pizza Trail begins beside the authored walk spawn'
+Assert-True ($trailBlock.Groups[1].Value.Contains('Vector3.new(0, 0.46, 74.5)')) 'Pizza Trail ends on top of the launcher platform at the regular console'
+Assert-True ($client.Contains('part.CanCollide = false') -and $client.Contains('part.CanTouch = false') -and $client.Contains('part.CanQuery = false')) 'Pizza Trail markers cannot affect movement, shots, or target queries'
+Assert-True ($client.Contains('folder:SetAttribute("ClientOnly", true)')) 'Pizza Trail world art is local to each player'
+Assert-True ($client.Contains('FOLLOW THE PIZZA TRAIL TO THE PIZZA CANNON.')) 'first-spawn hint gives the environmental route instruction'
+Assert-True ($client.Contains('PRESS E OR TAP TO OPERATE THE PIZZA CANNON.')) 'launcher-reached hint supports keyboard and touch'
+Assert-True ($client.Contains('AIM  •  CHARGE  •  LAUNCH!')) 'mounted onboarding uses the compact first-pizza corner hint'
+Assert-True ($client.Contains('onboardingHelpButton.Activated:Connect')) 'Help button can voluntarily replay Pizza Trail'
+Assert-True ($client.Contains('if onboardingCompleted and not replay then')) 'automatic Pizza Trail does not replay after completion'
+Assert-True ($client.Contains('player.CharacterAdded:Connect') -and $client.Contains('beginPizzaTrail(false)')) 'incomplete Pizza Trail is restored after respawn'
+$acceptedLaunchIndex = $client.IndexOf('if state.event == "launched"')
+$onboardingCompleteIndex = $client.IndexOf('onboardingCompleted = true', $acceptedLaunchIndex)
+Assert-True ($acceptedLaunchIndex -ge 0 -and $onboardingCompleteIndex -gt $acceptedLaunchIndex) 'first-pizza completion waits for the server-accepted launch event'
+Assert-True ($client.Contains('YOU''RE COOKING!') -and $client.Contains('Serve hungry customers for coins.')) 'accepted first launch shows the compact completion banner'
 Assert-True ($world.Contains('ring:SetAttribute("DeliveryZone", true)')) 'Wider Plates owns a physical server-visible delivery zone'
 Assert-True ($gameService.Contains('updateDeliveryZones(newLevel, false)')) 'Wider Plates updates the authoritative zone immediately after purchase'
 Assert-True ($gameService.Contains('RecordRunService.isSession(player) and 0 or state.upgrades.power')) 'Hotter Oven remains disabled for Record Run fairness'
