@@ -47,3 +47,10 @@
 - `Workspace.$ignoreUnknownInstances` must be true.
 - Runtime generation may replace only `PizzaLaunchWorld`; it must not modify `StudioRestaurant`.
 - The Transfer backup is read-only and excluded from version-control staging.
+
+## Recovery artifact
+
+- Working artifact: `E:\projects\roblox\pizzalaunch\recovery\PizzaLaunchMerged.recovery-20260831.rbxl`
+- SHA-256: `8C1C1B815626970FE6C228247338D52637B15B379022BD5A217AE936B976EE4B`
+- Provenance: deserialized from the Transfer DataModel and written to a new path after replacing exactly ten reviewed script sources. The original input was never serialized or written.
+- Static inventory: 92 descendants, six Workspace descendants, and ten script containers matching the reviewed branch source byte-for-byte.

@@ -8,6 +8,17 @@ function Assert-True([bool]$Condition, [string]$Message) {
     Write-Output "PASS: $Message"
 }
 
+function Get-NormalizedSourceHash([string]$Path) {
+    $text = [System.IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
+    $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($text)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [System.BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '')
+    } finally {
+        $sha.Dispose()
+    }
+}
+
 $transferInvariantHashes = @{
     'src\server\CustomerService.luau' = '78E7214C2D762165637761BED10F8663A5636B59B25739B67D928F9A00D05E4F'
     'src\server\InteractionService.luau' = '0C898C82732795319F395F45BE69018C78B77156C2F01739C6E97DDA876BEA1B'
@@ -16,7 +27,7 @@ $transferInvariantHashes = @{
     'src\server\init.server.luau' = '6EA4502197116E37571D53A7A24A0C1227DBC8270C3614A3518DD3B8F161D7C4'
 }
 foreach ($relativePath in $transferInvariantHashes.Keys) {
-    $actual = (Get-FileHash -LiteralPath (Join-Path $root $relativePath) -Algorithm SHA256).Hash
+    $actual = Get-NormalizedSourceHash (Join-Path $root $relativePath)
     Assert-True ($actual -eq $transferInvariantHashes[$relativePath]) "$relativePath remains byte-identical to Transfer"
 }
 

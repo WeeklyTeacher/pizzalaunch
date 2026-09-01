@@ -1,5 +1,17 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — safe Transfer recovery merge
+
+- Created branch `recovery/safe-transfer-merge-20260831` from `620262d`; recorded the clean tracked baseline and the supplied backup hash before source changes.
+- Read-only binary inventory of `recovery/PizzaLaunchTransfer.rbxl` found the complete ten-script game and a minimal saved Workspace. The restaurant, tables, launcher, customers, and UI are runtime-built; no Workspace replacement was performed.
+- Confirmed `CustomerService`, `InteractionService`, `LayoutService`, `PropService`, and bootstrap are byte-identical to Transfer. Preserved the existing six target coordinates, launcher origin/camera, scoring, coins, upgrades, free play, Record Run, and DataStore name.
+- Found and fixed the current-world construction regression: the detailed cannon used undefined `COLORS.orange`, which could stop `WorldBuilder` while creating the launcher.
+- Added a selected storefront merge around the existing coordinates: exterior sidewalk, framed façade, central player entrance/exit, customer door openings, canopy, marquee, and planters. Customer spawn points now begin on the exterior forecourt and use the unchanged Transfer side-aisle/customer lifecycle.
+- Made Workspace preservation explicit with `$ignoreUnknownInstances: true`, no Workspace `$path`, and a pre-sync safety check that also verifies the Transfer SHA-256.
+- Created `recovery/PizzaLaunchMerged.recovery-20260831.rbxl` from the Transfer DataModel at a new path. All ten embedded scripts match reviewed branch source; the Transfer input hash remained `73B3D5DF3B72F9B13350790759B715BC0E510BB7A41FED3C895F58BD17F11088`.
+- Automated verification passed: recovery safety/contracts, Transfer-invariant module hashes, customer lifecycle states, launcher/Record Run path presence, undefined color detection, artifact script equality, Rojo build, and `git diff --check`.
+- Roblox Studio was not launched in this run. Launcher firing before/after Record Run, live NPC movement through doors, collisions, mobile UI, and final visual composition remain explicit Studio-only checks; no live DataStore claim is made.
+
 ## 2026-08-31 — active reliability pass
 
 - Added one idempotent server launcher cleanup path for normal exit, Record Run completion, result exit, respawn, cancellation, and player removal. It clears the launcher lease, active projectile/touch connection, launch debounce/permission, Record Run handoff, and character movement; the client resets charging/input, camera, controls, guide, and launcher UI from the authoritative mode.
