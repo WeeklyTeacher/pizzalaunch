@@ -31,7 +31,7 @@
 - Initial unpublished-place playtest exposed that `GetOrderedDataStore()` itself can fail during module loading. Store acquisition is now guarded and lazy; a fresh Studio session produced empty Output.
 - Actual prompt input showed the three-second countdown, anchored operator pose, Scriptable camera, record HUD, and enabled launcher controls. Q exit restored Custom camera, WalkSpeed 16, an unanchored character, the side exit, and both station prompts.
 - Authoritative calibrated shots scored Table 1 Perfect at 140 and Table 2 Perfect at 150. Four consecutive Perfect deliveries reached 708 points and multiplier 1.25x; a deliberate wrong-table delivery left the score at 708 and reset the combo to 0.
-- A complete API-disabled run ended with a 290-point session best, a readable `GLOBAL BOARD UNAVAILABLE THIS SESSION` result, and an updated local best display. No DataStore error appeared.
+- A complete API-disabled run ended with a 290-point session best, the labeled Studio fallback `Global leaderboard is available in the published game. Studio API access is currently off.`, and an updated local best display. No DataStore error appeared.
 - iPhone 17 Pro landscape at a 750x361 runtime viewport fit the record header, timer, score, combo, personal best, target lane, aim pad, power controls, launch button, and exit button without clipping. The end summary remained centered and readable.
 - Fresh free-play regression after Record Run work delivered a Perfect pizza for +20 coins and combo 1, confirming the original restaurant loop remains intact. Final Studio Output was empty.
 
