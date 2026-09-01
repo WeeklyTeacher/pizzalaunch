@@ -195,21 +195,22 @@ feedback.Visible = false
 feedback.ZIndex = 5
 
 local roundOverlay = Instance.new("Frame")
-roundOverlay.Name = "RoundOverlay"
-roundOverlay.AnchorPoint = Vector2.new(0.5, 0.5)
-roundOverlay.Size = UDim2.fromOffset(510, 190)
-roundOverlay.Position = UDim2.fromScale(0.5, 0.46)
-roundOverlay.BackgroundColor3 = COLORS.red
-roundOverlay.BackgroundTransparency = 0.05
+roundOverlay.Name = "RoundClearedBanner"
+roundOverlay.AnchorPoint = Vector2.new(0.5, 0)
+roundOverlay.Size = UDim2.fromOffset(510, 78)
+roundOverlay.Position = UDim2.new(0.5, 0, 0, 126)
+roundOverlay.BackgroundColor3 = COLORS.darkRed
+roundOverlay.BackgroundTransparency = 0.04
+roundOverlay.Active = false
 roundOverlay.Visible = false
 roundOverlay.ZIndex = 8
 roundOverlay.Parent = gui
-addCorner(roundOverlay, 28)
-addStroke(roundOverlay, COLORS.yellow, 5)
-local roundOverlayTitle = makeLabel(roundOverlay, "Title", "ROUND CLEARED!", UDim2.new(1, -30, 0, 75), UDim2.fromOffset(15, 20), 40)
+addCorner(roundOverlay, 18)
+addStroke(roundOverlay, COLORS.yellow, 3)
+local roundOverlayTitle = makeLabel(roundOverlay, "Title", "ROUND CLEARED!", UDim2.new(1, -28, 0, 30), UDim2.fromOffset(14, 7), 23)
 roundOverlayTitle.TextColor3 = COLORS.yellow
 roundOverlayTitle.ZIndex = 9
-local roundOverlayDetail = makeLabel(roundOverlay, "Detail", "+25 COINS • NEXT: DINNER RUSH", UDim2.new(1, -30, 0, 65), UDim2.fromOffset(15, 100), 22)
+local roundOverlayDetail = makeLabel(roundOverlay, "Detail", "+25 COINS  -  NEXT: DINNER RUSH", UDim2.new(1, -28, 0, 27), UDim2.fromOffset(14, 40), 15)
 roundOverlayDetail.TextColor3 = Color3.new(1, 1, 1)
 roundOverlayDetail.ZIndex = 9
 
@@ -249,25 +250,29 @@ countdownLabel.ZIndex = 12
 
 local recordSummary = Instance.new("Frame")
 recordSummary.Name = "RecordSummary"
-recordSummary.AnchorPoint = Vector2.new(0.5, 0.5)
-recordSummary.Size = UDim2.fromOffset(540, 270)
-recordSummary.Position = UDim2.fromScale(0.5, 0.47)
+recordSummary.AnchorPoint = Vector2.new(0.5, 0)
+recordSummary.Size = UDim2.fromOffset(540, 154)
+recordSummary.Position = UDim2.new(0.5, 0, 0, 124)
 recordSummary.BackgroundColor3 = COLORS.darkRed
+recordSummary.Active = false
 recordSummary.Visible = false
 recordSummary.ZIndex = 10
 recordSummary.Parent = gui
-addCorner(recordSummary, 28)
-addStroke(recordSummary, COLORS.yellow, 5)
-local recordSummaryTitle = makeLabel(recordSummary, "Title", "TIME!", UDim2.new(1, -30, 0, 65), UDim2.fromOffset(15, 18), 43)
+addCorner(recordSummary, 20)
+addStroke(recordSummary, COLORS.yellow, 3)
+local recordSummaryTitle = makeLabel(recordSummary, "Title", "TIME!", UDim2.new(1, -190, 0, 34), UDim2.fromOffset(16, 9), 27)
 recordSummaryTitle.TextColor3 = COLORS.yellow
+recordSummaryTitle.TextXAlignment = Enum.TextXAlignment.Left
 recordSummaryTitle.ZIndex = 11
-local recordSummaryDetail = makeLabel(recordSummary, "Detail", "FINAL SCORE  0\nPERSONAL BEST  0", UDim2.new(1, -40, 0, 110), UDim2.fromOffset(20, 88), 24)
+local recordSummaryDetail = makeLabel(recordSummary, "Detail", "FINAL SCORE  0\nPERSONAL BEST  0", UDim2.new(1, -188, 0, 78), UDim2.fromOffset(16, 43), 18)
 recordSummaryDetail.TextColor3 = Color3.new(1, 1, 1)
+recordSummaryDetail.TextXAlignment = Enum.TextXAlignment.Left
 recordSummaryDetail.ZIndex = 11
-local recordSummaryHint = makeLabel(recordSummary, "Hint", "EXIT THE LAUNCHER TO WALK AROUND OR TRY AGAIN", UDim2.new(1, -30, 0, 35), UDim2.fromOffset(15, 218), 13)
+local recordSummaryHint = makeLabel(recordSummary, "Hint", "EXIT THE LAUNCHER TO WALK AROUND OR TRY AGAIN", UDim2.new(1, -28, 0, 23), UDim2.fromOffset(14, 125), 11)
 recordSummaryHint.TextColor3 = COLORS.cream
+recordSummaryHint.TextXAlignment = Enum.TextXAlignment.Left
 recordSummaryHint.ZIndex = 11
-local recordContinue = makeButton(recordSummary, "Continue", "BACK TO RESTAURANT", UDim2.fromOffset(220, 38), UDim2.new(0.5, -110, 1, -46), COLORS.green)
+local recordContinue = makeButton(recordSummary, "Continue", "BACK TO RESTAURANT", UDim2.fromOffset(160, 52), UDim2.new(1, -174, 0, 14), COLORS.green)
 recordContinue.TextSize = 13
 recordContinue.ZIndex = 12
 
@@ -480,9 +485,14 @@ if UserInputService.TouchEnabled then
 	fireButton.Size = UDim2.fromOffset(128, 80)
 	fireButton.Position = UDim2.new(1, -140, 0, 14)
 	fireButton.TextSize = 18
-	roundOverlay.Size = UDim2.fromOffset(390, 150)
-	roundOverlayTitle.TextSize = 31
-	roundOverlayDetail.TextSize = 17
+	roundOverlay.Size = UDim2.fromOffset(340, 58)
+	roundOverlay.Position = UDim2.new(0.5, 0, 0, 84)
+	roundOverlayTitle.Size = UDim2.new(1, -20, 0, 22)
+	roundOverlayTitle.Position = UDim2.fromOffset(10, 4)
+	roundOverlayTitle.TextSize = 17
+	roundOverlayDetail.Size = UDim2.new(1, -20, 0, 22)
+	roundOverlayDetail.Position = UDim2.fromOffset(10, 29)
+	roundOverlayDetail.TextSize = 11
 	recordHud.Size = UDim2.fromOffset(330, 74)
 	recordHud.Position = UDim2.new(0.5, 0, 0, 5)
 	recordTitle.Size = UDim2.new(1, -12, 0, 16)
@@ -503,17 +513,21 @@ if UserInputService.TouchEnabled then
 	countdownLabel.Size = UDim2.fromOffset(360, 120)
 	countdownLabel.Position = UDim2.new(0.5, -180, 0.22, 0)
 	countdownLabel.TextSize = 74
-	recordSummary.Size = UDim2.fromOffset(390, 220)
-	recordSummaryTitle.TextSize = 34
-	recordSummaryDetail.Position = UDim2.fromOffset(16, 74)
-	recordSummaryDetail.Size = UDim2.new(1, -32, 0, 95)
-	recordSummaryDetail.TextSize = 19
-	recordSummaryHint.Position = UDim2.fromOffset(12, 177)
-	recordSummaryHint.Size = UDim2.new(1, -24, 0, 32)
-	recordSummaryHint.TextSize = 10
-	recordContinue.Size = UDim2.fromOffset(190, 30)
-	recordContinue.Position = UDim2.new(0.5, -95, 1, -36)
-	recordContinue.TextSize = 10
+	recordSummary.Size = UDim2.fromOffset(350, 134)
+	recordSummary.Position = UDim2.new(0.5, 0, 0, 82)
+	recordSummaryTitle.Size = UDim2.new(1, -132, 0, 27)
+	recordSummaryTitle.Position = UDim2.fromOffset(12, 7)
+	recordSummaryTitle.TextSize = 19
+	recordSummaryDetail.Position = UDim2.fromOffset(12, 34)
+	recordSummaryDetail.Size = UDim2.new(1, -126, 0, 67)
+	recordSummaryDetail.TextSize = 13
+	recordSummaryHint.Position = UDim2.fromOffset(10, 105)
+	recordSummaryHint.Size = UDim2.new(1, -20, 0, 22)
+	recordSummaryHint.TextSize = 8
+	recordContinue.Size = UDim2.fromOffset(108, 45)
+	recordContinue.Position = UDim2.new(1, -118, 0, 11)
+	recordContinue.Text = "CONTINUE"
+	recordContinue.TextSize = 9
 
 end
 
@@ -808,21 +822,116 @@ local function showFeedback(displayText: string, color: Color3, detail: string?)
 	end)
 end
 
+local roundBannerToken = 0
 local function showRoundComplete(payload)
+	roundBannerToken += 1
+	local token = roundBannerToken
 	roundOverlayTitle.Text = string.format("ROUND %d CLEARED!", payload.completedRound or state.round)
-	roundOverlayDetail.Text = string.format("%s\n+%d COIN BONUS • NEXT: %s", payload.completedRoundName or "GREAT WORK", payload.roundReward or 0, state.roundName or "MORE ORDERS")
-	roundOverlay.Size = UserInputService.TouchEnabled and UDim2.fromOffset(340, 20) or UDim2.fromOffset(450, 20)
-	roundOverlay.BackgroundTransparency = 0.25
+	roundOverlayDetail.Text = string.format("%s  -  +%d COINS  -  NEXT: %s", payload.completedRoundName or "GREAT WORK", payload.roundReward or 0, state.roundName or "MORE ORDERS")
+	local targetPosition = UserInputService.TouchEnabled and UDim2.new(0.5, 0, 0, 84) or UDim2.new(0.5, 0, 0, 126)
+	roundOverlay.Position = targetPosition - UDim2.fromOffset(0, 18)
+	roundOverlay.BackgroundTransparency = 1
+	roundOverlayTitle.TextTransparency = 1
+	roundOverlayDetail.TextTransparency = 1
+	local border = roundOverlay:FindFirstChildOfClass("UIStroke")
+	if border then
+		border.Transparency = 1
+	end
 	roundOverlay.Visible = true
 	TweenService:Create(roundOverlay, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = UserInputService.TouchEnabled and UDim2.fromOffset(390, 150) or UDim2.fromOffset(510, 190),
-		BackgroundTransparency = 0.05,
+		Position = targetPosition,
+		BackgroundTransparency = 0.04,
 	}):Play()
-	task.delay(2.25, function()
-		local tween = TweenService:Create(roundOverlay, TweenInfo.new(0.25), { BackgroundTransparency = 1 })
+	TweenService:Create(roundOverlayTitle, TweenInfo.new(0.18), { TextTransparency = 0 }):Play()
+	TweenService:Create(roundOverlayDetail, TweenInfo.new(0.18), { TextTransparency = 0 }):Play()
+	if border then
+		TweenService:Create(border, TweenInfo.new(0.18), { Transparency = 0.05 }):Play()
+	end
+	task.delay(2.15, function()
+		if token ~= roundBannerToken then
+			return
+		end
+		local tween = TweenService:Create(roundOverlay, TweenInfo.new(0.25), {
+			Position = targetPosition - UDim2.fromOffset(0, 12),
+			BackgroundTransparency = 1,
+		})
+		TweenService:Create(roundOverlayTitle, TweenInfo.new(0.2), { TextTransparency = 1 }):Play()
+		TweenService:Create(roundOverlayDetail, TweenInfo.new(0.2), { TextTransparency = 1 }):Play()
+		if border then
+			TweenService:Create(border, TweenInfo.new(0.2), { Transparency = 1 }):Play()
+		end
 		tween:Play()
 		tween.Completed:Wait()
-		roundOverlay.Visible = false
+		if token == roundBannerToken then
+			roundOverlay.Visible = false
+		end
+	end)
+end
+
+local launcherEffectToken = 0
+local function playLauncherFire(reloadTime: number?)
+	launcherEffectToken += 1
+	local token = launcherEffectToken
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local station = world and world:FindFirstChild("LauncherStation")
+	local rig = station and station:FindFirstChild("AimRig")
+	if not station or not rig then
+		return
+	end
+
+	for _, descendant in rig:GetDescendants() do
+		if descendant:IsA("BasePart") and (descendant.Name == "LoadedPizza" or descendant.Name == "LoadedPepperoni") then
+			descendant.LocalTransparencyModifier = 1
+		elseif descendant:IsA("ParticleEmitter") then
+			if descendant.Name == "FlourPuff" then
+				descendant:Emit(10)
+			elseif descendant.Name == "CheeseSpark" then
+				descendant:Emit(16)
+			end
+		end
+	end
+
+	local flash = rig:FindFirstChild("CosmeticMuzzleFlash", true)
+	if flash and flash:IsA("BasePart") then
+		flash.Transparency = 0.08
+		local fireLight = flash:FindFirstChild("FireLight")
+		if fireLight and fireLight:IsA("PointLight") then
+			fireLight.Enabled = true
+		end
+		TweenService:Create(flash, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Transparency = 1 }):Play()
+		task.delay(0.12, function()
+			if fireLight and fireLight:IsA("PointLight") then
+				fireLight.Enabled = false
+			end
+		end)
+	end
+
+	local ovenGlow = station:FindFirstChild("OvenGlow")
+	local ovenLight = ovenGlow and ovenGlow:FindFirstChildOfClass("PointLight")
+	if ovenLight then
+		ovenLight.Brightness = 4.8
+		TweenService:Create(ovenLight, TweenInfo.new(0.3), { Brightness = 2.3 }):Play()
+	end
+	local feedOven = station:FindFirstChild("PizzaFeedOven")
+	local steam = feedOven and feedOven:FindFirstChild("WarmOvenSteam")
+	if steam and steam:IsA("Smoke") then
+		steam.Opacity = 0.5
+		task.delay(0.3, function()
+			if steam.Parent then
+				steam.Opacity = 0.24
+			end
+		end)
+	end
+
+	task.delay(math.max(0.18, (reloadTime or 0.55) * 0.72), function()
+		if token ~= launcherEffectToken or not rig.Parent then
+			return
+		end
+		for _, descendant in rig:GetDescendants() do
+			if descendant:IsA("BasePart") and (descendant.Name == "LoadedPizza" or descendant.Name == "LoadedPepperoni") then
+				descendant.LocalTransparencyModifier = 0
+			end
+		end
 	end)
 end
 
@@ -1114,7 +1223,9 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		applyMode()
 	end
 
-	if state.event == "shotResult" and state.payload then
+	if state.event == "launched" then
+		playLauncherFire(state.payload and state.payload.reloadTime)
+	elseif state.event == "shotResult" and state.payload then
 		local payload = state.payload
 		local detail
 		if payload.recordRun then
@@ -1276,6 +1387,29 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	local rig = station and station:FindFirstChild("AimRig")
 	if rig and rig:IsA("Model") then
 		rig:PivotTo(CFrame.lookAt(Config.LAUNCH_ORIGIN, Config.LAUNCH_ORIGIN + direction))
+	end
+	if station then
+		local crankRig = station:FindFirstChild("CosmeticCrankRig")
+		local crankBase = crankRig and crankRig:GetAttribute("BasePivot")
+		if crankRig and crankRig:IsA("Model") and typeof(crankBase) == "CFrame" then
+			local motion = math.rad(charge * 58 + (charging and math.sin(os.clock() * 12) * 3 or 0))
+			crankRig:PivotTo(crankBase * CFrame.Angles(0, 0, motion))
+		end
+		for _, item in station:GetChildren() do
+			if item:IsA("BasePart") and item.Name == "FeedRoller" then
+				local rollerBase = item:GetAttribute("CosmeticBaseCFrame")
+				if typeof(rollerBase) == "CFrame" then
+					item.CFrame = rollerBase * CFrame.Angles((os.clock() * (ready and 0.65 or 4.2)) % (math.pi * 2), 0, 0)
+				end
+			end
+		end
+		local gauge = station:FindFirstChild("PressureGauge")
+		local readout = gauge and gauge:FindFirstChild("PressureReadout")
+		local gaugeLabel = readout and readout:FindFirstChild("Label")
+		if gaugeLabel and gaugeLabel:IsA("TextLabel") then
+			gaugeLabel.Text = string.format("POWER\n%d%%", math.floor(charge * 100 + 0.5))
+			gaugeLabel.TextColor3 = charge >= 0.8 and COLORS.red or COLORS.ink
+		end
 	end
 end)
 

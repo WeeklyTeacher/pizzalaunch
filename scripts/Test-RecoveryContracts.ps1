@@ -36,6 +36,7 @@ $world = Get-Content -LiteralPath $worldPath -Raw
 $config = Get-Content -LiteralPath (Join-Path $root 'src\shared\Config.luau') -Raw
 $customers = Get-Content -LiteralPath (Join-Path $root 'src\server\CustomerService.luau') -Raw
 $gameService = Get-Content -LiteralPath (Join-Path $root 'src\server\GameService.luau') -Raw
+$client = Get-Content -LiteralPath (Join-Path $root 'src\client\init.client.luau') -Raw
 
 $definitions = [regex]::Matches($world, '(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*Color3\.') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
 $references = [regex]::Matches($world, 'COLORS\.([A-Za-z][A-Za-z0-9_]*)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
@@ -43,6 +44,9 @@ $missingColors = $references | Where-Object { $_ -notin $definitions }
 Assert-True ($missingColors.Count -eq 0) "WorldBuilder has no undefined COLORS entries"
 
 Assert-True ($world.Contains('buildStorefrontExterior(world)')) 'storefront exterior is part of runtime construction'
+Assert-True ($world.Contains('buildRestaurantArtPass(world)')) 'isolated restaurant art pass is part of runtime construction'
+Assert-True ($world.Contains('buildNeighborhoodStreet(world)')) 'isolated neighborhood street is part of runtime construction'
+Assert-True ($world.Contains('RemovableWithoutGameplayImpact')) 'visual expansion models declare their gameplay-safe ownership boundary'
 Assert-True ($world.Contains('CFrame.new(x, 0.2, 83)')) 'customer spawn points begin outside the front doors'
 Assert-True (-not $world.Contains('StudioRestaurant:Destroy')) 'runtime world does not delete StudioRestaurant'
 Assert-True ($config.Contains('Config.RECORD_RUN_STORE = "PizzaLaunch_RecordRun_AllTime_v1"')) 'OrderedDataStore name is unchanged'
@@ -55,3 +59,6 @@ foreach ($stateName in @('Entering', 'WalkingToSeat', 'SeatedWaiting', 'Served',
 Assert-True ($gameService.Contains('local function onLaunch')) 'authoritative pizza launch handler is present'
 Assert-True ($gameService.Contains('RecordRunService.begin(player)')) 'Record Run start path is present'
 Assert-True ($gameService.Contains('cleanupLauncherSession(player, "recordCompleted"')) 'Record Run completion uses launcher cleanup'
+Assert-True ($client.Contains('roundOverlay.Name = "RoundClearedBanner"')) 'round-clear feedback uses the compact banner path'
+Assert-True (-not $client.Contains('roundOverlay.Size = UDim2.fromOffset(510, 190)')) 'legacy blocking round-clear overlay size is absent'
+Assert-True ($client.Contains('if state.event == "launched"')) 'launcher cosmetics wait for a server-accepted launch'

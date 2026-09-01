@@ -1,5 +1,23 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — protected visual-expansion checkpoint
+
+- Clean baseline commit: `c1abb4ef6ec7f7ad3bb77417d82af78355ed6776` on `recovery/safe-transfer-merge-20260831`.
+- Pushed annotated checkpoint tag: `checkpoint/current-working-before-visual-expansion-20260831`.
+- Visual work branch: `visual/protected-world-expansion-20260831`.
+- Baseline recovery artifact SHA-256: `8C1C1B815626970FE6C228247338D52637B15B379022BD5A217AE936B976EE4B`.
+- Source audit confirmed the working launcher, customers/six tables, free play, Record Run, scoring, coins, upgrades/progression, pizza splats, reactive breakable props, player walking, and launcher reset paths before any visual edit.
+- Council boundary: the environment pass owns removable perimeter/exterior art; launcher motion is client-only cosmetic feedback after a server-accepted shot; simple anchored parts, six low-cost ambient lights, one disabled-at-idle burst light, and zero-idle-rate particles protect mobile performance; the child-player read is a visible loaded pizza, obvious `Mount Launcher` prompt, lively storefronts, and feedback that never covers the shot.
+
+### Protected visual expansion
+
+- Replaced the 510x190 center-screen round overlay with a non-active 510x78 desktop / 340x58 touch top banner. It slides in, reports the reward and next round, and fades after 2.15 seconds without changing controls, movement, aiming, or launch readiness. The Record Run result surface is also a shallow, non-modal top card instead of a center blocker.
+- Kept the authoritative launcher origin, projectile creation, power validation, hit resolution, and cooldown code unchanged. Added a cosmetic crank rig, live pressure readout, angle ticks, server-accepted muzzle flash, flour/cheese particles, oven pulse/steam, reload pizza visibility, and feed-roller motion. The world prompt now reads `Mount Launcher`; the default prompt still displays the `E` key.
+- Added runtime models `RestaurantArtPass` and `NeighborhoodStreet`, each marked `VisualExpansion` and `RemovableWithoutGameplayImpact`. Restaurant additions stay on the ceiling, perimeter, corners, or behind the counter. The street adds a continuous walkable road/sidewalk/curb, crosswalk and lane markings, lamps, benches, bins, four fictional storefronts, a pizza van, a delivery scooter, and invisible outer safety boundaries.
+- Did not modify `default.project.json`, any DataStore/leaderboard code or name, table/customer positions, shared gameplay configuration, or the Transfer-invariant services. The tracked recovery artifact and Transfer backup remain unchanged at SHA-256 `8C1C1B815626970FE6C228247338D52637B15B379022BD5A217AE936B976EE4B` and `73B3D5DF3B72F9B13350790759B715BC0E510BB7A41FED3C895F58BD17F11088`, respectively.
+- Automated verification passed: `rojo build`, `Test-RecoverySafety.ps1`, `Test-RecoveryContracts.ps1`, unchanged core-game diff audit, visual ownership/banner contracts, and `git diff --check`.
+- Roblox Studio was not play-tested during this pass. Manual Studio verification remains required for exterior collision/composition, mobile landscape readability/performance, free-play firing, a non-blocking round-clear banner, a complete Record Run, exit/re-entry firing, customer presentation, splats/breakables, and Output errors. No live DataStore claim is made.
+
 ## 2026-08-31 — safe Transfer recovery merge
 
 - Created branch `recovery/safe-transfer-merge-20260831` from `620262d`; recorded the clean tracked baseline and the supplied backup hash before source changes.
