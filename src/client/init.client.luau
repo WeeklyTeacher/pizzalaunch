@@ -2,6 +2,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -38,6 +39,7 @@ local state = {
 	mode = "walk",
 	upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 	recordRun = { status = "idle", personalBest = 0, score = 0, combo = 0, multiplier = 1 },
+	shiftEvent = nil,
 }
 local aimYaw = 0
 local aimPitch = (Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH)
@@ -45,6 +47,7 @@ local charge = 0.34
 local charging = false
 local chargeStarted = 0
 local ready = true
+local reloadReadyAt = 0
 local activeFireInput: InputObject? = nil
 local targetHighlight: Highlight? = nil
 local yourOrderBillboard: BillboardGui? = nil
@@ -193,6 +196,74 @@ feedback.TextStrokeColor3 = COLORS.ink
 feedback.TextStrokeTransparency = 0.12
 feedback.Visible = false
 feedback.ZIndex = 5
+
+local dialogueCard = Instance.new("Frame")
+dialogueCard.Name = "CustomerDialogueCard"
+dialogueCard.AnchorPoint = Vector2.new(0, 0.5)
+dialogueCard.Size = UDim2.fromOffset(360, 116)
+dialogueCard.Position = UDim2.new(0, 18, 0.55, 0)
+dialogueCard.BackgroundColor3 = COLORS.cream
+dialogueCard.BackgroundTransparency = 0.03
+dialogueCard.Active = false
+dialogueCard.Visible = false
+dialogueCard.ZIndex = 14
+dialogueCard.Parent = gui
+addCorner(dialogueCard, 18)
+addStroke(dialogueCard, COLORS.darkRed, 3)
+local dialoguePortrait = makeLabel(dialogueCard, "Portrait", "M", UDim2.fromOffset(56, 56), UDim2.fromOffset(14, 16), 27)
+dialoguePortrait.BackgroundTransparency = 0
+dialoguePortrait.BackgroundColor3 = COLORS.red
+dialoguePortrait.TextColor3 = Color3.new(1, 1, 1)
+dialoguePortrait.Font = Enum.Font.GothamBlack
+dialoguePortrait.ZIndex = 15
+addCorner(dialoguePortrait, 28)
+local dialogueName = makeLabel(dialogueCard, "CustomerName", "MIA", UDim2.new(1, -114, 0, 24), UDim2.fromOffset(82, 11), 18)
+dialogueName.TextColor3 = COLORS.darkRed
+dialogueName.TextXAlignment = Enum.TextXAlignment.Left
+dialogueName.ZIndex = 15
+local dialogueMood = makeLabel(dialogueCard, "Personality", "SUPER HUNGRY", UDim2.new(1, -114, 0, 18), UDim2.fromOffset(82, 34), 11)
+dialogueMood.TextColor3 = COLORS.green
+dialogueMood.TextXAlignment = Enum.TextXAlignment.Left
+dialogueMood.ZIndex = 15
+local dialogueText = makeLabel(dialogueCard, "Line", "A hot cheese pizza would be perfect.", UDim2.new(1, -98, 0, 46), UDim2.fromOffset(82, 57), 16)
+dialogueText.Font = Enum.Font.GothamMedium
+dialogueText.TextWrapped = true
+dialogueText.TextScaled = false
+dialogueText.TextXAlignment = Enum.TextXAlignment.Left
+dialogueText.TextYAlignment = Enum.TextYAlignment.Top
+dialogueText.ZIndex = 15
+local dialogueClose = makeButton(dialogueCard, "Close", "X", UDim2.fromOffset(30, 30), UDim2.new(1, -39, 0, 8), COLORS.darkRed)
+dialogueClose.TextSize = 13
+dialogueClose.ZIndex = 16
+
+local eventBanner = Instance.new("Frame")
+eventBanner.Name = "ShiftEventBanner"
+eventBanner.AnchorPoint = Vector2.new(1, 0)
+eventBanner.Size = UDim2.fromOffset(310, 76)
+eventBanner.Position = UDim2.new(1, -18, 0, 212)
+eventBanner.BackgroundColor3 = COLORS.darkRed
+eventBanner.BackgroundTransparency = 0.04
+eventBanner.Active = false
+eventBanner.Visible = false
+eventBanner.ZIndex = 13
+eventBanner.Parent = gui
+addCorner(eventBanner, 17)
+addStroke(eventBanner, COLORS.yellow, 3)
+local eventIcon = makeLabel(eventBanner, "Icon", ">>", UDim2.fromOffset(54, 54), UDim2.fromOffset(10, 11), 19)
+eventIcon.BackgroundTransparency = 0
+eventIcon.BackgroundColor3 = COLORS.orange
+eventIcon.TextColor3 = Color3.new(1, 1, 1)
+eventIcon.ZIndex = 14
+addCorner(eventIcon, 14)
+local eventTitle = makeLabel(eventBanner, "Title", "DINNER RUSH", UDim2.new(1, -78, 0, 25), UDim2.fromOffset(72, 10), 17)
+eventTitle.TextColor3 = COLORS.yellow
+eventTitle.TextXAlignment = Enum.TextXAlignment.Left
+eventTitle.ZIndex = 14
+local eventDetail = makeLabel(eventBanner, "Detail", "Serve quickly for bonus coins.", UDim2.new(1, -80, 0, 34), UDim2.fromOffset(72, 36), 12)
+eventDetail.TextColor3 = Color3.new(1, 1, 1)
+eventDetail.TextXAlignment = Enum.TextXAlignment.Left
+eventDetail.TextYAlignment = Enum.TextYAlignment.Top
+eventDetail.ZIndex = 14
 
 local roundOverlay = Instance.new("Frame")
 roundOverlay.Name = "RoundClearedBanner"
@@ -441,6 +512,25 @@ end
 
 if UserInputService.TouchEnabled then
 	tutorial.Visible = false
+	dialogueCard.Size = UDim2.fromOffset(320, 110)
+	dialogueCard.Position = UDim2.new(0, 10, 0.55, 0)
+	dialogueName.Size = UDim2.new(1, -108, 0, 21)
+	dialogueName.TextSize = 16
+	dialogueMood.Size = UDim2.new(1, -108, 0, 16)
+	dialogueMood.TextSize = 9
+	dialogueText.Size = UDim2.new(1, -96, 0, 42)
+	dialogueText.TextSize = 14
+	eventBanner.Size = UDim2.fromOffset(280, 64)
+	eventBanner.Position = UDim2.new(1, -10, 0, 148)
+	eventIcon.Size = UDim2.fromOffset(44, 44)
+	eventIcon.Position = UDim2.fromOffset(9, 10)
+	eventIcon.TextSize = 14
+	eventTitle.Position = UDim2.fromOffset(61, 7)
+	eventTitle.Size = UDim2.new(1, -70, 0, 21)
+	eventTitle.TextSize = 14
+	eventDetail.Position = UDim2.fromOffset(61, 29)
+	eventDetail.Size = UDim2.new(1, -70, 0, 29)
+	eventDetail.TextSize = 10
 	stats.Size = UDim2.fromOffset(154, 50)
 	stats.Position = UDim2.fromOffset(18, 8)
 	coinsLabel.TextSize = 16
@@ -714,6 +804,11 @@ local function updateTargetVisuals()
 		for _, tableId in round.tables do
 			activeTables[tableId] = true
 		end
+		local shiftEvent = state.shiftEvent
+		if shiftEvent then
+			local eventTableId = shiftEvent.extraTableId or shiftEvent.specialTableId
+			if eventTableId then activeTables[eventTableId] = true end
+		end
 	end
 	if targetHighlight then
 		targetHighlight:Destroy()
@@ -751,9 +846,12 @@ local function updateTargetVisuals()
 					end
 				end
 				if targetRing and targetRing:IsA("BasePart") then
-					targetRing.Size = Vector3.new(0.15, 8 * 1.12, 8 * 1.12)
-					targetRing.Transparency = 0.55
-					targetRing.LocalTransparencyModifier = recordVisuals and available and 0 or 1
+					local zoneScale = isRecordSession() and 1.12 or (1 + (state.upgrades and state.upgrades.assist or 0) * 0.12)
+					local diameter = (Config.DELIVERY_ZONE_DIAMETER or 8) * zoneScale
+					targetRing.Size = Vector3.new(0.15, diameter, diameter)
+					local showRing = available and (recordVisuals or (operating and tableId == state.targetId))
+					targetRing.Transparency = tableId == state.targetId and 0.16 or 0.55
+					targetRing.LocalTransparencyModifier = showRing and 0 or 1
 				end
 				local top = tableModel:FindFirstChild("TableTop")
 				if recordVisuals and available and top and top:IsA("BasePart") then
@@ -819,6 +917,111 @@ local function showFeedback(displayText: string, color: Color3, detail: string?)
 		if token == feedbackToken then
 			feedback.Visible = false
 		end
+	end)
+end
+
+local dialogueToken = 0
+local function hideCustomerDialogue(immediate: boolean?)
+	dialogueToken += 1
+	local token = dialogueToken
+	if immediate or not dialogueCard.Visible then
+		dialogueCard.Visible = false
+		return
+	end
+	local tween = TweenService:Create(dialogueCard, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
+	for _, item in dialogueCard:GetDescendants() do
+		if item:IsA("TextLabel") or item:IsA("TextButton") then
+			TweenService:Create(item, TweenInfo.new(0.18), { TextTransparency = 1, BackgroundTransparency = 1 }):Play()
+		elseif item:IsA("UIStroke") then
+			TweenService:Create(item, TweenInfo.new(0.18), { Transparency = 1 }):Play()
+		end
+	end
+	tween:Play()
+	tween.Completed:Once(function()
+		if token == dialogueToken then
+			dialogueCard.Visible = false
+		end
+	end)
+end
+
+local function showCustomerDialogue(payload)
+	dialogueToken += 1
+	local token = dialogueToken
+	local name = payload.name or "Customer"
+	local line = payload.line or "A hot cheese pizza would be perfect."
+	local textWidth = UserInputService.TouchEnabled and 222 or 262
+	local textSize = UserInputService.TouchEnabled and 14 or 16
+	local bounds = TextService:GetTextSize(line, textSize, Enum.Font.GothamMedium, Vector2.new(textWidth, 500))
+	local cardHeight = math.max(UserInputService.TouchEnabled and 104 or 110, 70 + bounds.Y)
+	dialogueCard.Size = UDim2.fromOffset(UserInputService.TouchEnabled and 320 or 360, cardHeight)
+	dialogueText.Size = UDim2.new(1, -98, 0, bounds.Y + 4)
+	dialoguePortrait.Text = string.upper(string.sub(name, 1, 1))
+	dialoguePortrait.BackgroundColor3 = payload.color or COLORS.red
+	dialogueName.Text = string.upper(name)
+	dialogueMood.Text = string.format("%s  -  %s", payload.mood or "HUNGRY", payload.patience or "HAPPY")
+	dialogueText.Text = line
+	dialogueCard.BackgroundTransparency = 1
+	dialoguePortrait.BackgroundTransparency = 1
+	dialogueClose.BackgroundTransparency = 1
+	for _, label in { dialoguePortrait, dialogueName, dialogueMood, dialogueText, dialogueClose } do
+		label.TextTransparency = 1
+	end
+	local border = dialogueCard:FindFirstChildOfClass("UIStroke")
+	if border then border.Transparency = 1 end
+	dialogueCard.Visible = true
+	TweenService:Create(dialogueCard, TweenInfo.new(0.22), { BackgroundTransparency = 0.03 }):Play()
+	TweenService:Create(dialoguePortrait, TweenInfo.new(0.2), { TextTransparency = 0, BackgroundTransparency = 0 }):Play()
+	TweenService:Create(dialogueClose, TweenInfo.new(0.2), { TextTransparency = 0, BackgroundTransparency = 0 }):Play()
+	for _, label in { dialogueName, dialogueMood, dialogueText } do
+		TweenService:Create(label, TweenInfo.new(0.2), { TextTransparency = 0 }):Play()
+	end
+	for _, descendant in dialogueCard:GetDescendants() do
+		if descendant:IsA("UIStroke") then
+			TweenService:Create(descendant, TweenInfo.new(0.2), { Transparency = 0.05 }):Play()
+		end
+	end
+	task.delay(4.5, function()
+		if token == dialogueToken then
+			hideCustomerDialogue(false)
+		end
+	end)
+end
+
+dialogueClose.Activated:Connect(function()
+	hideCustomerDialogue(false)
+end)
+
+local eventBannerToken = 0
+local function showEventBanner(payload)
+	eventBannerToken += 1
+	local token = eventBannerToken
+	eventIcon.Text = payload.icon or "!"
+	eventTitle.Text = payload.title or "SHIFT EVENT"
+	eventDetail.Text = payload.description or payload.detail or payload.message or "Keep serving!"
+	eventBanner.BackgroundTransparency = 1
+	local targetPosition = UserInputService.TouchEnabled and UDim2.new(1, -10, 0, 148) or UDim2.new(1, -18, 0, 212)
+	eventBanner.Position = targetPosition + UDim2.fromOffset(18, 0)
+	for _, label in { eventIcon, eventTitle, eventDetail } do label.TextTransparency = 1 end
+	local border = eventBanner:FindFirstChildOfClass("UIStroke")
+	if border then border.Transparency = 1 end
+	eventBanner.Visible = true
+	TweenService:Create(eventBanner, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = targetPosition, BackgroundTransparency = 0.04,
+	}):Play()
+	for _, label in { eventIcon, eventTitle, eventDetail } do
+		TweenService:Create(label, TweenInfo.new(0.18), { TextTransparency = 0 }):Play()
+	end
+	if border then TweenService:Create(border, TweenInfo.new(0.18), { Transparency = 0.05 }):Play() end
+	task.delay(3.4, function()
+		if token ~= eventBannerToken then return end
+		local tween = TweenService:Create(eventBanner, TweenInfo.new(0.22), { BackgroundTransparency = 1 })
+		for _, label in { eventIcon, eventTitle, eventDetail } do
+			TweenService:Create(label, TweenInfo.new(0.18), { TextTransparency = 1 }):Play()
+		end
+		if border then TweenService:Create(border, TweenInfo.new(0.18), { Transparency = 1 }):Play() end
+		tween:Play()
+		tween.Completed:Wait()
+		if token == eventBannerToken then eventBanner.Visible = false end
 	end)
 end
 
@@ -910,7 +1113,8 @@ local function playLauncherFire(reloadTime: number?)
 	local ovenLight = ovenGlow and ovenGlow:FindFirstChildOfClass("PointLight")
 	if ovenLight then
 		ovenLight.Brightness = 4.8
-		TweenService:Create(ovenLight, TweenInfo.new(0.3), { Brightness = 2.3 }):Play()
+		local restingBrightness = 2.3 + (state.upgrades and state.upgrades.power or 0) * 0.6
+		TweenService:Create(ovenLight, TweenInfo.new(0.3), { Brightness = restingBrightness }):Play()
 	end
 	local feedOven = station:FindFirstChild("PizzaFeedOven")
 	local steam = feedOven and feedOven:FindFirstChild("WarmOvenSteam")
@@ -983,6 +1187,7 @@ local function resetLauncherInput()
 	charging = false
 	activeFireInput = nil
 	ready = true
+	reloadReadyAt = 0
 	charge = 0.34
 	aimYaw = 0
 	aimPitch = (Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH)
@@ -996,6 +1201,9 @@ end
 
 local function applyMode()
 	operating = state.mode == "launcher"
+	if operating then
+		hideCustomerDialogue(true)
+	end
 	local runStatus = recordStatus()
 	local recordSession = runStatus ~= "idle"
 	shopPanel.Visible = false
@@ -1207,7 +1415,8 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	state.recordRun = state.recordRun or { status = "idle", personalBest = 0, score = 0, combo = 0, multiplier = 1 }
 	coinsLabel.Text = string.format("COINS  %d", state.coins or 0)
 	comboLabel.Text = string.format("COMBO  x%d", state.combo or 0)
-	roundTitle.Text = string.format("ROUND %d • %s", state.round or 1, state.roundName or "FIRST ORDERS")
+	local eventSuffix = state.shiftEvent and string.format("  -  EVENT %s", state.shiftEvent.icon or "!") or ""
+	roundTitle.Text = string.format("ROUND %d • %s%s", state.round or 1, state.roundName or "FIRST ORDERS", eventSuffix)
 	targetLabel.Text = "SERVE ANY HUNGRY CUSTOMER"
 	progressFill.Size = UDim2.fromScale(math.clamp((state.roundProgress or 0) / math.max(state.roundGoal or 1, 1), 0, 1), 1)
 	roundCard.BackgroundColor3 = state.roundColor or COLORS.green
@@ -1224,7 +1433,9 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	end
 
 	if state.event == "launched" then
-		playLauncherFire(state.payload and state.payload.reloadTime)
+		local reloadTime = state.payload and state.payload.reloadTime or Config.RELOAD_TIME
+		reloadReadyAt = os.clock() + reloadTime
+		playLauncherFire(reloadTime)
 	elseif state.event == "shotResult" and state.payload then
 		local payload = state.payload
 		local detail
@@ -1253,13 +1464,20 @@ stateRemote.OnClientEvent:Connect(function(newState)
 					TweenService:Create(screenTint, TweenInfo.new(0.28), { BackgroundTransparency = 1 }):Play()
 				end)
 			end
+			if payload.tipBonus and payload.tipBonus > 0 then
+				detail ..= string.format("  -  BIGGER TIPS +%d", payload.tipBonus)
+			end
+			if payload.eventMessage then
+				detail ..= "\n" .. payload.eventMessage
+			end
 			shakeStrength = payload.result == "PERFECT!" and 1.15 or 0.65
 			if payload.comboMilestone then
 				shakeStrength = 1.4
 			end
 			shakeUntil = os.clock() + 0.34
 		else
-			detail = "Quick reload — give it another whirl!"
+			detail = payload.comboSaved and "COMBO SAVED - the critic only skips the bonus!" or "Quick reload — give it another whirl!"
+			if payload.eventMessage then detail ..= "\n" .. payload.eventMessage end
 			shakeStrength = 0.85
 			shakeUntil = os.clock() + 0.28
 		end
@@ -1270,6 +1488,11 @@ stateRemote.OnClientEvent:Connect(function(newState)
 			task.delay(0.45, function()
 				showRoundComplete(payload)
 			end)
+		end
+		if payload.shiftEventStarted then
+			showEventBanner(payload.shiftEventStarted)
+		elseif payload.shiftEventEnded and payload.eventMessage then
+			showEventBanner({ title = payload.shiftEventEnded.title or "SHIFT EVENT", icon = "OK", detail = payload.eventMessage })
 		end
 		task.delay(payload.reloadDelay or 0.35, function()
 			local status = recordStatus()
@@ -1292,7 +1515,17 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		ready = false
 		charging = false
 	elseif state.event == "purchaseResult" and state.payload then
-		showFeedback(state.payload.result, state.payload.success and COLORS.green or COLORS.orange, state.payload.success and ((state.payload.effect or "Upgrade equipped!") .. "  Applied now!") or "Deliver more pizzas!")
+		if state.payload.success then
+			showEventBanner({ title = state.payload.result, icon = "UP", detail = state.payload.changeMessage or state.payload.effect or "Upgrade applied now!" })
+		else
+			showFeedback(state.payload.result, COLORS.orange, "Deliver more pizzas!")
+		end
+	elseif state.event == "customerDialogue" and state.payload then
+		showCustomerDialogue(state.payload)
+	elseif state.event == "shiftEventStarted" and state.payload then
+		showEventBanner(state.payload)
+	elseif state.event == "shiftEventEnded" and state.payload then
+		showEventBanner({ title = state.payload.title or "SHIFT EVENT", icon = "OK", detail = state.payload.detail })
 	elseif state.event == "modeChanged" and state.payload then
 		showFeedback(state.payload.result or (operating and "READY!" or "LET'S WALK!"), operating and COLORS.green or COLORS.yellow,
 			operating and "Aim for the glowing delivery plate" or "Explore, greet customers, or check the register")
@@ -1348,14 +1581,17 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	camera.FieldOfView = 57
 
 	powerFill.Size = UDim2.fromScale(math.max(charge, 0.02), 1)
-	powerText.Text = string.format("POWER  %d%%", math.floor(charge * 100 + 0.5))
+	local powerLevel = status ~= "idle" and 0 or (state.upgrades and state.upgrades.power or 0)
+	powerText.Text = string.format("POWER  %d%%  -  RANGE +%d%%", math.floor(charge * 100 + 0.5), powerLevel * 4)
 	local pitchDegrees = math.deg(Config.MIN_PITCH + aimPitch * (Config.MAX_PITCH - Config.MIN_PITCH))
 	local arcName = pitchDegrees < 37 and "LOW" or (pitchDegrees < 49 and "MEDIUM" or "HIGH")
 	arcText.Text = "ARC  " .. arcName
 
 	local direction = currentDirection()
-	local powerLevel = status ~= "idle" and 0 or (state.upgrades and state.upgrades.power or 0)
 	local speed = Config.speedFromCharge(charge, powerLevel)
+	if not ready and reloadReadyAt > os.clock() and status ~= "saving" and status ~= "finished" then
+		fireButton.Text = string.format("RELOAD\n%.1fs", reloadReadyAt - os.clock())
+	end
 	local landing, flightTime = Config.landingPoint(direction, speed, 6.85)
 	local missDistance = math.huge
 	local activeRound = Config.ROUNDS[math.clamp(state.round or 1, 1, #Config.ROUNDS)]

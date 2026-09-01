@@ -475,9 +475,12 @@ local function buildTable(world: Folder, definition)
 	local ring = makePart(model, "TargetRing", Vector3.new(0.15, 8, 8), CFrame.new(p + Vector3.new(0, 5.04, 0)) * CFrame.Angles(0, 0, math.pi / 2), definition.color, Enum.Material.Neon)
 	ring.Shape = Enum.PartType.Cylinder
 	ring.CanCollide = false
-	ring.CanTouch = false
+	ring.CanTouch = true
+	ring.CanQuery = false
 	ring.Transparency = 0.18
 	ring:SetAttribute("TableId", definition.id)
+	ring:SetAttribute("DeliverySurface", true)
+	ring:SetAttribute("DeliveryZone", true)
 
 	local boothSeat = makePart(model, "BoothSeat", Vector3.new(topWidth - 2, 1.5, 4.2), CFrame.new(p + Vector3.new(0, 2, -seatOffset - 0.5)), definition.color, Enum.Material.Fabric)
 	local boothBack = makePart(model, "BoothBack", Vector3.new(topWidth - 1, definition.id <= 2 and 6 or 7, 1.5), CFrame.new(p + Vector3.new(0, 5, -seatOffset - 2.2)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
@@ -846,6 +849,32 @@ local function buildRestaurantArtPass(world: Folder)
 		frame.CanCollide = false
 		surfaceText(frame, "DecorText", data[1] < 0 and Enum.NormalId.Right or Enum.NormalId.Left, data[4], COLORS.cream, COLORS.darkRed, 18)
 	end
+
+	local progression = Instance.new("Model")
+	progression.Name = "ProgressionDecor"
+	progression:SetAttribute("SessionProgressionVisuals", true)
+	progression.Parent = art
+	for _, y in { 12.2, 27.8 } do
+		local trim = makePart(progression, "UpgradedMenuTrim", Vector3.new(49, 0.55, 0.4), CFrame.new(21, y, -94.05), COLORS.yellow, Enum.Material.Neon)
+		trim.Transparency = 1
+		trim.CanCollide = false
+		trim.CanTouch = false
+		trim:SetAttribute("ProgressionMilestone", 1)
+	end
+	local ovenBadge = makePart(progression, "GoldOvenBadge", Vector3.new(12, 4, 0.45), CFrame.new(-40, 18.8, -85.75), COLORS.yellow, Enum.Material.Metal)
+	ovenBadge.Transparency = 1
+	ovenBadge.CanCollide = false
+	ovenBadge:SetAttribute("ProgressionMilestone", 3)
+	local badgeGui = surfaceText(ovenBadge, "OvenBadgeText", Enum.NormalId.Back, "GOLDEN OVEN", COLORS.darkRed, nil, 18)
+	badgeGui.Enabled = false
+	badgeGui:SetAttribute("ProgressionMilestone", 3)
+	local streetAward = makePart(progression, "StreetAwardSign", Vector3.new(28, 5, 0.55), CFrame.new(0, 24, 70.8), COLORS.green, Enum.Material.Wood)
+	streetAward.Transparency = 1
+	streetAward.CanCollide = false
+	streetAward:SetAttribute("ProgressionMilestone", 6)
+	local awardGui = surfaceText(streetAward, "StreetAwardText", Enum.NormalId.Back, "NEIGHBORHOOD FAVORITE", COLORS.cream, nil, 20)
+	awardGui.Enabled = false
+	awardGui:SetAttribute("ProgressionMilestone", 6)
 end
 
 local function buildNeighborhoodStreet(world: Folder)
@@ -952,6 +981,28 @@ local function buildNeighborhoodStreet(world: Folder)
 		local wheel = makePart(scooter, "ScooterWheel", Vector3.new(1, 3.2, 3.2), CFrame.new(x, 0.1, 114), Color3.fromRGB(38, 40, 43), Enum.Material.Rubber)
 		wheel.Shape = Enum.PartType.Cylinder
 		wheel.Orientation = Vector3.new(0, 90, 0)
+	end
+
+	local pedestrian = Instance.new("Model")
+	pedestrian.Name = "AmbientStreetPedestrian"
+	pedestrian:SetAttribute("AmbientActivity", true)
+	pedestrian.Parent = street
+	local pedestrianStart = Vector3.new(-84, -2, 151)
+	local pedestrianRoot = makePart(pedestrian, "Root", Vector3.new(1, 1, 1), CFrame.new(pedestrianStart + Vector3.new(0, 3, 0)), Color3.new(1, 1, 1))
+	pedestrianRoot.Transparency = 1
+	pedestrianRoot.CanCollide = false
+	pedestrianRoot.CanTouch = false
+	pedestrianRoot.CanQuery = false
+	pedestrian.PrimaryPart = pedestrianRoot
+	local pedestrianBody = makePart(pedestrian, "Body", Vector3.new(2.4, 3.5, 1.5), CFrame.new(pedestrianStart + Vector3.new(0, 3.5, 0)), Color3.fromRGB(80, 124, 179), Enum.Material.SmoothPlastic)
+	local pedestrianHead = makePart(pedestrian, "Head", Vector3.new(2.2, 2.2, 2.2), CFrame.new(pedestrianStart + Vector3.new(0, 6.2, 0)), Color3.fromRGB(211, 161, 119), Enum.Material.SmoothPlastic)
+	pedestrianHead.Shape = Enum.PartType.Ball
+	for _, part in { pedestrianBody, pedestrianHead } do
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = false
+		part.Transparency = 1
+		part:SetAttribute("AmbientVisibleTransparency", 0)
 	end
 
 	for _, boundary in {

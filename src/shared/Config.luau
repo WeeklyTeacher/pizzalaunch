@@ -28,6 +28,7 @@ Config.MIN_SPEED = 90
 Config.MAX_SPEED = 151
 Config.CHARGE_TIME = 1.25
 Config.RELOAD_TIME = 0.85
+Config.DELIVERY_ZONE_DIAMETER = 8
 Config.PROJECTILE_LIFETIME = 5
 Config.MAX_AIM_X = 0.82
 Config.MIN_PITCH = math.rad(27)

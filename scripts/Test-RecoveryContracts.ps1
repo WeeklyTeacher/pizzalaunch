@@ -20,7 +20,6 @@ function Get-NormalizedSourceHash([string]$Path) {
 }
 
 $transferInvariantHashes = @{
-    'src\server\CustomerService.luau' = '78E7214C2D762165637761BED10F8663A5636B59B25739B67D928F9A00D05E4F'
     'src\server\InteractionService.luau' = '0C898C82732795319F395F45BE69018C78B77156C2F01739C6E97DDA876BEA1B'
     'src\server\LayoutService.luau' = 'CAC15A2013C3A8E6E6AAF3BE948803CC9D72BD92F87A30C166C267F6FBCD2D6D'
     'src\server\PropService.luau' = 'CB4C89F36DDF3ED91E85447D9D849C38F3CF844E69DE3BE708D9EA72CCC031E2'
@@ -30,6 +29,8 @@ foreach ($relativePath in $transferInvariantHashes.Keys) {
     $actual = Get-NormalizedSourceHash (Join-Path $root $relativePath)
     Assert-True ($actual -eq $transferInvariantHashes[$relativePath]) "$relativePath remains byte-identical to Transfer"
 }
+Assert-True ((Get-NormalizedSourceHash (Join-Path $root 'src\server\RecordRunService.luau')) -eq '9058017153B709B67651B0DEC1F924D2FD0706CF2F584DA1D46B6B2FC393A348') 'RecordRunService remains unchanged from the protected visual-expansion checkpoint'
+Assert-True ((Get-NormalizedSourceHash (Join-Path $root 'default.project.json')) -eq '2CAB2897048D4EA3A3F1B23EE29B8E1C41E520FAECF18F9D002774431970A000') 'Rojo project mapping remains unchanged from the protected visual-expansion checkpoint'
 
 $worldPath = Join-Path $root 'src\server\WorldBuilder.luau'
 $world = Get-Content -LiteralPath $worldPath -Raw
@@ -37,6 +38,9 @@ $config = Get-Content -LiteralPath (Join-Path $root 'src\shared\Config.luau') -R
 $customers = Get-Content -LiteralPath (Join-Path $root 'src\server\CustomerService.luau') -Raw
 $gameService = Get-Content -LiteralPath (Join-Path $root 'src\server\GameService.luau') -Raw
 $client = Get-Content -LiteralPath (Join-Path $root 'src\client\init.client.luau') -Raw
+$dialogue = Get-Content -LiteralPath (Join-Path $root 'src\server\CustomerDialogue.luau') -Raw
+$shiftEvents = Get-Content -LiteralPath (Join-Path $root 'src\server\ShiftEventService.luau') -Raw
+$worldActivity = Get-Content -LiteralPath (Join-Path $root 'src\server\WorldActivityService.luau') -Raw
 
 $definitions = [regex]::Matches($world, '(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*Color3\.') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
 $references = [regex]::Matches($world, 'COLORS\.([A-Za-z][A-Za-z0-9_]*)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
@@ -62,3 +66,25 @@ Assert-True ($gameService.Contains('cleanupLauncherSession(player, "recordComple
 Assert-True ($client.Contains('roundOverlay.Name = "RoundClearedBanner"')) 'round-clear feedback uses the compact banner path'
 Assert-True (-not $client.Contains('roundOverlay.Size = UDim2.fromOffset(510, 190)')) 'legacy blocking round-clear overlay size is absent'
 Assert-True ($client.Contains('if state.event == "launched"')) 'launcher cosmetics wait for a server-accepted launch'
+Assert-True ($client.Contains('dialogueCard.Name = "CustomerDialogueCard"')) 'customer greetings use the contextual side card'
+Assert-True ($client.Contains('dialogueText.TextScaled = false')) 'customer dialogue never uses oversized TextScaled rendering'
+Assert-True ($client.Contains('dialogueCard.Active = false')) 'customer dialogue card is non-modal'
+Assert-True ($client.Contains('eventBanner.Name = "ShiftEventBanner"')) 'shift events use a compact side banner'
+Assert-True ($world.Contains('ring:SetAttribute("DeliveryZone", true)')) 'Wider Plates owns a physical server-visible delivery zone'
+Assert-True ($gameService.Contains('updateDeliveryZones(newLevel, false)')) 'Wider Plates updates the authoritative zone immediately after purchase'
+Assert-True ($gameService.Contains('RecordRunService.isSession(player) and 0 or state.upgrades.power')) 'Hotter Oven remains disabled for Record Run fairness'
+Assert-True ($gameService.Contains('local effectiveReload = recordSession and Config.RELOAD_TIME')) 'Speedy Oven reload remains server-authoritative and Record Run neutral'
+Assert-True ($gameService.Contains('payload.tipBonus')) 'Bigger Tips exposes its extra reward in delivery feedback'
+foreach ($eventName in @('DinnerRush', 'BirthdayTable', 'FoodCritic')) {
+    Assert-True ($shiftEvents.Contains('"' + $eventName + '"')) "shift event service contains $eventName"
+}
+Assert-True ($shiftEvents.Contains('fastService = true')) 'Dinner Rush has a fast-service bonus'
+Assert-True ($shiftEvents.Contains('confetti = true')) 'Birthday Table requests a confetti celebration'
+Assert-True ($shiftEvents.Contains('comboSaved = true')) 'Food Critic miss preserves the combo while dropping only the bonus'
+foreach ($customerName in @('Mia', 'Bo', 'Ziggy', 'Pip', 'Nana', 'Max', 'Lulu', 'Kai', 'Sunny', 'Rex', 'Bea', 'Nico')) {
+    Assert-True ($dialogue.Contains($customerName + ' = {')) "dialogue profile exists for $customerName"
+}
+foreach ($category in @('greeting', 'waiting', 'happy', 'wrong', 'leaving')) {
+    Assert-True ($dialogue.Contains($category + ' =')) "dialogue pools contain $category lines"
+}
+Assert-True ($worldActivity.Contains('AmbientStreetPedestrian')) 'street activity animates the isolated ambient pedestrian'

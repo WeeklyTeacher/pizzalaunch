@@ -1,5 +1,24 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — customer/events progression checkpoint
+
+- Clean starting commit: `2216dd19fc8dbe5e4b90c9f4bd977bc193542183` on `visual/protected-world-expansion-20260831`, matching its pushed remote.
+- Pushed annotated restore tag: `checkpoint/before-customer-events-progression-20260831`.
+- Working branch: `feature/customer-events-progression-20260831`.
+- Baseline artifact hashes remain unchanged: recovery build `8C1C1B815626970FE6C228247338D52637B15B379022BD5A217AE936B976EE4B`; Transfer backup `73B3D5DF3B72F9B13350790759B715BC0E510BB7A41FED3C895F58BD17F11088`.
+- Source/contract baseline confirms free walking and canonical launcher cleanup, enter/exit and server-authoritative aiming/launch, six tables and the complete customer lifecycle, scoring/coins/upgrades, splats/reactive props, free play, and the one-minute Record Run. Runtime behavior still requires Studio play verification; this checkpoint does not claim a new live playtest.
+
+### Customer experience, shift events, and visible progression
+
+- Replaced customer-triggered center feedback with a non-active side card: fixed-size typography, wrapped short copy, calculated card height, initial portrait icon, name/personality/patience labels, close button, and a 4.5-second fade. Entering the launcher immediately hides it; it never binds movement or launch input.
+- Added complete dialogue pools for all 12 rotating identities across greeting, waiting, happy, wrong-pizza, and leaving states. Existing Entering → WalkingToSeat → SeatedWaiting → Served → HappyReaction → Eating → Leaving → Despawn behavior remains the lifecycle authority. Patience is now a non-punitive `:)` / `...` / `!` marker with matching border color; harmless customer hits still splat/react and recover.
+- Added a server-wide replaying event cycle outside Record Run: Dinner Rush reveals and walks in an extra customer and pays +4 for service within ten seconds; Birthday Table targets a group-capacity booth with two party settings, +24 coins, confetti, and a room cheer; Food Critic marks one customer `STAR`, pays +32 Perfect / +20 Great, and saves the combo if the bonus is missed. Events use a shallow side banner and expire without penalties.
+- Made upgrade effects measurable and visible. Wider Plates scales a real `DeliveryZone` touch part and matching ring; Speedy Oven reports the remaining authoritative reload; Hotter Oven displays its exact +4%-per-level range and strengthens oven glow; Bigger Tips reports the additional multiplied coins. Record Run continues using fixed power, reload, and zone scaling and never receives event/economy bonuses.
+- Added session progression décor at total upgrade levels 1/3/6 (menu trim, golden oven badge, neighborhood-favorite sign), a low-volume replacement-customer door chime, slowly changing window ambience, and one isolated non-colliding distant street pedestrian. No table, launcher, camera, customer entrance, or shot-arc coordinate changed.
+- Intentionally extended `CustomerService` while keeping `InteractionService`, `LayoutService`, `PropService`, bootstrap, `RecordRunService`, DataStore names, and `default.project.json` protected. Recovery contracts now preserve the lifecycle and new behavior explicitly rather than incorrectly requiring the enhanced customer module to remain byte-identical.
+- Verified: `rojo build` produced an 86,411-byte place (`E5FF03278029216CA1362932DFF9D2A4BFBDAB5FACE870977F9E9DAAE57B8F76`), recovery safety/contracts passed, all 12 dialogue profiles and five categories passed, all event/upgrade fairness contracts passed, and `git diff --check` passed. Transfer and recovery artifact files were not edited.
+- Not claimed as verified in this environment: live Studio UI composition, collision feel, audio balance, event timing, mobile frame rate, or the full walk → talk → launch → serve → event → Record Run → exit/re-enter → launch sequence. Those remain the final manual Studio playtest, including Output inspection.
+
 ## 2026-08-31 — protected visual-expansion checkpoint
 
 - Clean baseline commit: `c1abb4ef6ec7f7ad3bb77417d82af78355ed6776` on `recovery/safe-transfer-merge-20260831`.

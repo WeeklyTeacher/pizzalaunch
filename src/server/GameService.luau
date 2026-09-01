@@ -9,6 +9,8 @@ local InteractionService = require(script.Parent.InteractionService)
 local LayoutService = require(script.Parent.LayoutService)
 local PropService = require(script.Parent.PropService)
 local RecordRunService = require(script.Parent.RecordRunService)
+local ShiftEventService = require(script.Parent.ShiftEventService)
+local WorldActivityService = require(script.Parent.WorldActivityService)
 
 local GameService = {}
 
@@ -86,7 +88,17 @@ local function roundDefinition(roundNumber: number)
 end
 
 local function nextTarget(previousId: number?, roundNumber: number): number
-	local pool = roundDefinition(roundNumber).tables
+	local pool = ShiftEventService.extendTablePool(roundDefinition(roundNumber).tables)
+	local available = CustomerService.getAvailableTables()
+	local readyPool = {}
+	for _, tableId in pool do
+		if table.find(available, tableId) then
+			table.insert(readyPool, tableId)
+		end
+	end
+	if #readyPool > 0 then
+		pool = readyPool
+	end
 	if #pool == 1 then
 		return pool[1]
 	end
@@ -119,6 +131,7 @@ local function sendState(player: Player, eventName: string?, payload: { [string]
 		upgrades = state.upgrades,
 		mode = state.mode,
 		recordRun = RecordRunService.getSnapshot(player),
+		shiftEvent = ShiftEventService.getSnapshot(),
 		payload = payload,
 	})
 end
@@ -147,6 +160,95 @@ local function worldTable(tableId: number): Model?
 		end
 	end
 	return nil
+end
+
+local function updateDeliveryZones(assistLevel: number, recordSession: boolean)
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	if not world then return end
+	local scale = recordSession and 1.12 or (1 + assistLevel * 0.12)
+	for _, tableData in Config.TABLES do
+		local tableModel = worldTable(tableData.id)
+		local ring = tableModel and tableModel:FindFirstChild("TargetRing")
+		if ring and ring:IsA("BasePart") then
+			local diameter = (Config.DELIVERY_ZONE_DIAMETER or 8) * scale
+			ring.Size = Vector3.new(0.15, diameter, diameter)
+			ring:SetAttribute("DeliveryZoneScale", scale)
+		end
+	end
+end
+
+local function applyProgressionVisuals(state)
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	if not world then return end
+	local totalLevels = 0
+	for _, level in state.upgrades do
+		totalLevels += level
+	end
+	local progression = world:FindFirstChild("ProgressionDecor", true)
+	if progression then
+		for _, descendant in progression:GetDescendants() do
+			local milestone = descendant:GetAttribute("ProgressionMilestone")
+			if typeof(milestone) == "number" then
+				local visible = totalLevels >= milestone
+				if descendant:IsA("BasePart") then
+					descendant.Transparency = visible and (descendant:GetAttribute("VisibleTransparency") or 0) or 1
+				elseif descendant:IsA("SurfaceGui") or descendant:IsA("Light") then
+					descendant.Enabled = visible
+				end
+			end
+		end
+	end
+	local station = world:FindFirstChild("LauncherStation")
+	local ovenGlow = station and station:FindFirstChild("OvenGlow")
+	local ovenLight = ovenGlow and ovenGlow:FindFirstChildOfClass("PointLight")
+	if ovenLight then
+		ovenLight.Brightness = 2.3 + state.upgrades.power * 0.6
+	end
+end
+
+local function eventRoleTable(eventData)
+	if not eventData then return nil end
+	return eventData.specialTableId or eventData.extraTableId
+end
+
+local function clearShiftEventVisual(eventData)
+	local tableId = eventRoleTable(eventData)
+	if tableId then
+		CustomerService.setSpecialRole(tableId, nil)
+	end
+end
+
+local function beginShiftEvent(eventData)
+	local tableId = eventRoleTable(eventData)
+	if tableId then
+		CustomerService.setSpecialRole(tableId, eventData.kind)
+	end
+	for player, state in states do
+		if not RecordRunService.isSession(player) then
+			if eventData.specialTableId then
+				state.targetId = eventData.specialTableId
+				state.targetSetAt = Workspace:GetServerTimeNow()
+			end
+			sendState(player, "shiftEventStarted", eventData)
+		end
+	end
+end
+
+local function endShiftEvent(eventData, message: string?)
+	clearShiftEventVisual(eventData)
+	for player, state in states do
+		if not RecordRunService.isSession(player) then
+			local roundTables = roundDefinition(state.round).tables
+			if not table.find(roundTables, state.targetId) then
+				state.targetId = nextTarget(nil, state.round)
+				state.targetSetAt = Workspace:GetServerTimeNow()
+			end
+			sendState(player, "shiftEventEnded", {
+				title = eventData and eventData.title or "SHIFT EVENT",
+				detail = message or "The restaurant is back to its usual rhythm.",
+			})
+		end
+	end
 end
 
 local function reactionText(customer: Model, text: string)
@@ -216,6 +318,39 @@ local function coinBurst(position: Vector3, color: Color3)
 		}):Play()
 	end
 	task.delay(0.8, function()
+		folder:Destroy()
+	end)
+end
+
+local function confettiBurst(position: Vector3)
+	local folder = Instance.new("Folder")
+	folder.Name = "BirthdayConfetti"
+	folder.Parent = Workspace
+	local colors = {
+		Color3.fromRGB(255, 85, 96), Color3.fromRGB(255, 211, 55),
+		Color3.fromRGB(76, 200, 124), Color3.fromRGB(82, 180, 235),
+	}
+	for index = 1, 18 do
+		local piece = Instance.new("Part")
+		piece.Name = "Confetti"
+		piece.Size = Vector3.new(0.22, 0.65, 0.35)
+		piece.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+		piece.Anchored = true
+		piece.CanCollide = false
+		piece.CanTouch = false
+		piece.CanQuery = false
+		piece.Material = Enum.Material.Neon
+		piece.Color = colors[(index - 1) % #colors + 1]
+		piece.Parent = folder
+		local angle = index / 18 * math.pi * 2
+		local distance = 4 + index % 4
+		TweenService:Create(piece, TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = position + Vector3.new(math.cos(angle) * distance, 6 + index % 5, math.sin(angle) * distance),
+			Orientation = Vector3.new(index * 43, index * 71, index * 29),
+			Transparency = 1,
+		}):Play()
+	end
+	task.delay(1, function()
 		folder:Destroy()
 	end)
 end
@@ -408,17 +543,20 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 	state.shotActive = false
 	activeShots[player] = nil
 	local recordSession = RecordRunService.isSession(player)
+	local effectiveReload = recordSession and Config.RELOAD_TIME or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12)
 	local payload = {
 		result = result,
 		position = hitPosition,
 		tableId = tableId,
 		coinsEarned = 0,
 		comboBonus = 0,
-		reloadDelay = recordSession and 0.3 or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12),
+		reloadDelay = math.max(0.05, state.lastLaunch + effectiveReload - Workspace:GetServerTimeNow()),
 		recordRun = recordSession,
 	}
-	local tableEligible = tableId ~= nil and (recordSession or table.find(roundDefinition(state.round).tables, tableId) ~= nil)
+	local eligibleTables = ShiftEventService.extendTablePool(roundDefinition(state.round).tables)
+	local tableEligible = tableId ~= nil and (recordSession or table.find(eligibleTables, tableId) ~= nil)
 	local acceptedDelivery = result == "delivery" and tableEligible and hitPosition ~= nil and CustomerService.claimDelivery(tableId)
+	local shiftOutcome = nil
 
 	if acceptedDelivery and tableId and hitPosition then
 		local definition = tableDefinition(tableId)
@@ -455,17 +593,33 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			state.bestCombo = math.max(state.bestCombo, state.combo)
 			state.roundProgress += 1
 			local comboBonus = math.min((state.combo - 1) * 2, 12)
-		-- The reward multiplier is calculated only here, on the server.
-		local earned = math.floor((accuracy.coins + comboBonus) * (1 + state.upgrades.tips * 0.25) + 0.5)
+			local unmultipliedReward = accuracy.coins + comboBonus
+			-- The reward multiplier and all event bonuses are calculated only here,
+			-- on the server. Record Run never enters this branch.
+			local deliveryReward = math.floor(unmultipliedReward * (1 + state.upgrades.tips * 0.25) + 0.5)
+			local serviceTime = Workspace:GetServerTimeNow() - (state.targetSetAt or Workspace:GetServerTimeNow())
+			shiftOutcome = ShiftEventService.recordDelivery(tableId, accuracy.name, serviceTime)
+			local earned = deliveryReward + (shiftOutcome.bonus or 0)
 			state.coins += earned
 			payload.coinsEarned = earned
 			payload.comboBonus = comboBonus
+			payload.tipBonus = math.max(0, deliveryReward - unmultipliedReward)
+			payload.rewardMultiplier = 1 + state.upgrades.tips * 0.25
+			payload.eventBonus = shiftOutcome.bonus or 0
+			payload.fastServiceBonus = shiftOutcome.fastService and shiftOutcome.bonus or nil
+			payload.eventMessage = shiftOutcome.message
 		end
 
 		pizza.Anchored = true
 		pizza.CFrame = CFrame.new(definition.position + Vector3.new(0, 4.95, 0)) * CFrame.Angles(0, 0, math.pi / 2)
 		customerReaction(tableId, "success")
 		CustomerService.served(tableId)
+		if shiftOutcome and shiftOutcome.confetti then
+			confettiBurst(definition.position + Vector3.new(0, 6, 0))
+			for _, tableData in Config.TABLES do
+				customerReaction(tableData.id, "crowd")
+			end
+		end
 		local crowdMilestone = (recordSession and payload.recordComboMilestone) or (not recordSession and (state.combo == 3 or state.combo == 5 or state.combo % 10 == 0))
 		if crowdMilestone then
 			payload.comboMilestone = recordSession and payload.recordCombo or state.combo
@@ -508,16 +662,34 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 				PropService.resetAll()
 			end
 			state.targetId = nextTarget(state.targetId, state.round)
+			state.targetSetAt = Workspace:GetServerTimeNow()
+			if shiftOutcome and shiftOutcome.ended then
+				endShiftEvent(shiftOutcome.ended, shiftOutcome.message)
+			end
+			local startedEvent = ShiftEventService.maybeStart(roundDefinition(state.round).tables, state.targetId)
+			if startedEvent then
+				beginShiftEvent(startedEvent)
+			end
 		end
 	elseif tableId then
 		if recordSession then
 			RecordRunService.recordMiss(player)
 		else
-			state.combo = 0
+			local eventMiss = ShiftEventService.recordMiss()
+			if eventMiss then
+				payload.comboSaved = eventMiss.comboSaved
+				payload.eventMessage = eventMiss.message
+				endShiftEvent(eventMiss.ended, eventMiss.message)
+			else
+				state.combo = 0
+			end
 		end
 		payload.result = result == "delivery" and "TABLE IS CLEARING!" or "TOO HUNGRY!"
 		payload.color = Color3.fromRGB(255, 139, 95)
-		if result ~= "delivery" then
+		if result == "delivery" then
+			CustomerService.wrongPizza(tableId)
+			customerReaction(tableId, "wrong")
+		else
 			customerReaction(tableId, "dodge")
 		end
 		playSound(pizza, SOUND.miss, 0.38, 1.25)
@@ -525,7 +697,14 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		if recordSession then
 			RecordRunService.recordMiss(player)
 		else
-			state.combo = 0
+			local eventMiss = ShiftEventService.recordMiss()
+			if eventMiss then
+				payload.comboSaved = eventMiss.comboSaved
+				payload.eventMessage = eventMiss.message
+				endShiftEvent(eventMiss.ended, eventMiss.message)
+			else
+				state.combo = 0
+			end
 		end
 		payload.color = Color3.fromRGB(255, 139, 95)
 		playSound(pizza, SOUND.splat, 0.5, math.random(85, 115) / 100)
@@ -673,6 +852,20 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 	end)
 end
 
+local function upgradeChangeMessage(upgradeId: string, oldLevel: number, newLevel: number): string
+	if upgradeId == "tips" then
+		return string.format("Delivery rewards x%.2f -> x%.2f", 1 + oldLevel * 0.25, 1 + newLevel * 0.25)
+	elseif upgradeId == "assist" then
+		local diameter = Config.DELIVERY_ZONE_DIAMETER or 8
+		return string.format("Landing zone %.1f -> %.1f studs", diameter * (1 + oldLevel * 0.12), diameter * (1 + newLevel * 0.12))
+	elseif upgradeId == "reload" then
+		return string.format("Oven reload %.2fs -> %.2fs", Config.RELOAD_TIME * (1 - oldLevel * 0.12), Config.RELOAD_TIME * (1 - newLevel * 0.12))
+	elseif upgradeId == "power" then
+		return string.format("Max launch power %d -> %d", math.floor(Config.MAX_SPEED * (1 + oldLevel * 0.04) + 0.5), math.floor(Config.MAX_SPEED * (1 + newLevel * 0.04) + 0.5))
+	end
+	return "Upgrade applied immediately"
+end
+
 local function onPurchase(player: Player, upgradeId: any)
 	local state = states[player]
 	local definition = typeof(upgradeId) == "string" and Config.UPGRADES[upgradeId] or nil
@@ -693,14 +886,29 @@ local function onPurchase(player: Player, upgradeId: any)
 		sendState(player, "purchaseResult", { result = "NEED MORE COINS", success = false, cost = cost })
 		return
 	end
+	local oldLevel = level
 	state.coins -= cost
 	state.upgrades[upgradeId] += 1
+	local newLevel = state.upgrades[upgradeId]
+	if upgradeId == "assist" then
+		updateDeliveryZones(newLevel, false)
+	end
+	applyProgressionVisuals(state)
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local console = world and world:FindFirstChild("OperatorConsole", true)
+	if console and console:IsA("BasePart") then
+		coinBurst(console.Position + Vector3.new(0, 4, 0), Color3.fromRGB(75, 200, 116))
+		playSound(console, SOUND.success, 0.28, 1.25)
+	end
 	setLeaderstats(player, state)
 	sendState(player, "purchaseResult", {
-		result = string.format("%s LEVEL %d!", definition.name, state.upgrades[upgradeId]),
+		result = string.format("%s LEVEL %d!", definition.name, newLevel),
 		success = true,
 		upgradeId = upgradeId,
 		effect = definition.effect,
+		changeMessage = upgradeChangeMessage(upgradeId, oldLevel, newLevel),
+		oldLevel = oldLevel,
+		newLevel = newLevel,
 	})
 end
 
@@ -793,6 +1001,8 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		launcherOccupant = player
 		InteractionService.setLauncherAvailable(false)
 		LayoutService.setRound(state.round)
+		updateDeliveryZones(state.upgrades.assist, false)
+		applyProgressionVisuals(state)
 		state.mode = "launcher"
 		root.CFrame = Config.LAUNCHER_OPERATOR_CFRAME
 		root.Anchored = true
@@ -830,6 +1040,7 @@ local function addPlayer(player: Player)
 		round = 1,
 		roundProgress = 0,
 		targetId = nextTarget(nil, 1),
+		targetSetAt = Workspace:GetServerTimeNow(),
 		lastLaunch = -100,
 		shotActive = false,
 		mode = "walk",
@@ -862,6 +1073,7 @@ end
 
 function GameService.start()
 	createRemotes()
+	ShiftEventService.reset()
 	launchRemote.OnServerEvent:Connect(onLaunch)
 	purchaseRemote.OnServerEvent:Connect(onPurchase)
 	modeRemote.OnServerEvent:Connect(function(player, requestedMode)
@@ -870,9 +1082,18 @@ function GameService.start()
 		end
 	end)
 	local world = Workspace:WaitForChild("PizzaLaunchWorld")
-	CustomerService.start(world)
+	CustomerService.start(world, function(lifecycleName)
+		if lifecycleName == "entered" then
+			local door = world:FindFirstChild("FrontGlassDoor", true)
+			if door and door:IsA("BasePart") then
+				playSound(door, SOUND.success, 0.1, 1.55)
+			end
+		end
+	end)
 	LayoutService.start(world)
 	PropService.start(world)
+	WorldActivityService.start(world)
+	updateDeliveryZones(0, false)
 	RecordRunService.start(world, function(player, eventName)
 		local state = states[player]
 		if not state then
@@ -907,6 +1128,7 @@ function GameService.start()
 			PropService.resetAll()
 			local started, reason = RecordRunService.begin(player)
 			if started then
+				updateDeliveryZones(0, true)
 				local snapshot = RecordRunService.getSnapshot(player)
 				state.targetId = snapshot.targetId or state.targetId
 				sendState(player, "recordCountdown", nil)
@@ -928,14 +1150,25 @@ function GameService.start()
 			local state = states[player]
 			local info = typeof(tableId) == "number" and CustomerService.getInfo(tableId) or nil
 			if state and state.mode == "walk" and info then
-				sendState(player, "notice", {
-					result = string.format("%s - %s", string.upper(info.name), info.mood),
-					detail = info.state == "SeatedWaiting" and info.line or "I'll be ready again in a moment!",
+				sendState(player, "customerDialogue", {
+					name = info.name,
+					mood = info.mood,
+					line = info.state == "SeatedWaiting" and info.line or "I will be ready again in a moment.",
 					color = info.color,
+					patience = info.patience,
 				})
 			end
 		end,
 	})
+	task.spawn(function()
+		while world.Parent do
+			task.wait(1)
+			local expired = ShiftEventService.expire()
+			if expired then
+				endShiftEvent(expired, "Event time ended. No penalty - keep serving!")
+			end
+		end
+	end)
 	Players.PlayerAdded:Connect(addPlayer)
 	Players.PlayerRemoving:Connect(function(player)
 		cleanupLauncherSession(player, "playerLeaving", { cancelRun = false, moveToExit = false, notifyClient = false })

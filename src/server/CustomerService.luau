@@ -1,11 +1,14 @@
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local CustomerDialogue = require(script.Parent.CustomerDialogue)
+
 local CustomerService = {}
 
 local recordsByTable = {}
 local identityCounter = 0
 local entrancePoints = {}
+local lifecycleCallback = nil
 
 local IDENTITIES = {
 	{ name = "Mia", mood = "SUPER HUNGRY", line = "I saved room for a flying pizza!", skin = Color3.fromRGB(246, 199, 154), shirt = Color3.fromRGB(255, 102, 118), accent = Color3.fromRGB(255, 190, 65) },
@@ -51,6 +54,13 @@ local function setState(record, stateName: string)
 	record.tableModel:SetAttribute("CustomerState", stateName)
 	record.tableModel:SetAttribute("DeliveryAvailable", available)
 	record.tableModel:SetAttribute("Occupied", stateName ~= "Despawn" and stateName ~= "Empty")
+	if available then
+		local now = Workspace:GetServerTimeNow()
+		record.waitingSince = now
+		record.customer:SetAttribute("WaitingSince", now)
+		record.customer:SetAttribute("PatienceState", "HAPPY")
+		record.tableModel:SetAttribute("PatienceState", "HAPPY")
+	end
 	local prompt = record.customer:FindFirstChild("CustomerPrompt", true)
 	if prompt and prompt:IsA("ProximityPrompt") then
 		prompt.Enabled = available
@@ -66,11 +76,40 @@ local function setFace(record, text: string)
 	if label then label.Text = text end
 end
 
-local function setMarker(record, text: string)
+local function setMarker(record, text: string, color: Color3?)
+	local marker = record.customer:FindFirstChild("WaitingMarker", true)
 	local label = labelInside(record.customer, "WaitingMarker")
 	if label then
 		label.Text = text
-		label.TextColor3 = record.identity.accent
+		label.TextColor3 = color or record.identity.accent
+	end
+	local border = marker and marker:FindFirstChild("UIStroke", true)
+	if border and border:IsA("UIStroke") then
+		border.Color = color or record.identity.accent
+	end
+end
+
+local function refreshWaitingMarker(record)
+	if record.specialRole == "FoodCritic" then
+		setMarker(record, "STAR", Color3.fromRGB(255, 211, 55))
+		return
+	elseif record.specialRole == "BirthdayTable" then
+		setMarker(record, "B-DAY", Color3.fromRGB(255, 112, 153))
+		return
+	elseif record.specialRole == "DinnerRush" then
+		setMarker(record, "RUSH", Color3.fromRGB(255, 143, 55))
+		return
+	end
+	local waited = Workspace:GetServerTimeNow() - (record.waitingSince or Workspace:GetServerTimeNow())
+	local patienceState = waited >= 18 and "HUNGRY" or (waited >= 9 and "WAITING" or "HAPPY")
+	record.customer:SetAttribute("PatienceState", patienceState)
+	record.tableModel:SetAttribute("PatienceState", patienceState)
+	if patienceState == "HUNGRY" then
+		setMarker(record, "!", Color3.fromRGB(255, 126, 72))
+	elseif patienceState == "WAITING" then
+		setMarker(record, "...", Color3.fromRGB(255, 205, 65))
+	else
+		setMarker(record, ":)", Color3.fromRGB(91, 213, 128))
 	end
 end
 
@@ -136,7 +175,7 @@ local function applyIdentity(record)
 	record.identity = identity
 	record.customer:SetAttribute("CustomerName", identity.name)
 	record.customer:SetAttribute("Mood", identity.mood)
-	record.customer:SetAttribute("PersonalityLine", identity.line)
+	record.customer:SetAttribute("PersonalityLine", CustomerDialogue.get(identity.name, "waiting"))
 	record.customer:SetAttribute("CustomerColor", identity.accent)
 	record.tableModel:SetAttribute("CustomerName", identity.name)
 	local prompt = record.customer:FindFirstChild("CustomerPrompt", true)
@@ -151,7 +190,7 @@ local function applyIdentity(record)
 		end
 	end
 	setFace(record, "^  ^\n\\___/")
-	setMarker(record, "PIZZA")
+	refreshWaitingMarker(record)
 end
 
 local function arrivalPoint(record): Vector3
@@ -186,14 +225,22 @@ local function beginArrival(record, token: number)
 	tweenToSeat(record, 1.1)
 	if record.token ~= token then return end
 	setFace(record, "^  ^\n\\___/")
-	setMarker(record, "PIZZA")
+	record.customer:SetAttribute("LastDialogue", CustomerDialogue.get(record.identity.name, "waiting"))
 	setState(record, "SeatedWaiting")
+	refreshWaitingMarker(record)
+	if lifecycleCallback then
+		lifecycleCallback("entered", record.tableId, record.customer)
+	end
 end
 
 local function beginDeparture(record, token: number)
 	if record.token ~= token or not record.customer.Parent then return end
 	setState(record, "Leaving")
+	record.customer:SetAttribute("LastDialogue", CustomerDialogue.get(record.identity.name, "leaving"))
 	setMarker(record, "BYE")
+	if lifecycleCallback then
+		lifecycleCallback("leaving", record.tableId, record.customer)
+	end
 	local root = record.customer.PrimaryPart
 	if root then
 		tweenRootTo(record, sideAislePoint(record, root.Position.Z), 1.0)
@@ -227,7 +274,6 @@ local function idleLoop(record)
 					end
 				end
 			end
-			if beat % 4 == 0 then setMarker(record, "...") end
 			task.wait(0.65)
 			if record.state == "SeatedWaiting" and (record.customer:GetAttribute("ReactingUntil") or 0) <= Workspace:GetServerTimeNow() then
 				for _, part in { head, arm } do
@@ -236,15 +282,16 @@ local function idleLoop(record)
 						if typeof(reset) == "CFrame" then TweenService:Create(part, TweenInfo.new(0.3), { CFrame = reset }):Play() end
 					end
 				end
-				setMarker(record, "PIZZA")
+				refreshWaitingMarker(record)
 			end
 		end
 	end)
 end
 
-function CustomerService.start(world: Instance)
+function CustomerService.start(world: Instance, onLifecycle)
 	table.clear(recordsByTable)
 	table.clear(entrancePoints)
+	lifecycleCallback = onLifecycle
 	for _, side in { -1, 1 } do
 		local point = world:FindFirstChild(side < 0 and "CustomerEntranceLeft" or "CustomerEntranceRight", true)
 		if point and point:IsA("BasePart") then entrancePoints[side] = point.Position end
@@ -273,6 +320,7 @@ function CustomerService.start(world: Instance)
 				recordsByTable[tableId] = record
 				applyIdentity(record)
 				setState(record, "SeatedWaiting")
+				refreshWaitingMarker(record)
 				idleLoop(record)
 			end
 		end
@@ -301,6 +349,9 @@ function CustomerService.served(tableId: number)
 	if not record or record.state ~= "Served" then return end
 	local token = record.token
 	setState(record, "HappyReaction")
+	record.customer:SetAttribute("LastDialogue", CustomerDialogue.get(record.identity.name, "happy"))
+	setMarker(record, "STAR", Color3.fromRGB(255, 220, 72))
+	setFace(record, "*  *\n\\___/")
 	CustomerService.markReacting(record.customer, 2.5)
 	task.delay(1.7, function()
 		if record.token ~= token or record.state ~= "HappyReaction" then return end
@@ -319,20 +370,87 @@ function CustomerService.hit(tableId: number)
 	record.token += 1
 	local token = record.token
 	setState(record, "HitReaction")
+	record.customer:SetAttribute("LastDialogue", CustomerDialogue.get(record.identity.name, "wrong"))
+	setMarker(record, "OOPS", Color3.fromRGB(255, 139, 90))
 	CustomerService.markReacting(record.customer, 1.6)
 	task.delay(1.55, function()
 		if record.token == token and record.state == "HitReaction" then
 			setFace(record, "^  ^\n\\___/")
-			setMarker(record, "PIZZA")
 			setState(record, "SeatedWaiting")
+			refreshWaitingMarker(record)
 		end
+	end)
+end
+
+function CustomerService.wrongPizza(tableId: number)
+	local record = recordsByTable[tableId]
+	if not record or record.state ~= "SeatedWaiting" then return end
+	record.customer:SetAttribute("LastDialogue", CustomerDialogue.get(record.identity.name, "wrong"))
+	CustomerService.markReacting(record.customer, 1.6)
+	setMarker(record, "?", Color3.fromRGB(255, 153, 85))
+	task.delay(1.55, function()
+		if record.state == "SeatedWaiting" then refreshWaitingMarker(record) end
 	end)
 end
 
 function CustomerService.getInfo(tableId: number)
 	local record = recordsByTable[tableId]
 	if not record then return nil end
-	return { name = record.identity.name, mood = record.identity.mood, line = record.identity.line, color = record.identity.accent, state = record.state }
+	return {
+		name = record.identity.name,
+		mood = record.identity.mood,
+		line = CustomerDialogue.get(record.identity.name, record.state == "SeatedWaiting" and "greeting" or "waiting"),
+		color = record.identity.accent,
+		state = record.state,
+		patience = record.customer:GetAttribute("PatienceState") or "HAPPY",
+	}
+end
+
+function CustomerService.getDialogue(tableId: number, category: string): string?
+	local record = recordsByTable[tableId]
+	if not record then return nil end
+	return CustomerDialogue.get(record.identity.name, category)
+end
+
+function CustomerService.setSpecialRole(tableId: number?, role: string?)
+	if not tableId then return end
+	local record = recordsByTable[tableId]
+	if not record then return end
+	local oldDecor = record.tableModel:FindFirstChild("ShiftEventDecor")
+	if oldDecor then oldDecor:Destroy() end
+	record.specialRole = role
+	record.customer:SetAttribute("SpecialRole", role)
+	record.tableModel:SetAttribute("SpecialRole", role)
+	refreshWaitingMarker(record)
+	if role == "BirthdayTable" then
+		local decor = Instance.new("Model")
+		decor.Name = "ShiftEventDecor"
+		decor.Parent = record.tableModel
+		for index, xOffset in { -3.2, 3.2 } do
+			local placeSetting = Instance.new("Part")
+			placeSetting.Name = "BirthdayPlaceSetting"
+			placeSetting.Shape = Enum.PartType.Cylinder
+			placeSetting.Size = Vector3.new(0.12, 2.8, 2.8)
+			placeSetting.CFrame = CFrame.new(record.tablePosition + Vector3.new(xOffset, 5.32, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+			placeSetting.Anchored = true
+			placeSetting.CanCollide = false
+			placeSetting.CanTouch = false
+			placeSetting.CanQuery = false
+			placeSetting.Material = Enum.Material.Neon
+			placeSetting.Color = index == 1 and Color3.fromRGB(255, 112, 153) or Color3.fromRGB(82, 180, 235)
+			placeSetting.Parent = decor
+		end
+	end
+	if role == "DinnerRush" and record.state == "SeatedWaiting" then
+		record.token += 1
+		local token = record.token
+		task.spawn(beginArrival, record, token)
+	end
+end
+
+function CustomerService.getCustomer(tableId: number): Model?
+	local record = recordsByTable[tableId]
+	return record and record.customer or nil
 end
 
 function CustomerService.getAvailableTables()
