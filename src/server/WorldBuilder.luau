@@ -478,13 +478,50 @@ local function buildLauncher(world: Folder)
 	bestDisplay.CanCollide = false
 	surfaceText(bestDisplay, "PersonalBestGui", Enum.NormalId.Back, "YOUR BEST\nLOADING...", COLORS.cream, nil, 18)
 
-	local base = makePart(station, "CannonBase", Vector3.new(14, 6, 14), CFrame.new(0, 3, 65), COLORS.red, Enum.Material.Metal)
+	-- A compact restaurant machine, deliberately all behind the muzzle so the
+	-- aiming lane remains clean from the operator camera to every table.
+	local base = makePart(station, "CannonBase", Vector3.new(18, 5, 16), CFrame.new(0, 2.5, 65), COLORS.darkRed, Enum.Material.Metal)
 	base.Shape = Enum.PartType.Cylinder
 	base.Orientation = Vector3.new(0, 0, 90)
+	makePart(station, "BaseTrim", Vector3.new(19, 1.1, 17), CFrame.new(0, 4.4, 65), COLORS.yellow, Enum.Material.Metal)
+	local feedOven = makePart(station, "PizzaFeedOven", Vector3.new(13, 11, 10), CFrame.new(0, 7, 75), COLORS.darkWood, Enum.Material.Brick)
+	local ovenDoor = makePart(station, "OvenMouth", Vector3.new(8, 6, 0.45), CFrame.new(0, 7, 69.8), COLORS.dark, Enum.Material.Metal)
+	ovenDoor.CanCollide = false
+	local ovenFire = makePart(station, "OvenGlow", Vector3.new(6.8, 4.6, 0.18), CFrame.new(0, 7, 69.52), COLORS.orange, Enum.Material.Neon)
+	ovenFire.CanCollide = false
+	local ovenLight = Instance.new("PointLight")
+	ovenLight.Color = COLORS.orange
+	ovenLight.Brightness = 2.3
+	ovenLight.Range = 19
+	ovenLight.Parent = ovenFire
+	surfaceText(feedOven, "OvenBrand", Enum.NormalId.Back, "MAMA MIA\nPIZZA PRESS", COLORS.cream, COLORS.darkRed, 18)
+	local steam = Instance.new("Smoke")
+	steam.Name = "WarmOvenSteam"
+	steam.Color = Color3.fromRGB(255, 238, 210)
+	steam.Opacity = 0.24
+	steam.RiseVelocity = 3
+	steam.Size = 4
+	steam.Parent = feedOven
+	makePart(station, "FeedBelt", Vector3.new(8, 0.7, 10), CFrame.new(0, 5.1, 71.5), COLORS.steel, Enum.Material.Metal)
+	for z = 68, 75, 2 do
+		local roller = makePart(station, "FeedRoller", Vector3.new(1, 6.5, 1), CFrame.new(0, 5.85, z), COLORS.yellow, Enum.Material.Metal)
+		roller.Shape = Enum.PartType.Cylinder
+		roller.Orientation = Vector3.new(0, 0, 90)
+	end
 	for _, x in { -7.5, 7.5 } do
 		local wheel = makePart(station, "CannonWheel", Vector3.new(2, 11, 11), CFrame.new(x, 3.2, 66), COLORS.steel, Enum.Material.Metal)
 		wheel.Shape = Enum.PartType.Cylinder
 	end
+	local gaugePost = makePart(station, "PressureGaugePost", Vector3.new(0.8, 7, 0.8), CFrame.new(10, 7, 70), COLORS.steel, Enum.Material.Metal)
+	local gauge = makePart(station, "PressureGauge", Vector3.new(0.65, 6, 6), CFrame.new(10, 10, 70), COLORS.cream, Enum.Material.Metal)
+	gauge.Shape = Enum.PartType.Cylinder
+	gauge.Orientation = Vector3.new(0, 0, 90)
+	gauge.CanCollide = false
+	surfaceText(gauge, "PressureReadout", Enum.NormalId.Back, "POWER\nHOT", COLORS.darkRed, nil, 16)
+	local leverBase = makePart(station, "CrankBase", Vector3.new(3.5, 3.5, 3.5), CFrame.new(-10, 5.5, 70), COLORS.steel, Enum.Material.Metal)
+	local lever = makePart(station, "LaunchCrank", Vector3.new(1, 9, 1), CFrame.new(-10, 9, 70) * CFrame.Angles(0, 0, math.rad(-32)), COLORS.red, Enum.Material.Metal)
+	local leverKnob = makePart(station, "CrankKnob", Vector3.new(2.6, 2.6, 2.6), lever.CFrame * CFrame.new(0, 4.4, 0), COLORS.yellow, Enum.Material.SmoothPlastic)
+	leverKnob.Shape = Enum.PartType.Ball
 
 	local rig = Instance.new("Model")
 	rig.Name = "AimRig"
@@ -494,10 +531,27 @@ local function buildLauncher(world: Folder)
 	pivot.CanCollide = false
 	pivot.CanTouch = false
 	rig.PrimaryPart = pivot
-	local barrel = makePart(rig, "Barrel", Vector3.new(5.2, 5.2, 15), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, 7.2)), Color3.fromRGB(226, 54, 52), Enum.Material.Metal)
+	local barrel = makePart(rig, "Barrel", Vector3.new(7.4, 7.4, 16), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, 7.4)), Color3.fromRGB(186, 47, 46), Enum.Material.Metal)
 	barrel.CanCollide = false
-	local muzzle = makePart(rig, "Muzzle", Vector3.new(7, 7, 2), CFrame.new(Config.LAUNCH_ORIGIN), COLORS.yellow, Enum.Material.Neon)
+	local barrelBand = makePart(rig, "BarrelBand", Vector3.new(8.2, 8.2, 1.2), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, 2.0)), COLORS.yellow, Enum.Material.Metal)
+	barrelBand.CanCollide = false
+	local muzzle = makePart(rig, "Muzzle", Vector3.new(9, 9, 2.2), CFrame.new(Config.LAUNCH_ORIGIN), COLORS.yellow, Enum.Material.Metal)
 	muzzle.CanCollide = false
+	local muzzleOpening = makePart(rig, "MuzzleOpening", Vector3.new(0.25, 6.7, 6.7), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, -1.15)), COLORS.dark, Enum.Material.SmoothPlastic)
+	muzzleOpening.CanCollide = false
+	local loadedPizza = makePart(rig, "LoadedPizza", Vector3.new(0.5, 5.8, 5.8), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, -1.35)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 197, 68), Enum.Material.SmoothPlastic)
+	loadedPizza.Shape = Enum.PartType.Cylinder
+	loadedPizza.CanCollide = false
+	for _, offset in { Vector3.new(0, 1.3, 1.1), Vector3.new(0, -1.2, 1.0), Vector3.new(0, 0.2, -1.45) } do
+		local pepperoni = makePart(rig, "LoadedPepperoni", Vector3.new(0.22, 1.05, 1.05), loadedPizza.CFrame * CFrame.new(offset), COLORS.red, Enum.Material.SmoothPlastic)
+		pepperoni.Shape = Enum.PartType.Cylinder
+		pepperoni.CanCollide = false
+	end
+	local muzzleLight = Instance.new("PointLight")
+	muzzleLight.Color = COLORS.yellow
+	muzzleLight.Brightness = 1.2
+	muzzleLight.Range = 13
+	muzzleLight.Parent = muzzle
 
 	for _, x in { -13, 13 } do
 		local rail = makePart(station, "SafetyRail", Vector3.new(1, 5, 18), CFrame.new(x, 2.5, 65), COLORS.yellow, Enum.Material.Metal)

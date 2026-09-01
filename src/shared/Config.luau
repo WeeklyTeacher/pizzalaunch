@@ -58,10 +58,12 @@ Config.ACCURACY = {
 }
 
 Config.UPGRADES = {
-	tips = { name = "BIGGER TIPS", description = "+25% coins", costs = { 35, 85, 160 } },
-	assist = { name = "WIDER PLATES", description = "easier accuracy", costs = { 45, 100, 180 } },
-	reload = { name = "SPEEDY OVEN", description = "faster reload", costs = { 40, 95, 170 } },
-	power = { name = "HOTTER OVEN", description = "+4% launch power", costs = { 50, 110, 195 } },
+	-- These are session-only until economy persistence is intentionally added.  The
+	-- values below are also the sole source for the authoritative server effects.
+	tips = { name = "BIGGER TIPS", icon = "$", effect = "+25% delivery coins per level", costs = { 35, 85, 160 } },
+	assist = { name = "WIDER PLATES", icon = "O", effect = "+12% delivery radius per level", costs = { 45, 100, 180 } },
+	reload = { name = "SPEEDY OVEN", icon = ">>", effect = "-12% oven reload per level", costs = { 40, 95, 170 } },
+	power = { name = "HOTTER OVEN", icon = "!", effect = "+4% launch range per level", costs = { 50, 110, 195 } },
 }
 
 Config.ROUNDS = {

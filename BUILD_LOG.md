@@ -1,5 +1,13 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — active reliability pass
+
+- Added one idempotent server launcher cleanup path for normal exit, Record Run completion, result exit, respawn, cancellation, and player removal. It clears the launcher lease, active projectile/touch connection, launch debounce/permission, Record Run handoff, and character movement; the client resets charging/input, camera, controls, guide, and launcher UI from the authoritative mode.
+- Rebuilt upgrade cards with explicit current-level, owned/available/maxed, BUY/NEED MORE COINS states and server-authoritative effect descriptions. Upgrades are explicitly session-only; tips, delivery radius, reload, and power all apply in the server scoring/launch path.
+- Record Run now retries and warns on DataStore failures, avoids duplicate completion submissions, caches board reads/name resolution, and keeps personal-best writes independent from global-board reads. Studio API failures render a labeled sample board rather than “unavailable.”
+- Manual Studio requirement for real persistence: **File → Experience Settings → Security → Enable Studio Access to API Services**. This run does not claim published-server DataStore testing.
+- Verified here: `rojo build default.project.json -o pizzalaunch.rbxlx`, `git diff --check`, and source-contract checks for all four server upgrade calculations, tracked projectile cleanup, six cleanup-path call sites, retried OrderedDataStore access, Studio sample-board text, and the removed unavailable-result message. Roblox Studio was not installed in this execution environment, so the exact two-run/respawn sequence and visual mobile pass remain the one manual Studio test.
+
 ## 2026-08-30 — Record Run council decision
 
 - **Game / Creative Director:** Keep the restaurant and proven launch feel fully visible. Add a bright second console at the existing station so free play remains the default and the timed challenge feels like an in-world arcade event.

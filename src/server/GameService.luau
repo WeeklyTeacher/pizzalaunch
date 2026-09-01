@@ -28,6 +28,7 @@ local stateRemote: RemoteEvent
 local purchaseRemote: RemoteEvent
 local modeRemote: RemoteEvent
 local launcherOccupant: Player?
+local activeShots: { [Player]: { pizza: BasePart, connection: RBXScriptConnection? } } = {}
 
 local function playSound(parent: Instance, soundId: string, volume: number, playbackSpeed: number?)
 	local sound = Instance.new("Sound")
@@ -405,6 +406,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 	end
 	pizza:SetAttribute("Resolved", true)
 	state.shotActive = false
+	activeShots[player] = nil
 	local recordSession = RecordRunService.isSession(player)
 	local payload = {
 		result = result,
@@ -412,7 +414,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		tableId = tableId,
 		coinsEarned = 0,
 		comboBonus = 0,
-		reloadDelay = recordSession and 0.3 or math.max(0.12, 0.48 - state.upgrades.reload * 0.1),
+		reloadDelay = recordSession and 0.3 or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12),
 		recordRun = recordSession,
 	}
 	local tableEligible = tableId ~= nil and (recordSession or table.find(roundDefinition(state.round).tables, tableId) ~= nil)
@@ -453,7 +455,8 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			state.bestCombo = math.max(state.bestCombo, state.combo)
 			state.roundProgress += 1
 			local comboBonus = math.min((state.combo - 1) * 2, 12)
-			local earned = math.floor((accuracy.coins + comboBonus) * (1 + state.upgrades.tips * 0.25) + 0.5)
+		-- The reward multiplier is calculated only here, on the server.
+		local earned = math.floor((accuracy.coins + comboBonus) * (1 + state.upgrades.tips * 0.25) + 0.5)
 			state.coins += earned
 			payload.coinsEarned = earned
 			payload.comboBonus = comboBonus
@@ -658,6 +661,7 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 			finishShot(player, pizza, hit.Name == "RestaurantFloor" and "FLOOR PIZZA!" or "SAUCY SPLAT!", pizza.Position, nil)
 		end
 	end)
+	activeShots[player] = { pizza = pizza, connection = connection }
 
 	task.delay(Config.PROJECTILE_LIFETIME, function()
 		if pizza.Parent and not pizza:GetAttribute("Resolved") then
@@ -696,6 +700,7 @@ local function onPurchase(player: Player, upgradeId: any)
 		result = string.format("%s LEVEL %d!", definition.name, state.upgrades[upgradeId]),
 		success = true,
 		upgradeId = upgradeId,
+		effect = definition.effect,
 	})
 end
 
@@ -715,6 +720,49 @@ local function restoreMovement(character: Model, moveToExit: boolean)
 	end
 end
 
+-- This is deliberately the one route out of a launcher session.  It is safe to
+-- call more than once because every mutable launcher resource is cleared before
+-- the player and prompt are restored.
+local function cleanupLauncherSession(player: Player, reason: string, options: { cancelRun: boolean?, moveToExit: boolean?, notifyClient: boolean? }?)
+	local state = states[player]
+	if not state then
+		return
+	end
+	options = options or {}
+	state.cleanupEpoch = (state.cleanupEpoch or 0) + 1
+	state.shotActive = false
+	state.lastLaunch = -100
+	local shot = activeShots[player]
+	activeShots[player] = nil
+	if shot then
+		if shot.connection and shot.connection.Connected then
+			shot.connection:Disconnect()
+		end
+		if shot.pizza.Parent then
+			shot.pizza:Destroy()
+		end
+	end
+	if options.cancelRun then
+		RecordRunService.cancel(player)
+	end
+	if state.resumeTargetId then
+		state.targetId = state.resumeTargetId
+		state.resumeTargetId = nil
+	end
+	state.mode = "walk"
+	if launcherOccupant == player then
+		launcherOccupant = nil
+		InteractionService.setLauncherAvailable(true)
+	end
+	local character = player.Character
+	if character then
+		restoreMovement(character, options.moveToExit == true)
+	end
+	if options.notifyClient then
+		sendState(player, "launcherReset", { result = "BACK ON THE FLOOR", reason = reason })
+	end
+end
+
 local function setPlayerMode(player: Player, requestedMode: string)
 	local state = states[player]
 	if not state then
@@ -724,6 +772,12 @@ local function setPlayerMode(player: Player, requestedMode: string)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if requestedMode == "launcher" then
+		-- A finished/saving run must never make the next free-play launcher session
+		-- use Record Run restrictions or fixed physics. Route stale state through
+		-- the same cleanup path rather than only changing the Record Run flag.
+		if RecordRunService.isSession(player) then
+			cleanupLauncherSession(player, "reenterLauncher", { cancelRun = true, moveToExit = false, notifyClient = false })
+		end
 		if launcherOccupant and launcherOccupant ~= player then
 			sendState(player, "notice", { result = "LAUNCHER BUSY", detail = "Another chef is serving right now." })
 			return
@@ -747,22 +801,7 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		humanoid.AutoRotate = false
 		sendState(player, "modeChanged", { result = "READY TO LAUNCH!", mode = "launcher" })
 	elseif requestedMode == "walk" then
-		local wasOperating = state.mode == "launcher"
-		if RecordRunService.isSession(player) then
-			RecordRunService.cancel(player)
-			if state.resumeTargetId then
-				state.targetId = state.resumeTargetId
-				state.resumeTargetId = nil
-			end
-		end
-		state.mode = "walk"
-		if launcherOccupant == player then
-			launcherOccupant = nil
-			InteractionService.setLauncherAvailable(true)
-		end
-		if character then
-			restoreMovement(character, wasOperating)
-		end
+		cleanupLauncherSession(player, "playerExit", { cancelRun = true, moveToExit = state.mode == "launcher", notifyClient = false })
 		sendState(player, "modeChanged", { result = "BACK ON THE FLOOR", mode = "walk" })
 	end
 end
@@ -770,16 +809,7 @@ end
 local function initializeCharacter(player: Player, character: Model)
 	local state = states[player]
 	if state then
-		RecordRunService.cancel(player)
-		if state.resumeTargetId then
-			state.targetId = state.resumeTargetId
-			state.resumeTargetId = nil
-		end
-		state.mode = "walk"
-	end
-	if launcherOccupant == player then
-		launcherOccupant = nil
-		InteractionService.setLauncherAvailable(true)
+		cleanupLauncherSession(player, "characterRespawn", { cancelRun = true, moveToExit = false, notifyClient = false })
 	end
 	task.defer(function()
 		if character.Parent then
@@ -804,6 +834,7 @@ local function addPlayer(player: Player)
 		shotActive = false,
 		mode = "walk",
 		upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
+		cleanupEpoch = 0,
 	}
 	RecordRunService.addPlayer(player)
 
@@ -853,6 +884,9 @@ function GameService.start()
 		end
 		if eventName == "recordEnding" then
 			PropService.resetAll()
+			-- Timer completion releases the cannon immediately, including a pizza
+			-- still in flight, while preserving the server-side result save.
+			cleanupLauncherSession(player, "recordCompleted", { cancelRun = false, moveToExit = true, notifyClient = false })
 		end
 		sendState(player, eventName, nil)
 	end)
@@ -904,10 +938,7 @@ function GameService.start()
 	})
 	Players.PlayerAdded:Connect(addPlayer)
 	Players.PlayerRemoving:Connect(function(player)
-		if launcherOccupant == player then
-			launcherOccupant = nil
-			InteractionService.setLauncherAvailable(true)
-		end
+		cleanupLauncherSession(player, "playerLeaving", { cancelRun = false, moveToExit = false, notifyClient = false })
 		RecordRunService.removePlayer(player)
 		states[player] = nil
 	end)

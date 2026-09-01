@@ -142,6 +142,14 @@ Focused follow-up completed: the existing station now offers a separate 60-secon
 
 ## Council decision notes
 
+## 2026-08-31 — reliability and readability pass
+
+- **Senior Roblox gameplay engineer:** A Record Run completion must take the same idempotent cleanup route as exit, cancellation, respawn, and re-entry. Clear the lease, active projectile/touch connection, debounces, server permission, movement, and client aim state—not merely a UI button.
+- **UI/UX designer:** Replace the cramped text stack with four high-contrast, whole-card purchase targets. Every card exposes its level, plain-English server effect, price/shortfall, ownership, and max state; purchases update instantly and toast the applied effect.
+- **Systems engineer:** Keep the existing OrderedDataStore name. Retried personal-best writes and top-10 reads are independent, logged, cached, and use a labeled Studio sample board when API services are off.
+- **Environment artist:** Turn the glowing block into an oven-fed pizza press with a loaded pizza, muzzle, gauge, crank, steel/wood/red restaurant materials, and contained heat effects behind a clear firing lane.
+- **Nine-year-old playtester:** “I need to know whether I can buy it, what it does, and why I can’t.” Buttons now say BUY, NEED MORE COINS, or MAXED in words as well as color.
+
 - **Gameplay designer:** Preserve the proven physics/scoring system. Improve replayability through changing active seats and readable authored hazards, not more currencies or menus.
 - **Environment designer:** Move restaurant identity into the player's route—entrance, host/register counter, prep cues, launcher, aisle, booths—instead of adding decoration to distant walls.
 - **Gameplay engineer:** Use a small authoritative interaction service and deterministic layout state. Avoid moving tables during a projectile and avoid NPC pathfinding through targets.

@@ -267,6 +267,9 @@ recordSummaryDetail.ZIndex = 11
 local recordSummaryHint = makeLabel(recordSummary, "Hint", "EXIT THE LAUNCHER TO WALK AROUND OR TRY AGAIN", UDim2.new(1, -30, 0, 35), UDim2.fromOffset(15, 218), 13)
 recordSummaryHint.TextColor3 = COLORS.cream
 recordSummaryHint.ZIndex = 11
+local recordContinue = makeButton(recordSummary, "Continue", "BACK TO RESTAURANT", UDim2.fromOffset(220, 38), UDim2.new(0.5, -110, 1, -46), COLORS.green)
+recordContinue.TextSize = 13
+recordContinue.ZIndex = 12
 
 local controls = Instance.new("Frame")
 controls.Name = "Controls"
@@ -322,7 +325,7 @@ exitButton.Visible = false
 local shopPanel = Instance.new("Frame")
 shopPanel.Name = "ShopPanel"
 shopPanel.AnchorPoint = Vector2.new(1, 0)
-shopPanel.Size = UDim2.fromOffset(310, 353)
+shopPanel.Size = UDim2.fromOffset(420, 555)
 shopPanel.Position = UDim2.new(1, -18, 0, 82)
 shopPanel.BackgroundColor3 = COLORS.cream
 shopPanel.Visible = false
@@ -330,18 +333,69 @@ shopPanel.ZIndex = 6
 shopPanel.Parent = gui
 addCorner(shopPanel, 20)
 addStroke(shopPanel, COLORS.red, 3)
-local shopTitle = makeLabel(shopPanel, "Title", "LAUNCHER UPGRADES", UDim2.new(1, -20, 0, 32), UDim2.fromOffset(10, 8), 16)
-shopTitle.TextColor3 = COLORS.red
+local shopTitle = makeLabel(shopPanel, "Title", "UPGRADE THE PIZZA CANNON", UDim2.new(1, -24, 0, 30), UDim2.fromOffset(12, 8), 19)
+shopTitle.TextColor3 = COLORS.ink
 shopTitle.ZIndex = 7
-local upgradeButtons = {}
+local shopSubtitle = makeLabel(shopPanel, "Subtitle", "SESSION-ONLY UPGRADES  •  EFFECTS APPLY RIGHT AWAY", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 37), 11)
+shopSubtitle.TextColor3 = Color3.fromRGB(91, 74, 68)
+shopSubtitle.ZIndex = 7
+local shopCoins = makeLabel(shopPanel, "ShopCoins", "YOUR COINS  0", UDim2.new(1, -24, 0, 29), UDim2.fromOffset(12, 57), 17)
+shopCoins.BackgroundColor3 = COLORS.yellow
+shopCoins.BackgroundTransparency = 0
+shopCoins.TextColor3 = COLORS.ink
+shopCoins.ZIndex = 7
+addCorner(shopCoins, 10)
+local shopScroll = Instance.new("ScrollingFrame")
+shopScroll.Name = "UpgradeCards"
+shopScroll.Size = UDim2.new(1, -16, 1, -102)
+shopScroll.Position = UDim2.fromOffset(8, 94)
+shopScroll.BackgroundTransparency = 1
+shopScroll.BorderSizePixel = 0
+shopScroll.CanvasSize = UDim2.fromOffset(0, 424)
+shopScroll.ScrollBarThickness = 6
+shopScroll.ZIndex = 7
+shopScroll.Parent = shopPanel
+local upgradeCards = {}
 local upgradeOrder = { "tips", "assist", "reload", "power" }
 for index, upgradeId in upgradeOrder do
-	local button = makeButton(shopPanel, upgradeId, "", UDim2.new(1, -24, 0, 65), UDim2.fromOffset(12, 43 + (index - 1) * 75), index % 2 == 0 and Color3.fromRGB(229, 205, 174) or Color3.fromRGB(255, 221, 141))
-	button.TextColor3 = COLORS.ink
-	button.TextSize = 14
-	button.ZIndex = 7
-	upgradeButtons[upgradeId] = button
-	button.Activated:Connect(function()
+	local card = Instance.new("TextButton")
+	card.Name = upgradeId
+	card.Size = UDim2.new(1, -4, 0, 100)
+	card.Position = UDim2.fromOffset(0, (index - 1) * 106)
+	card.BackgroundColor3 = Color3.fromRGB(255, 255, 248)
+	card.Text = ""
+	card.AutoButtonColor = false
+	card.ZIndex = 8
+	card.Parent = shopScroll
+	addCorner(card, 16)
+	addStroke(card, Color3.fromRGB(137, 116, 105), 2)
+	local icon = makeLabel(card, "Icon", "", UDim2.fromOffset(50, 50), UDim2.fromOffset(12, 25), 28)
+	icon.BackgroundColor3 = index % 2 == 0 and COLORS.blue or COLORS.orange
+	icon.BackgroundTransparency = 0
+	icon.TextColor3 = Color3.new(1, 1, 1)
+	icon.ZIndex = 9
+	addCorner(icon, 14)
+	local title = makeLabel(card, "Title", "", UDim2.new(1, -188, 0, 24), UDim2.fromOffset(72, 10), 16)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextColor3 = COLORS.ink
+	title.ZIndex = 9
+	local level = makeLabel(card, "Level", "", UDim2.new(1, -188, 0, 19), UDim2.fromOffset(72, 34), 11)
+	level.TextXAlignment = Enum.TextXAlignment.Left
+	level.TextColor3 = Color3.fromRGB(77, 118, 89)
+	level.ZIndex = 9
+	local effect = makeLabel(card, "Effect", "", UDim2.new(1, -188, 0, 32), UDim2.fromOffset(72, 55), 12)
+	effect.TextXAlignment = Enum.TextXAlignment.Left
+	effect.TextYAlignment = Enum.TextYAlignment.Top
+	effect.TextColor3 = Color3.fromRGB(73, 60, 55)
+	effect.ZIndex = 9
+	local action = makeLabel(card, "Action", "", UDim2.fromOffset(112, 66), UDim2.new(1, -122, 0.5, -33), 14)
+	action.BackgroundColor3 = COLORS.green
+	action.BackgroundTransparency = 0
+	action.TextColor3 = Color3.new(1, 1, 1)
+	action.ZIndex = 9
+	addCorner(action, 13)
+	upgradeCards[upgradeId] = { card = card, icon = icon, title = title, level = level, effect = effect, action = action }
+	card.Activated:Connect(function()
 		purchaseRemote:FireServer(upgradeId)
 	end)
 end
@@ -403,15 +457,11 @@ if UserInputService.TouchEnabled then
 	exitButton.Position = UDim2.new(1, -126, 0, 58)
 	exitButton.Text = "EXIT [Q]"
 	exitButton.TextSize = 12
-	shopPanel.Size = UDim2.fromOffset(270, 280)
+	shopPanel.Size = UDim2.fromOffset(290, 270)
 	shopPanel.Position = UDim2.new(1, -16, 0, 60)
 	shopTitle.TextSize = 13
-	for index, upgradeId in upgradeOrder do
-		local button = upgradeButtons[upgradeId]
-		button.Size = UDim2.new(1, -20, 0, 50)
-		button.Position = UDim2.fromOffset(10, 36 + (index - 1) * 57)
-		button.TextSize = 11
-	end
+	shopSubtitle.TextSize = 8
+	shopCoins.TextSize = 14
 	controls.Size = UDim2.new(1, -24, 0, 108)
 	controls.Position = UDim2.new(1, -10, 1, -12)
 	controlsConstraint.MinSize = Vector2.new(300, 108)
@@ -461,6 +511,9 @@ if UserInputService.TouchEnabled then
 	recordSummaryHint.Position = UDim2.fromOffset(12, 177)
 	recordSummaryHint.Size = UDim2.new(1, -24, 0, 32)
 	recordSummaryHint.TextSize = 10
+	recordContinue.Size = UDim2.fromOffset(190, 30)
+	recordContinue.Position = UDim2.new(0.5, -95, 1, -36)
+	recordContinue.TextSize = 10
 
 end
 
@@ -589,11 +642,11 @@ local function updateRecordUI()
 			recordSummaryTitle.Text = run.isNewBest and "NEW PERSONAL BEST!" or "RUN COMPLETE!"
 		end
 		local rankLine = run.madeTopTen and string.format("GLOBAL TOP 10  -  RANK #%d", run.rank) or "GLOBAL TOP 10  -  NOT THIS TIME"
-		if not run.persistenceAvailable then
-			rankLine = "GLOBAL BOARD UNAVAILABLE THIS SESSION"
+		if not run.globalBoardAvailable then
+			rankLine = UserInputService.TouchEnabled and "GLOBAL BOARD: STUDIO SAMPLE" or "GLOBAL BOARD: STUDIO SAMPLE / RECONNECTING"
 		end
 		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nPERSONAL BEST  %d\n%s", run.score or 0, run.personalBest or 0, rankLine)
-		recordSummaryHint.Text = "EXIT TO WALK AROUND - USE THE RED CONSOLE TO TRY AGAIN"
+		recordSummaryHint.Text = run.globalBoardAvailable and "SCORE SAVED SEPARATELY FROM THE BOARD - TRY AGAIN ANYTIME" or (run.globalBoardMessage or "Studio: enable API Services for live records.")
 	else
 		recordSummary.Visible = false
 	end
@@ -604,14 +657,32 @@ local function updateRecordUI()
 end
 
 local function updateShop(upgrades)
+	shopCoins.Text = string.format("YOUR COINS  %d", state.coins or 0)
 	for _, upgradeId in upgradeOrder do
 		local definition = Config.UPGRADES[upgradeId]
 		local level = upgrades and upgrades[upgradeId] or 0
 		local cost = definition.costs[level + 1]
+		local card = upgradeCards[upgradeId]
+		card.icon.Text = definition.icon or "?"
+		card.title.Text = definition.name
+		card.effect.Text = definition.effect or "Improves this cannon part"
 		if cost then
-			upgradeButtons[upgradeId].Text = string.format("%s  •  LEVEL %d\n%s  •  %d COINS", definition.name, level, definition.description, cost)
+			card.level.Text = level > 0 and string.format("CURRENT LEVEL %d  -  OWNED", level) or "CURRENT LEVEL 0  -  AVAILABLE"
+			local remaining = cost - (state.coins or 0)
+			if remaining <= 0 then
+				card.action.Text = string.format("BUY\n%d COINS", cost)
+				card.action.BackgroundColor3 = COLORS.green
+				card.card.BackgroundColor3 = Color3.fromRGB(255, 255, 248)
+			else
+				card.action.Text = string.format("NEED %d\nMORE COINS", remaining)
+				card.action.BackgroundColor3 = Color3.fromRGB(126, 111, 103)
+				card.card.BackgroundColor3 = Color3.fromRGB(246, 241, 232)
+			end
 		else
-			upgradeButtons[upgradeId].Text = string.format("%s  •  LEVEL %d\nMAXED OUT!", definition.name, level)
+			card.level.Text = string.format("CURRENT LEVEL %d  -  OWNED", level)
+			card.action.Text = "MAXED"
+			card.action.BackgroundColor3 = COLORS.blue
+			card.card.BackgroundColor3 = Color3.fromRGB(231, 246, 237)
 		end
 	end
 end
@@ -796,6 +867,24 @@ local function restoreTutorialAppearance()
 	end
 end
 
+-- Client counterpart to the server's idempotent launcher cleanup.  Input and
+-- camera state never survive a mode transition, respawn, cancelled run, or the
+-- Record Run results handoff.
+local function resetLauncherInput()
+	charging = false
+	activeFireInput = nil
+	ready = true
+	charge = 0.34
+	aimYaw = 0
+	aimPitch = (Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH)
+	table.clear(keyboardHeld)
+	table.clear(touchHeld)
+	shakeUntil = 0
+	shakeStrength = 0
+	fireButton.Text = "HOLD\nLAUNCH"
+	fireButton.BackgroundColor3 = COLORS.red
+end
+
 local function applyMode()
 	operating = state.mode == "launcher"
 	local runStatus = recordStatus()
@@ -816,10 +905,7 @@ local function applyMode()
 			restoreTutorialAppearance()
 		end
 	else
-		charging = false
-		activeFireInput = nil
-		table.clear(keyboardHeld)
-		table.clear(touchHeld)
+		resetLauncherInput()
 		controls.Visible = false
 		touchAimPad.Visible = false
 		exitButton.Visible = false
@@ -938,6 +1024,9 @@ shopToggle.Activated:Connect(function()
 	touchAimPad.Visible = operating and UserInputService.TouchEnabled and not shopPanel.Visible
 	exitButton.Visible = operating and not shopPanel.Visible
 end)
+recordContinue.Activated:Connect(function()
+	modeRemote:FireServer("walk")
+end)
 exitButton.Activated:Connect(function()
 	if operating then
 		modeRemote:FireServer("walk")
@@ -1020,6 +1109,10 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		updateRecordUI()
 		updateTargetVisuals()
 	end
+	if newState.event == "launcherReset" then
+		resetLauncherInput()
+		applyMode()
+	end
 
 	if state.event == "shotResult" and state.payload then
 		local payload = state.payload
@@ -1088,7 +1181,7 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		ready = false
 		charging = false
 	elseif state.event == "purchaseResult" and state.payload then
-		showFeedback(state.payload.result, state.payload.success and COLORS.green or COLORS.orange, state.payload.success and "Upgrade equipped!" or "Deliver more pizzas!")
+		showFeedback(state.payload.result, state.payload.success and COLORS.green or COLORS.orange, state.payload.success and ((state.payload.effect or "Upgrade equipped!") .. "  Applied now!") or "Deliver more pizzas!")
 	elseif state.event == "modeChanged" and state.payload then
 		showFeedback(state.payload.result or (operating and "READY!" or "LET'S WALK!"), operating and COLORS.green or COLORS.yellow,
 			operating and "Aim for the glowing delivery plate" or "Explore, greet customers, or check the register")

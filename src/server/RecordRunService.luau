@@ -1,6 +1,7 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
@@ -13,6 +14,48 @@ local notifyChanged
 local legendsLabel: TextLabel?
 local nameCache = {}
 local refreshBusy = false
+local lastBoardRefreshAt = 0
+local lastBoardEntries = nil
+
+local SAMPLE_BOARD = {
+	{ name = "Chef Pepper", score = 1280 },
+	{ name = "Mia's Dad", score = 1040 },
+	{ name = "Pizza Pal", score = 860 },
+	{ name = "Oven Ace", score = 720 },
+	{ name = "You?", score = 600 },
+}
+
+local function warnStore(operation: string, err: any)
+	warn(string.format("[PizzaLaunch][RecordRun] %s failed: %s", operation, tostring(err)))
+end
+
+local function studioFallbackMessage(): string
+	return "Global leaderboard is available in the published game.\nStudio API access is currently off.\n\nFor Studio testing: File > Experience Settings > Security >\nEnable Studio Access to API Services."
+end
+
+local function setSampleBoard(message: string)
+	local lines = { "PIZZA LAUNCH LEGENDS", "STUDIO SAMPLE BOARD", "", message, "" }
+	for rank, entry in SAMPLE_BOARD do
+		table.insert(lines, string.format("%2d.  %-18s  %d", rank, entry.name, entry.score))
+	end
+	setBoardText(table.concat(lines, "\n"))
+end
+
+local function retryStore(operation: string, callback): (boolean, any)
+	local lastError
+	for attempt = 1, 3 do
+		local success, value = pcall(callback)
+		if success then
+			return true, value
+		end
+		lastError = value
+		warnStore(string.format("%s (attempt %d/3)", operation, attempt), value)
+		if attempt < 3 then
+			task.wait(attempt * 0.35)
+		end
+	end
+	return false, lastError
+end
 
 local function getOrderedStore()
 	if not storeChecked then
@@ -22,6 +65,8 @@ local function getOrderedStore()
 		end)
 		if success then
 			orderedStore = store
+		else
+			warnStore("GetOrderedDataStore", store)
 		end
 	end
 	return orderedStore
@@ -66,14 +111,18 @@ end
 local function readTopTen()
 	local store = getOrderedStore()
 	if not store then
-		setBoardText("PIZZA LAUNCH LEGENDS\n\nRecords are warming up!\n\nPublish this place to test\nsaved scores in Studio.")
+		setSampleBoard(studioFallbackMessage())
 		return nil
 	end
-	local success, pageOrError = pcall(function()
+	local success, pageOrError = retryStore("GetSortedAsync", function()
 		return store:GetSortedAsync(false, 10)
 	end)
 	if not success then
-		setBoardText("PIZZA LAUNCH LEGENDS\n\nRecords are warming up!\n\nStudio: enable API Services\nto test saved scores.")
+		if RunService:IsStudio() then
+			setSampleBoard(studioFallbackMessage())
+		else
+			setBoardText("PIZZA LAUNCH LEGENDS\n\nThe live board is reconnecting.\nPlease check back in a moment.")
+		end
 		return nil
 	end
 
@@ -91,11 +140,18 @@ end
 
 local function refreshBoard()
 	if refreshBusy then
-		return nil
+		return lastBoardEntries
+	end
+	if lastBoardEntries and now() - lastBoardRefreshAt < 20 then
+		return lastBoardEntries
 	end
 	refreshBusy = true
 	local entries = readTopTen()
 	refreshBusy = false
+	if entries then
+		lastBoardEntries = entries
+		lastBoardRefreshAt = now()
+	end
 	return entries
 end
 
@@ -148,6 +204,9 @@ function RecordRunService.addPlayer(player: Player)
 		persistenceAvailable = true,
 		persistenceMessage = "",
 		token = 0,
+		globalBoardAvailable = true,
+		globalBoardMessage = "",
+		lastSubmittedToken = -1,
 	}
 	task.spawn(function()
 		local store = getOrderedStore()
@@ -155,12 +214,14 @@ function RecordRunService.addPlayer(player: Player)
 			local run = runs[player]
 			if run then
 				run.persistenceAvailable = false
-				run.persistenceMessage = "Publish this place to test saved records in Studio."
+				run.persistenceMessage = RunService:IsStudio() and studioFallbackMessage() or "Personal best is temporarily unavailable."
+				run.globalBoardAvailable = false
+				run.globalBoardMessage = run.persistenceMessage
 				notify(player, "recordBestLoaded")
 			end
 			return
 		end
-		local success, value = pcall(function()
+		local success, value = retryStore("GetAsync personal best", function()
 			return store:GetAsync(playerKey(player))
 		end)
 		local run = runs[player]
@@ -171,7 +232,7 @@ function RecordRunService.addPlayer(player: Player)
 			run.personalBest = math.max(0, math.floor(value))
 		elseif not success then
 			run.persistenceAvailable = false
-			run.persistenceMessage = "Records are unavailable in this Studio session."
+			run.persistenceMessage = RunService:IsStudio() and studioFallbackMessage() or "Personal best is temporarily unavailable."
 		end
 		notify(player, "recordBestLoaded")
 	end)
@@ -199,6 +260,8 @@ function RecordRunService.getSnapshot(player: Player)
 		isNewBest = run.isNewBest,
 		persistenceAvailable = run.persistenceAvailable,
 		persistenceMessage = run.persistenceMessage,
+		globalBoardAvailable = run.globalBoardAvailable,
+		globalBoardMessage = run.globalBoardMessage,
 	}
 end
 
@@ -227,6 +290,8 @@ function RecordRunService.begin(player: Player): (boolean, string?)
 	run.rank = nil
 	run.madeTopTen = false
 	run.isNewBest = false
+	run.globalBoardAvailable = true
+	run.globalBoardMessage = ""
 	run.countdownEndsAt = now() + Config.RECORD_RUN_COUNTDOWN
 	run.endsAt = run.countdownEndsAt + Config.RECORD_RUN_DURATION
 	notify(player, "recordCountdown")
@@ -281,6 +346,10 @@ function RecordRunService.finish(player: Player)
 	if not run or run.status ~= "running" then
 		return
 	end
+	if run.lastSubmittedToken == run.token then
+		return
+	end
+	run.lastSubmittedToken = run.token
 	run.status = "saving"
 	run.combo = 0
 	run.multiplier = 1
@@ -291,33 +360,39 @@ function RecordRunService.finish(player: Player)
 	end
 	notify(player, "recordEnding")
 
+	local completedToken = run.token
 	task.spawn(function()
 		local key = playerKey(player)
 		local store = getOrderedStore()
-		local saveSucceeded = store ~= nil
-		if run.score >= previousBest then
-			local success, storedValue = pcall(function()
-				if not store then
-					error("record store unavailable")
-				end
+		local personalSaveSucceeded = true
+		if run.score > previousBest then
+			if not store then
+				personalSaveSucceeded = false
+			else
+				local success, storedValue = retryStore("UpdateAsync completed Record Run", function()
 				return store:UpdateAsync(key, function(oldValue)
 					return math.max(typeof(oldValue) == "number" and oldValue or 0, run.score)
 				end)
 			end)
-			saveSucceeded = success
-			if success and typeof(storedValue) == "number" then
-				run.personalBest = math.floor(storedValue)
+				personalSaveSucceeded = success
+				if success and typeof(storedValue) == "number" then
+					run.personalBest = math.floor(storedValue)
+				end
 			end
 		end
 
-		local entries
-		if saveSucceeded then
-			entries = refreshBoard()
-		else
+		if not personalSaveSucceeded then
 			run.persistenceAvailable = false
-			run.persistenceMessage = "Score shown for this session; saved records are unavailable."
+			run.persistenceMessage = "Score shown for this session; personal best could not be saved."
 		end
-		if runs[player] ~= run or run.status ~= "saving" then
+		-- Board fetch is deliberately independent from the personal-best write.
+		-- A read outage must not turn a successfully saved score into a failure.
+		local entries = refreshBoard()
+		if not entries then
+			run.globalBoardAvailable = false
+			run.globalBoardMessage = RunService:IsStudio() and studioFallbackMessage() or "The live board is reconnecting; your score may still be saved."
+		end
+		if runs[player] ~= run or run.status ~= "saving" or run.token ~= completedToken then
 			return
 		end
 		run.rank = rankForKey(entries, key)
