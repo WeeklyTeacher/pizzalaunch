@@ -1,5 +1,15 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — onboarding visibility follow-up
+
+- Clean starting state: pushed commit `3a221fe93745880c1cf1a6e032e4dd2487f411bf` on `feature/sightline-onboarding-20260831` with no local changes.
+- Removed the small maroon/yellow cannon distance billboard and every player-facing grid-unit reference. Wider Plates now confirms its delivery-zone change as a percentage instead of an engine distance.
+- Enlarged the seven client-only floor arrows to a wide neon cheese silhouette with three large round pepperoni pieces per arrow. The first two begin directly ahead of the authored spawn, the route curves across the open forecourt, and the final two sit on top of the launcher platform. Markers remain flat, shadowless, non-colliding, non-touching, and non-queryable.
+- Simplified walking guidance to one compact bottom hint: `Follow the pizza arrows to the Pizza Cannon!`, changing at interaction range to `Press E or tap the Pizza Cannon to start!`. The trail remains visible through the approach, fades on mount, starts fresh every client play session, restores before completion after respawn, and reappears on explicit `? HELP` replay—even if Help is requested while mounted.
+- Preserved the relocated full-size `NEIGHBORHOOD FAVORITE` sign and its camera-frustum contract. No world geometry, launcher/camera coordinate, customer system, Record Run logic, scoring, upgrade panel, Rojo mapping, or DataStore code changed.
+- Verified: `rojo build default.project.json` produced a 232,392-byte place with SHA-256 `5A274E2D352842BEF6AC22534E8BE32F70E7091CF952AF14EF984AC423CEE7B4`; recovery safety and all recovery/onboarding visibility contracts passed; source search found no player-facing `stud`/`studs` copy or removed beacon path; the sign remains outside the launcher frustum; and `git diff --check` passed.
+- Roblox Studio was not interactively driven in this command-line run. Fresh-Play arrow visibility/orientation, following the route, mount fade, in-game Help replay, and the free-play/Record Run/upgrades/aiming sequence remain an explicit manual Studio verification rather than a claimed runtime result.
+
 ## 2026-08-31 — launcher-sightline/onboarding restore checkpoint
 
 - Clean baseline commit: `9f41fe56dc2a66998cebc0954dc42a220db7c0cc` on the pushed `feature/customer-events-progression-20260831` branch.

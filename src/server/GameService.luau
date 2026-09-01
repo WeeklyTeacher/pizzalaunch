@@ -856,8 +856,7 @@ local function upgradeChangeMessage(upgradeId: string, oldLevel: number, newLeve
 	if upgradeId == "tips" then
 		return string.format("Delivery rewards x%.2f -> x%.2f", 1 + oldLevel * 0.25, 1 + newLevel * 0.25)
 	elseif upgradeId == "assist" then
-		local diameter = Config.DELIVERY_ZONE_DIAMETER or 8
-		return string.format("Landing zone %.1f -> %.1f studs", diameter * (1 + oldLevel * 0.12), diameter * (1 + newLevel * 0.12))
+		return string.format("Landing zone +%d%% -> +%d%%", oldLevel * 12, newLevel * 12)
 	elseif upgradeId == "reload" then
 		return string.format("Oven reload %.2fs -> %.2fs", Config.RELOAD_TIME * (1 - oldLevel * 0.12), Config.RELOAD_TIME * (1 - newLevel * 0.12))
 	elseif upgradeId == "power" then

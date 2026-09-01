@@ -66,8 +66,6 @@ local onboardingReachedLauncher = false
 local onboardingTrailActive = true
 local onboardingTrailFolder: Folder? = nil
 local onboardingTrailParts = {}
-local onboardingBeacon: BillboardGui? = nil
-local onboardingBeaconText: TextLabel? = nil
 local onboardingHighlight: Highlight? = nil
 local onboardingNextDistanceCheck = 0
 local restoreTutorialAppearance
@@ -665,13 +663,15 @@ if UserInputService.TouchEnabled then
 end
 
 local PIZZA_TRAIL_POINTS = {
-	Vector3.new(-16, -0.39, 83.5),
-	Vector3.new(-13, -0.39, 82.5),
-	Vector3.new(-10, -0.39, 81.5),
-	Vector3.new(-7, -0.39, 80.5),
-	Vector3.new(-4.5, -0.39, 78.5),
-	Vector3.new(-2, 0.46, 76),
-	Vector3.new(0, 0.46, 74.5),
+	-- The first two arrows sit directly ahead of WALK_SPAWN_CFRAME and the
+	-- remaining curve stays on the open forecourt, clear of both consoles.
+	Vector3.new(-14.8, -0.39, 82.8),
+	Vector3.new(-12.2, -0.39, 81.5),
+	Vector3.new(-9.4, -0.39, 80.2),
+	Vector3.new(-6.6, -0.39, 78.9),
+	Vector3.new(-4.2, -0.39, 77.3),
+	Vector3.new(-2, 0.46, 75.7),
+	Vector3.new(0, 0.46, 74.2),
 }
 
 local function registerTrailPart(part: BasePart, baseTransparency: number)
@@ -697,34 +697,38 @@ local function makePizzaArrow(parent: Instance, position: Vector3, nextPosition:
 
 	local shaft = Instance.new("Part")
 	shaft.Name = "CheeseShaft"
-	shaft.Size = Vector3.new(0.9, 0.09, 2.15)
-	shaft.CFrame = arrowFrame * CFrame.new(0, 0, 0.25)
+	shaft.Size = Vector3.new(1.8, 0.12, 3.2)
+	shaft.CFrame = arrowFrame * CFrame.new(0, 0, 0.35)
 	shaft.Color = COLORS.yellow
 	shaft.Material = Enum.Material.Neon
 	shaft.Parent = model
-	registerTrailPart(shaft, 0.12)
+	registerTrailPart(shaft, 0.02)
 
 	for side = -1, 1, 2 do
 		local arrowHead = Instance.new("Part")
 		arrowHead.Name = "CheeseArrowHead"
-		arrowHead.Size = Vector3.new(0.72, 0.09, 1.85)
-		arrowHead.CFrame = arrowFrame * CFrame.new(side * 0.62, 0, -1.12) * CFrame.Angles(0, math.rad(side * 42), 0)
+		arrowHead.Size = Vector3.new(1.15, 0.12, 2.8)
+		arrowHead.CFrame = arrowFrame * CFrame.new(side * 0.88, 0, -1.5) * CFrame.Angles(0, math.rad(side * 40), 0)
 		arrowHead.Color = COLORS.yellow
 		arrowHead.Material = Enum.Material.Neon
 		arrowHead.Parent = model
-		registerTrailPart(arrowHead, 0.12)
+		registerTrailPart(arrowHead, 0.02)
 	end
 
-	for pepperoniIndex, offset in { -0.48, 0.38 } do
+	for _, pepperoniOffset in {
+		Vector3.new(-0.48, 0.1, 0.72),
+		Vector3.new(0.48, 0.1, 0.08),
+		Vector3.new(0, 0.1, -0.72),
+	} do
 		local pepperoni = Instance.new("Part")
 		pepperoni.Name = "Pepperoni"
 		pepperoni.Shape = Enum.PartType.Cylinder
-		pepperoni.Size = Vector3.new(0.08, 0.44, 0.44)
-		pepperoni.CFrame = arrowFrame * CFrame.new((pepperoniIndex - 1.5) * 0.22, 0.075, offset) * CFrame.Angles(0, 0, math.pi / 2)
+		pepperoni.Size = Vector3.new(0.12, 0.72, 0.72)
+		pepperoni.CFrame = arrowFrame * CFrame.new(pepperoniOffset) * CFrame.Angles(0, 0, math.pi / 2)
 		pepperoni.Color = COLORS.red
 		pepperoni.Material = Enum.Material.SmoothPlastic
 		pepperoni.Parent = model
-		registerTrailPart(pepperoni, 0.04)
+		registerTrailPart(pepperoni, 0)
 	end
 end
 
@@ -750,29 +754,6 @@ local function ensurePizzaTrailWorld()
 		makePizzaArrow(folder, position, nextPosition, index)
 	end
 
-	local beacon = Instance.new("BillboardGui")
-	beacon.Name = "PizzaCannonBeacon"
-	beacon.Adornee = console
-	beacon.AlwaysOnTop = true
-	beacon.LightInfluence = 0
-	beacon.MaxDistance = 150
-	beacon.Size = UDim2.fromOffset(UserInputService.TouchEnabled and 190 or 228, UserInputService.TouchEnabled and 40 or 46)
-	beacon.StudsOffsetWorldSpace = Vector3.new(0, 6.5, 0)
-	-- Parent to the authored console on this client so the beacon survives a
-	-- character respawn without ever becoming a server-owned world object.
-	beacon.Parent = console
-	local beaconFrame = Instance.new("Frame")
-	beaconFrame.Size = UDim2.fromScale(1, 1)
-	beaconFrame.BackgroundColor3 = COLORS.darkRed
-	beaconFrame.BackgroundTransparency = 0.06
-	beaconFrame.Parent = beacon
-	addCorner(beaconFrame, 13)
-	addStroke(beaconFrame, COLORS.yellow, 3)
-	local beaconLabel = makeLabel(beaconFrame, "Label", "PIZZA CANNON", UDim2.new(1, -12, 1, -8), UDim2.fromOffset(6, 4), UserInputService.TouchEnabled and 12 or 14)
-	beaconLabel.TextColor3 = COLORS.cream
-	onboardingBeacon = beacon
-	onboardingBeaconText = beaconLabel
-
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "PizzaCannonInteractionHighlight"
 	highlight.Adornee = console
@@ -787,12 +768,10 @@ local function ensurePizzaTrailWorld()
 end
 
 local function updateOnboardingWalkHint()
-	if onboardingTrailActive then
-		walkHint.Text = "FOLLOW THE PIZZA TRAIL TO THE PIZZA CANNON."
-	elseif onboardingReachedLauncher then
-		walkHint.Text = "PRESS E OR TAP TO OPERATE THE PIZZA CANNON."
+	if onboardingTrailActive and not onboardingReachedLauncher then
+		walkHint.Text = "Follow the pizza arrows to the Pizza Cannon!"
 	else
-		walkHint.Text = UserInputService.TouchEnabled and "WALK TO THE PIZZA CANNON • TAP OPERATE" or "WALK TO THE PIZZA CANNON • PRESS E / TAP TO OPERATE"
+		walkHint.Text = "Press E or tap the Pizza Cannon to start!"
 	end
 end
 
@@ -807,9 +786,6 @@ local function setPizzaTrailVisible(visible: boolean, immediate: boolean?)
 			TweenService:Create(part, TweenInfo.new(0.35), { Transparency = target }):Play()
 		end
 	end
-	if onboardingBeacon then
-		onboardingBeacon.Enabled = visible or onboardingReachedLauncher
-	end
 	if onboardingHighlight then
 		onboardingHighlight.Enabled = onboardingReachedLauncher and not operating
 	end
@@ -823,10 +799,7 @@ local function beginPizzaTrail(replay: boolean)
 	onboardingReplayActive = replay
 	onboardingReachedLauncher = false
 	tutorial.Visible = false
-	setPizzaTrailVisible(not operating, true)
-	if onboardingBeacon then
-		onboardingBeacon.Enabled = not operating
-	end
+	setPizzaTrailVisible(true, true)
 end
 
 local function showFirstPizzaHint()
@@ -841,10 +814,10 @@ end
 local function updatePizzaTrail()
 	ensurePizzaTrailWorld()
 	if onboardingTrailActive then
-		local pulse = math.sin(os.clock() * 3.4) * 0.08
+		local pulse = math.sin(os.clock() * 3.4) * 0.045
 		for _, part in onboardingTrailParts do
 			local baseTransparency = part:GetAttribute("TrailBaseTransparency") or 0.1
-			part.Transparency = math.clamp(baseTransparency + pulse, 0.02, 0.28)
+			part.Transparency = math.clamp(baseTransparency + pulse, 0, 0.1)
 		end
 	end
 	if operating or (onboardingCompleted and not onboardingReplayActive) then
@@ -862,17 +835,14 @@ local function updatePizzaTrail()
 		return
 	end
 	local distance = (root.Position - console.Position).Magnitude
-	if onboardingBeaconText then
-		onboardingBeaconText.Text = onboardingReachedLauncher
-			and "PIZZA CANNON  •  E / TAP"
-			or string.format("PIZZA CANNON  •  %d STUDS", math.max(0, math.floor(distance + 0.5)))
-	end
-	if onboardingTrailActive and distance <= 12 then
+	if onboardingTrailActive and not onboardingReachedLauncher and distance <= 12 then
 		onboardingReachedLauncher = true
-		setPizzaTrailVisible(false, false)
+		if onboardingHighlight then onboardingHighlight.Enabled = true end
+		updateOnboardingWalkHint()
 	elseif onboardingReachedLauncher and distance > 18 then
 		onboardingReachedLauncher = false
-		setPizzaTrailVisible(true, false)
+		if onboardingHighlight then onboardingHighlight.Enabled = false end
+		updateOnboardingWalkHint()
 	end
 end
 
@@ -1468,8 +1438,7 @@ local function applyMode()
 
 	if operating then
 		onboardingReachedLauncher = true
-		setPizzaTrailVisible(false, true)
-		if onboardingBeacon then onboardingBeacon.Enabled = false end
+		setPizzaTrailVisible(false, false)
 		if onboardingHighlight then onboardingHighlight.Enabled = false end
 		if not onboardingCompleted or onboardingReplayActive then
 			showFirstPizzaHint()
@@ -1688,7 +1657,6 @@ stateRemote.OnClientEvent:Connect(function(newState)
 			onboardingReplayActive = false
 			onboardingReachedLauncher = false
 			setPizzaTrailVisible(false, true)
-			if onboardingBeacon then onboardingBeacon.Enabled = false end
 			if onboardingHighlight then onboardingHighlight.Enabled = false end
 			TweenService:Create(tutorial, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
 			for _, descendant in tutorial:GetDescendants() do
