@@ -6,3 +6,8 @@
 /*.rbxl.lock
 
 sourcemap.json
+
+# Canonical recovery inputs are local, read-only evidence.
+/recovery/PizzaLaunchTransfer.rbxl
+/recovery/PizzaLaunchTransfer.original.rbxl
+/recovery/*.rbxl.lock
