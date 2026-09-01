@@ -66,6 +66,7 @@ local onboardingReachedLauncher = false
 local onboardingTrailActive = true
 local onboardingTrailFolder: Folder? = nil
 local onboardingTrailParts = {}
+local onboardingInteractionAnchor: BasePart? = nil
 local onboardingHighlight: Highlight? = nil
 local onboardingNextDistanceCheck = 0
 local restoreTutorialAppearance
@@ -662,16 +663,16 @@ if UserInputService.TouchEnabled then
 	onboardingHelpButton.TextSize = 11
 end
 
-local PIZZA_TRAIL_POINTS = {
-	-- The first two arrows sit directly ahead of WALK_SPAWN_CFRAME and the
-	-- remaining curve stays on the open forecourt, clear of both consoles.
-	Vector3.new(-14.8, -0.39, 82.8),
-	Vector3.new(-12.2, -0.39, 81.5),
-	Vector3.new(-9.4, -0.39, 80.2),
-	Vector3.new(-6.6, -0.39, 78.9),
-	Vector3.new(-4.2, -0.39, 77.3),
-	Vector3.new(-2, 0.46, 75.7),
-	Vector3.new(0, 0.46, 74.2),
+local PIZZA_TRAIL_ANCHOR_OFFSETS = {
+	-- All seven markers derive from LauncherInteractionAnchor. The first offset
+	-- lands directly ahead of spawn; the zero offset is the final floor marker.
+	Vector3.new(-14.7, 0, -1.5),
+	Vector3.new(-12, 0, -1),
+	Vector3.new(-9.4, 0, -0.5),
+	Vector3.new(-6.8, 0, -0.2),
+	Vector3.new(-4.5, 0, 0),
+	Vector3.new(-2.3, 0, 0),
+	Vector3.new(0, 0, 0),
 }
 
 local function registerTrailPart(part: BasePart, baseTransparency: number)
@@ -737,11 +738,11 @@ local function ensurePizzaTrailWorld()
 		return
 	end
 	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
-	local station = world and world:FindFirstChild("LauncherStation")
-	local console = station and station:FindFirstChild("OperatorConsole")
-	if not console or not console:IsA("BasePart") then
+	local interactionAnchor = world and world:FindFirstChild("LauncherInteractionAnchor", true)
+	if not interactionAnchor or not interactionAnchor:IsA("BasePart") then
 		return
 	end
+	onboardingInteractionAnchor = interactionAnchor
 
 	onboardingTrailParts = {}
 	local folder = Instance.new("Folder")
@@ -749,14 +750,19 @@ local function ensurePizzaTrailWorld()
 	folder:SetAttribute("ClientOnly", true)
 	folder.Parent = Workspace
 	onboardingTrailFolder = folder
-	for index, position in PIZZA_TRAIL_POINTS do
-		local nextPosition = PIZZA_TRAIL_POINTS[index + 1] or console.Position
+	local trailFloorY = -0.39
+	local trailPoints = {}
+	for _, offset in PIZZA_TRAIL_ANCHOR_OFFSETS do
+		table.insert(trailPoints, Vector3.new(interactionAnchor.Position.X + offset.X, trailFloorY, interactionAnchor.Position.Z + offset.Z))
+	end
+	for index, position in trailPoints do
+		local nextPosition = trailPoints[index + 1] or (position + Vector3.new(0, 0, -1))
 		makePizzaArrow(folder, position, nextPosition, index)
 	end
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "PizzaCannonInteractionHighlight"
-	highlight.Adornee = console
+	highlight.Adornee = interactionAnchor
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.FillColor = COLORS.yellow
 	highlight.FillTransparency = 0.82
@@ -827,14 +833,13 @@ local function updatePizzaTrail()
 		return
 	end
 	onboardingNextDistanceCheck = os.clock() + 0.1
-	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
-	local console = world and world:FindFirstChild("OperatorConsole", true)
+	local interactionAnchor = onboardingInteractionAnchor
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not console or not console:IsA("BasePart") or not root or not root:IsA("BasePart") then
+	if not interactionAnchor or not interactionAnchor.Parent or not root or not root:IsA("BasePart") then
 		return
 	end
-	local distance = (root.Position - console.Position).Magnitude
+	local distance = (root.Position - interactionAnchor.Position).Magnitude
 	if onboardingTrailActive and not onboardingReachedLauncher and distance <= 12 then
 		onboardingReachedLauncher = true
 		if onboardingHighlight then onboardingHighlight.Enabled = true end

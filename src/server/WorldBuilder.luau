@@ -532,12 +532,17 @@ local function buildLauncher(world: Folder)
 	local operatorConsole = makePart(station, "OperatorConsole", Vector3.new(9, 4.5, 3), CFrame.new(0, 3.2, 73), COLORS.green, Enum.Material.Metal)
 	operatorConsole.CanCollide = false
 	surfaceText(operatorConsole, "ConsoleLabel", Enum.NormalId.Back, "PRESS E\nTO LAUNCH", COLORS.yellow, COLORS.dark, 18)
-	prompt(operatorConsole, "LauncherPrompt", "Mount Launcher", "Pizza Cannon", 12)
-	local operatorSpot = makePart(station, "OperatorSpot", Vector3.new(0.18, 8, 8), CFrame.new(0, 0.04, 73) * CFrame.Angles(0, 0, math.pi / 2), COLORS.green, Enum.Material.Neon)
-	operatorSpot.Shape = Enum.PartType.Cylinder
-	operatorSpot.CanCollide = false
-	operatorSpot.CanTouch = false
-	operatorSpot.Transparency = 0.3
+	-- This is the one authoritative interaction destination. The pizza press
+	-- reaches Z=80, so the anchor sits one clear player-step in front at Z=84.
+	-- Tutorial code and server permission checks bind to this exact part only.
+	local interactionAnchor = makePart(operatorConsole, "LauncherInteractionAnchor", Vector3.new(2, 4, 2), CFrame.new(0, 2.4, 84), Color3.new(1, 1, 1))
+	interactionAnchor.Transparency = 1
+	interactionAnchor.CanCollide = false
+	interactionAnchor.CanTouch = false
+	interactionAnchor.CanQuery = false
+	interactionAnchor.CastShadow = false
+	interactionAnchor:SetAttribute("AuthoritativeLauncherInteraction", true)
+	prompt(interactionAnchor, "LauncherPrompt", "Mount Launcher", "Pizza Cannon", 12)
 
 	local recordConsole = makePart(station, "RecordRunConsole", Vector3.new(10, 5.5, 3), CFrame.new(-13, 3.7, 73), COLORS.red, Enum.Material.Metal)
 	recordConsole.CanCollide = false

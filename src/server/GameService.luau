@@ -993,8 +993,8 @@ local function setPlayerMode(player: Player, requestedMode: string)
 			return
 		end
 		local world = Workspace:FindFirstChild("PizzaLaunchWorld")
-		local console = world and world:FindFirstChild("OperatorConsole", true)
-		if not console or not console:IsA("BasePart") or (root.Position - console.Position).Magnitude > 17 then
+		local interactionAnchor = world and world:FindFirstChild("LauncherInteractionAnchor", true)
+		if not interactionAnchor or not interactionAnchor:IsA("BasePart") or (root.Position - interactionAnchor.Position).Magnitude > 17 then
 			return
 		end
 		launcherOccupant = player

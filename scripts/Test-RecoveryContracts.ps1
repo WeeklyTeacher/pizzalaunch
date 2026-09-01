@@ -59,6 +59,10 @@ Assert-True ($world.Contains('CFrame.new(42, 27.2, 73.4)')) 'Neighborhood Favori
 $signNearestHorizontalEdge = 42 - (28 / 2)
 $signHorizontalAngle = [Math]::Atan2($signNearestHorizontalEdge, [Math]::Abs(82 - 73.4)) * 180 / [Math]::PI
 Assert-True ($signHorizontalAngle -gt 28.5) 'relocated sign stays outside the 57-degree launcher-camera horizontal frustum'
+Assert-True ($world.Contains('"LauncherInteractionAnchor"') -and $world.Contains('CFrame.new(0, 2.4, 84)')) 'real cannon prompt has one explicit clear-floor interaction anchor'
+Assert-True ($world.Contains('prompt(interactionAnchor, "LauncherPrompt", "Mount Launcher", "Pizza Cannon", 12)')) 'actual Mount Launcher prompt is parented to LauncherInteractionAnchor'
+Assert-True ($world.Contains('AuthoritativeLauncherInteraction')) 'launcher anchor declares its authoritative interaction role'
+Assert-True (-not $world.Contains('"OperatorSpot"')) 'obsolete glow underneath the pizza press is removed'
 Assert-True ($config.Contains('Config.RECORD_RUN_STORE = "PizzaLaunch_RecordRun_AllTime_v1"')) 'OrderedDataStore name is unchanged'
 Assert-True ($config.Contains('Config.LAUNCH_ORIGIN = Vector3.new(0, 12, 50)')) 'Transfer launcher origin is unchanged'
 Assert-True ($config.Contains('Vector3.new(-24, 2.5, 2)') -and $config.Contains('Vector3.new(24, 2.5, -55)')) 'Transfer near/far table geometry is present'
@@ -76,11 +80,15 @@ Assert-True ($client.Contains('dialogueCard.Name = "CustomerDialogueCard"')) 'cu
 Assert-True ($client.Contains('dialogueText.TextScaled = false')) 'customer dialogue never uses oversized TextScaled rendering'
 Assert-True ($client.Contains('dialogueCard.Active = false')) 'customer dialogue card is non-modal'
 Assert-True ($client.Contains('eventBanner.Name = "ShiftEventBanner"')) 'shift events use a compact side banner'
-$trailBlock = [regex]::Match($client, 'local PIZZA_TRAIL_POINTS = \{([\s\S]*?)\r?\n\}')
-Assert-True ($trailBlock.Success) 'client defines an isolated Pizza Trail route'
+$trailBlock = [regex]::Match($client, 'local PIZZA_TRAIL_ANCHOR_OFFSETS = \{([\s\S]*?)\r?\n\}')
+Assert-True ($trailBlock.Success) 'client defines an anchor-relative Pizza Trail route'
 Assert-True (([regex]::Matches($trailBlock.Groups[1].Value, 'Vector3\.new\(')).Count -eq 7) 'Pizza Trail contains seven large path arrows'
-Assert-True ($trailBlock.Groups[1].Value.Contains('Vector3.new(-14.8, -0.39, 82.8)') -and $trailBlock.Groups[1].Value.Contains('Vector3.new(-12.2, -0.39, 81.5)')) 'first two arrows begin directly ahead of the authored walk spawn'
-Assert-True ($trailBlock.Groups[1].Value.Contains('Vector3.new(0, 0.46, 74.2)')) 'Pizza Trail ends on top of the launcher platform at the regular console'
+Assert-True ($trailBlock.Groups[1].Value.Contains('Vector3.new(-14.7, 0, -1.5)') -and $trailBlock.Groups[1].Value.Contains('Vector3.new(-12, 0, -1)')) 'first two arrows begin directly ahead of the authored walk spawn'
+Assert-True ($trailBlock.Groups[1].Value.Contains('Vector3.new(0, 0, 0)')) 'final Pizza Trail marker lands exactly at LauncherInteractionAnchor'
+Assert-True ($client.Contains('interactionAnchor.Position.X + offset.X') -and $client.Contains('interactionAnchor.Position.Z + offset.Z')) 'every Pizza Trail marker derives from the explicit interaction anchor'
+Assert-True ($client.Contains('highlight.Adornee = interactionAnchor')) 'launcher highlighting binds only to LauncherInteractionAnchor'
+Assert-True (-not $client.Contains('FindFirstChild("OperatorConsole"')) 'onboarding never guesses its destination from the decorative console'
+Assert-True ($gameService.Contains('root.Position - interactionAnchor.Position')) 'server mount permission validates against LauncherInteractionAnchor'
 Assert-True ($client.Contains('shaft.Size = Vector3.new(1.8, 0.12, 3.2)') -and $client.Contains('arrowHead.Size = Vector3.new(1.15, 0.12, 2.8)')) 'Pizza Trail arrow geometry is wide and unmistakable'
 $pepperoniBlock = [regex]::Match($client, 'for _, pepperoniOffset in \{([\s\S]*?)\r?\n\s*\} do')
 Assert-True ($pepperoniBlock.Success -and ([regex]::Matches($pepperoniBlock.Groups[1].Value, 'Vector3\.new\(')).Count -eq 3) 'every Pizza Trail arrow carries three round pepperoni circles'

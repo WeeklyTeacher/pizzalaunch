@@ -1,5 +1,15 @@
 # Pizza Launch Build Log
 
+## 2026-08-31 — Pizza Trail destination correction
+
+- Clean starting state: pushed commit `5251bbbbc31539edcf18f7093f9795a0643e75a6` on `feature/sightline-onboarding-20260831` with no local changes.
+- Root cause: the prior final marker ended at `Z=74.2` and the old green `OperatorSpot` ring was at `Z=73`, both underneath the decorative `MAMA MIA PIZZA PRESS`, whose body reaches forward to `Z=80`.
+- Added one explicit `LauncherInteractionAnchor` on the clear approach floor at `(0, 2.4, 84)`, one player-step in front of the press. The actual `LauncherPrompt` is now a child of this anchor, and the server's mount-distance validation uses the same anchor.
+- Removed the obsolete under-press `OperatorSpot`. All seven trail positions are now generated from fixed safe offsets relative to `LauncherInteractionAnchor`; the final offset is zero, the final arrow points toward the cannon, and the local interaction highlight and proximity check use only that anchor. The onboarding client no longer searches for `OperatorConsole`, decorative ovens, signs, or nearby launcher-named models.
+- The anchor and trail are invisible/faded while mounted, so the existing clear aiming frustum and relocated `NEIGHBORHOOD FAVORITE` sign remain protected. No launcher physics, camera coordinate, restaurant layout, customer, scoring, upgrade, Record Run, DataStore, or Rojo mapping behavior changed.
+- Verified: `rojo build default.project.json` produced a 233,016-byte place with SHA-256 `DDC5168A81B8BE7B1EC535C58773106DAF8B10F3C2B3ABA08012FD70557FEE96`; recovery safety and all recovery/anchor contracts passed; `OperatorSpot`, the prior absolute trail route, and client `OperatorConsole` destination search are absent; protected gameplay/configuration files have no diff; and `git diff --check` passed.
+- Roblox Studio was not interactively driven in this command-line run. Fresh spawn → follow trail → stand on final arrow → prompt appears → press `E`/tap → mounted sequence remains the explicit manual Studio validation and is not claimed as runtime-tested here.
+
 ## 2026-08-31 — onboarding visibility follow-up
 
 - Clean starting state: pushed commit `3a221fe93745880c1cf1a6e032e4dd2487f411bf` on `feature/sightline-onboarding-20260831` with no local changes.
