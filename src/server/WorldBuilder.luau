@@ -16,6 +16,7 @@ local COLORS = {
 	wood = Color3.fromRGB(139, 83, 50),
 	darkWood = Color3.fromRGB(85, 50, 39),
 	yellow = Color3.fromRGB(255, 200, 59),
+	orange = Color3.fromRGB(255, 126, 54),
 	steel = Color3.fromRGB(82, 88, 96),
 }
 
@@ -213,6 +214,75 @@ local function buildHangingLight(world: Folder, position: Vector3)
 	light.Parent = bulb
 end
 
+local function buildStorefrontExterior(world: Folder)
+	local storefront = Instance.new("Model")
+	storefront.Name = "StorefrontExterior"
+	storefront:SetAttribute("Ownership", "RuntimeCompatibility")
+	storefront.Parent = world
+
+	-- The forecourt extends the walkable route outside without changing any
+	-- table, launcher, or camera coordinate from the Transfer game.
+	local sidewalk = makePart(storefront, "FrontSidewalk", Vector3.new(132, 1, 34), CFrame.new(0, -1, 88), Color3.fromRGB(202, 197, 187), Enum.Material.Concrete)
+	sidewalk:SetAttribute("SplatSurface", true)
+	for x = -60, 60, 12 do
+		local seam = makePart(storefront, "SidewalkSeam", Vector3.new(0.12, 0.04, 32), CFrame.new(x, -0.47, 88), Color3.fromRGB(158, 153, 146), Enum.Material.Concrete)
+		seam.CanCollide = false
+		seam.CanTouch = false
+	end
+
+	-- Three openings are kept clear: the player's central entrance and the
+	-- existing left/right customer doors. Wall segments frame rather than block.
+	for _, segment in {
+		{ x = -62.5, width = 7 },
+		{ x = -37.5, width = 23 },
+		{ x = 21.5, width = 55 },
+		{ x = 62.5, width = 7 },
+	} do
+		local wall = makePart(storefront, "FrontFacade", Vector3.new(segment.width, 18, 2), CFrame.new(segment.x, 8, 72), Color3.fromRGB(214, 82, 59), Enum.Material.Brick)
+		wall:SetAttribute("SplatSurface", true)
+		makePart(storefront, "FacadeWainscot", Vector3.new(segment.width - 0.3, 4.5, 0.35), CFrame.new(segment.x, 1.6, 73.1), COLORS.darkWood, Enum.Material.WoodPlanks)
+	end
+
+	local header = makePart(storefront, "StorefrontHeader", Vector3.new(132, 5, 2.4), CFrame.new(0, 19.5, 72), COLORS.cream, Enum.Material.Plaster)
+	header:SetAttribute("SplatSurface", true)
+	local marquee = makePart(storefront, "MainMarquee", Vector3.new(50, 8, 1), CFrame.new(8, 20, 73.4), COLORS.darkRed, Enum.Material.Wood)
+	marquee.CanCollide = false
+	surfaceText(marquee, "MainMarqueeText", Enum.NormalId.Back, "PIZZA LAUNCH\nFLYING PIES  -  HAPPY FAMILIES", COLORS.yellow, nil, 24)
+
+	local canopy = makePart(storefront, "StripedCanopy", Vector3.new(126, 1, 9), CFrame.new(0, 15.6, 77), COLORS.red, Enum.Material.Fabric)
+	canopy.CanCollide = false
+	for x = -56, 56, 16 do
+		local stripe = makePart(storefront, "CanopyStripe", Vector3.new(7.5, 0.18, 8.6), CFrame.new(x, 16.15, 77), COLORS.cream, Enum.Material.Fabric)
+		stripe.CanCollide = false
+	end
+
+	-- The central doors align with the authored walk spawn at X=-16. They are
+	-- non-colliding glass so interaction never depends on an animation finishing.
+	for _, x in { -20, -12 } do
+		local door = makePart(storefront, "PlayerEntranceDoor", Vector3.new(7.5, 13, 0.45), CFrame.new(x, 6, 71), Color3.fromRGB(134, 211, 232), Enum.Material.Glass)
+		door.Transparency = 0.38
+		door.CanCollide = false
+		local handle = makePart(storefront, "DoorHandle", Vector3.new(0.35, 3, 0.35), CFrame.new(x + (x < -16 and 2.4 or -2.4), 6, 70.5), COLORS.steel, Enum.Material.Metal)
+		handle.CanCollide = false
+	end
+	for _, x in { -24.2, -16, -7.8 } do
+		makePart(storefront, "PlayerDoorFrame", Vector3.new(0.8, 14, 1), CFrame.new(x, 6, 71), COLORS.darkWood, Enum.Material.Wood)
+	end
+	local entranceSign = makePart(storefront, "EntranceSign", Vector3.new(17, 2.5, 0.6), CFrame.new(-16, 13.8, 70.6), COLORS.green, Enum.Material.Wood)
+	entranceSign.CanCollide = false
+	surfaceText(entranceSign, "EntranceSignText", Enum.NormalId.Back, "ENTER  /  EXIT", COLORS.cream, nil, 18)
+
+	for _, x in { -48, 48 } do
+		local planter = makePart(storefront, "FrontPlanter", Vector3.new(10, 3, 5), CFrame.new(x, 1, 83), COLORS.darkWood, Enum.Material.WoodPlanks)
+		planter.CanCollide = false
+		for offset = -3, 3, 3 do
+			local plant = makePart(storefront, "PlanterGreenery", Vector3.new(2.4, 3.5, 2.4), CFrame.new(x + offset, 3.7, 83), Color3.fromRGB(68, 143, 75), Enum.Material.Grass)
+			plant.Shape = Enum.PartType.Ball
+			plant.CanCollide = false
+		end
+	end
+end
+
 local function buildCustomerEntrances(world: Folder)
 	local entranceModel = Instance.new("Model")
 	entranceModel.Name = "CustomerEntrances"
@@ -232,7 +302,9 @@ local function buildCustomerEntrances(world: Folder)
 		local mat = makePart(entranceModel, "WelcomeMat", Vector3.new(11, 0.14, 6), CFrame.new(x, -0.35, 67.5), COLORS.darkRed, Enum.Material.Fabric)
 		mat.CanCollide = false
 		mat.CanTouch = false
-		local point = makePart(entranceModel, side < 0 and "CustomerEntranceLeft" or "CustomerEntranceRight", Vector3.new(1, 1, 1), CFrame.new(x, 0.2, 69), Color3.new(1, 1, 1))
+		-- Customers now materialize on the exterior forecourt, walk through the
+		-- visible glass door, then continue along the same safe side aisle.
+		local point = makePart(entranceModel, side < 0 and "CustomerEntranceLeft" or "CustomerEntranceRight", Vector3.new(1, 1, 1), CFrame.new(x, 0.2, 83), Color3.new(1, 1, 1))
 		point.Transparency = 1
 		point.CanCollide = false
 		point.CanTouch = false
@@ -653,6 +725,7 @@ function WorldBuilder.build()
 	world.Parent = Workspace
 
 	buildShell(world)
+	buildStorefrontExterior(world)
 	buildCustomerEntrances(world)
 	buildKitchen(world)
 	buildDecor(world)
