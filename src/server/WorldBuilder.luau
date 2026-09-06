@@ -103,6 +103,7 @@ local function prompt(parent: Instance, name: string, actionText: string, object
 	item.ObjectText = objectText
 	item.KeyboardKeyCode = Enum.KeyCode.E
 	item.GamepadKeyCode = Enum.KeyCode.ButtonX
+	item.ClickablePrompt = true
 	item.HoldDuration = 0
 	item.MaxActivationDistance = distance
 	item.RequiresLineOfSight = false
@@ -247,7 +248,7 @@ local function buildStorefrontExterior(world: Folder)
 	header:SetAttribute("SplatSurface", true)
 	local marquee = makePart(storefront, "MainMarquee", Vector3.new(50, 8, 1), CFrame.new(8, 20, 73.4), COLORS.darkRed, Enum.Material.Wood)
 	marquee.CanCollide = false
-	surfaceText(marquee, "MainMarqueeText", Enum.NormalId.Back, "PIZZA LAUNCH\nFLYING PIES  -  HAPPY FAMILIES", COLORS.yellow, nil, 24)
+	surfaceText(marquee, "MainMarqueeText", Enum.NormalId.Back, "PIZZA LAUNCHER\nWALK HERE TO PLAY", COLORS.yellow, nil, 24)
 
 	local canopy = makePart(storefront, "StripedCanopy", Vector3.new(126, 1, 9), CFrame.new(0, 15.6, 77), COLORS.red, Enum.Material.Fabric)
 	canopy.CanCollide = false
@@ -525,13 +526,23 @@ local function buildLauncher(world: Folder)
 	station.Name = "LauncherStation"
 	station.Parent = world
 	makePart(station, "Platform", Vector3.new(30, 1, 20), CFrame.new(0, -0.1, 66), COLORS.darkWood, Enum.Material.WoodPlanks)
-	local marquee = makePart(station, "Backboard", Vector3.new(12, 4, 1), CFrame.new(18, 9, 72.5), COLORS.red, Enum.Material.Wood)
+	-- A player who continues through the entrance sees this from the normal
+	-- interior camera. The camera-facing sign is locally hidden on mount, so it
+	-- can guide a new arrival without covering the launcher aiming view.
+	local interiorGuide = makePart(station, "InteriorLauncherGuide", Vector3.new(1, 1, 1), CFrame.new(-16, 7, 45), COLORS.darkRed, Enum.Material.SmoothPlastic)
+	interiorGuide.CanCollide = false
+	interiorGuide.CanTouch = false
+	interiorGuide.CanQuery = false
+	interiorGuide.Transparency = 1
+	local interiorBillboard = billboard(interiorGuide, "InteriorLauncherBillboard", "PIZZA LAUNCHER\nTURN AROUND  •  FOLLOW THE ARROWS", COLORS.darkRed, Vector3.zero, Vector2.new(260, 76))
+	interiorBillboard.MaxDistance = 34
+	local marquee = makePart(station, "Backboard", Vector3.new(18, 6, 1), CFrame.new(18, 11, 72.5), COLORS.red, Enum.Material.Wood)
 	marquee.CanCollide = false
-	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "PIZZA\nLAUNCH", COLORS.yellow, nil, 23)
+	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "PIZZA LAUNCHER\nWALK HERE TO PLAY", COLORS.yellow, nil, 21)
 
 	local operatorConsole = makePart(station, "OperatorConsole", Vector3.new(9, 4.5, 3), CFrame.new(0, 3.2, 73), COLORS.green, Enum.Material.Metal)
 	operatorConsole.CanCollide = false
-	surfaceText(operatorConsole, "ConsoleLabel", Enum.NormalId.Back, "PRESS E\nTO LAUNCH", COLORS.yellow, COLORS.dark, 18)
+	surfaceText(operatorConsole, "ConsoleLabel", Enum.NormalId.Back, "PIZZA LAUNCHER\nUSE FROM THE PIZZA PAD", COLORS.yellow, COLORS.dark, 16)
 	-- This is the one authoritative interaction destination. The pizza press
 	-- reaches Z=80, so the anchor sits one clear player-step in front at Z=84.
 	-- Tutorial code and server permission checks bind to this exact part only.
@@ -542,12 +553,35 @@ local function buildLauncher(world: Folder)
 	interactionAnchor.CanQuery = false
 	interactionAnchor.CastShadow = false
 	interactionAnchor:SetAttribute("AuthoritativeLauncherInteraction", true)
-	prompt(interactionAnchor, "LauncherPrompt", "Mount Launcher", "Pizza Cannon", 12)
+	prompt(interactionAnchor, "LauncherPrompt", "USE LAUNCHER", "PIZZA LAUNCHER", 12)
+	billboard(interactionAnchor, "LauncherMountBillboard", "STEP HERE TO PLAY", COLORS.darkRed, Vector3.new(0, 5.2, 0), Vector2.new(260, 68))
 
-	local recordConsole = makePart(station, "RecordRunConsole", Vector3.new(10, 5.5, 3), CFrame.new(-13, 3.7, 73), COLORS.red, Enum.Material.Metal)
+	-- The prompt's exact activation point is reinforced by a flat, non-colliding
+	-- pizza-colored pad. It remains clear of the storefront and never becomes an
+	-- invisible seat players have to discover.
+	local usePad = makePart(station, "LauncherUsePad", Vector3.new(0.18, 10, 10), CFrame.new(0, 0.16, 84) * CFrame.Angles(0, 0, math.pi / 2), COLORS.yellow, Enum.Material.Neon)
+	usePad.Shape = Enum.PartType.Cylinder
+	usePad.CanCollide = false
+	usePad.CanTouch = false
+	usePad.CanQuery = false
+	usePad.Transparency = 0.18
+	usePad:SetAttribute("LauncherMountPosition", true)
+	local padCenter = makePart(station, "LauncherUsePadCenter", Vector3.new(0.2, 6.8, 6.8), CFrame.new(0, 0.27, 84) * CFrame.Angles(0, 0, math.pi / 2), COLORS.red, Enum.Material.SmoothPlastic)
+	padCenter.Shape = Enum.PartType.Cylinder
+	padCenter.CanCollide = false
+	padCenter.CanTouch = false
+	padCenter.CanQuery = false
+	for _, offset in { Vector3.new(-1.5, 0, -1.2), Vector3.new(1.4, 0, -0.5), Vector3.new(0.3, 0, 1.6) } do
+		local topping = makePart(station, "LauncherUsePadPepperoni", Vector3.new(0.22, 1.25, 1.25), CFrame.new(Vector3.new(0, 0.39, 84) + offset) * CFrame.Angles(0, 0, math.pi / 2), COLORS.darkRed, Enum.Material.Neon)
+		topping.Shape = Enum.PartType.Cylinder
+		topping.CanCollide = false
+		topping.CanTouch = false
+		topping.CanQuery = false
+	end
+
+	local recordConsole = makePart(station, "ModeInfoConsole", Vector3.new(10, 5.5, 3), CFrame.new(-13, 3.7, 73), COLORS.red, Enum.Material.Metal)
 	recordConsole.CanCollide = false
-	surfaceText(recordConsole, "RecordRunSign", Enum.NormalId.Back, "1-MINUTE RECORD RUN\nFAR TABLES SCORE MORE", COLORS.yellow, COLORS.dark, 18)
-	prompt(recordConsole, "RecordRunPrompt", "Start 1-Minute Record Run", "Pizza Launch Records", 12)
+	surfaceText(recordConsole, "ModeInfoSign", Enum.NormalId.Back, "TWO WAYS TO PLAY\nCHOOSE AFTER MOUNTING", COLORS.yellow, COLORS.dark, 17)
 	local recordGlow = makePart(station, "RecordRunGlow", Vector3.new(0.16, 9, 9), CFrame.new(-13, 0.04, 73) * CFrame.Angles(0, 0, math.pi / 2), COLORS.yellow, Enum.Material.Neon)
 	recordGlow.Shape = Enum.PartType.Cylinder
 	recordGlow.CanCollide = false

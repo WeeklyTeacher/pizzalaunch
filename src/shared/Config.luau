@@ -39,8 +39,8 @@ Config.MAX_YAW = math.rad(33)
 Config.LAUNCH_ORIGIN = Vector3.new(0, 12, 50)
 Config.CAMERA_POSITION = Vector3.new(0, 29, 82)
 Config.CAMERA_FOCUS = Vector3.new(0, 6.5, -22)
-Config.LAUNCHER_OPERATOR_CFRAME = CFrame.new(0, 3.5, 73)
-Config.LAUNCHER_EXIT_CFRAME = CFrame.new(16, 3.5, 72) * CFrame.Angles(0, math.rad(-90), 0)
+Config.LAUNCHER_OPERATOR_CFRAME = CFrame.lookAt(Vector3.new(0, 3.5, 84), Vector3.new(0, 3.5, 65))
+Config.LAUNCHER_EXIT_CFRAME = CFrame.lookAt(Vector3.new(10, 3.5, 84), Vector3.new(0, 3.5, 84))
 Config.WALK_SPAWN_CFRAME = CFrame.lookAt(Vector3.new(-16, 3.5, 84), Vector3.new(0, 3.5, 65))
 
 Config.TABLES = {

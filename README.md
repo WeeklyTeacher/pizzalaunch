@@ -1,12 +1,12 @@
 # Pizza Launch
 
-Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through the pizzeria, greet a changing cast of customers, step behind the counter to operate the pizza cannon, and land dinner on any hungry table. Accurate deliveries earn coins, combo bonuses, and session upgrades; misses create harmless, temporary restaurant chaos.
+Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through the pizzeria, greet a changing cast of customers, use the Pizza Launcher, and land dinner on any hungry table. Accurate deliveries earn coins, combo bonuses, and session upgrades; misses create harmless, temporary restaurant chaos.
 
 ## Play the game
 
 - Walk with normal Roblox movement (`WASD`, thumbstick, or touch controls).
-- Use `E`, the gamepad interaction button, or the touch prompt at the glowing launcher to operate it.
-- Use the separate red **Start 1-Minute Record Run** console for the optional timed challenge. Free play remains available at the green console.
+- Follow the pizza arrows to the pizza-shaped launcher pad, then use `E`, gamepad `X`, or the large touch prompt labeled **USE LAUNCHER**.
+- Choose **FREE PLAY** or **1-MINUTE RECORD RUN** after mounting. Both choices use the same launcher and server-owned mount state.
 - While operating, move the mouse to aim naturally left/right and raise/lower the launch arc.
 - Keyboard: `A`/`D` or left/right arrows turn; `W`/`S` or up/down arrows change arc.
 - Touch: drag to aim or use the large four-way aim pad.
@@ -19,9 +19,9 @@ Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through th
 
 Mobile play is landscape-only. Normal touch movement appears while walking; it is replaced by the dedicated aim pad and launch controls only while operating the cannon.
 
-## One-minute Record Run
+## 1-Minute Record Run
 
-The red console beside the normal launcher starts an in-restaurant record attempt: a three-second countdown followed by 60 seconds of launches. Every currently occupied table becomes a glowing choice only during the run. Near, middle, and far tables pay progressively more points, so players can repeat a difficult far table after its next customer arrives or take safer nearby deliveries. Perfect and Great accuracy add bonuses. Consecutive correct deliveries raise a stepped multiplier from 1x to 2x, while misses and wrong hits reset the run combo.
+Choose **1-MINUTE RECORD RUN** from the launcher mode picker to start a three-second countdown followed by 60 seconds of launches. Every currently occupied table becomes a glowing choice only during the run. Near, middle, and far tables pay progressively more points, so players can repeat a difficult far table after its next customer arrives or take safer nearby deliveries. Perfect and Great accuracy add bonuses. Consecutive correct deliveries raise a stepped multiplier from 1x to 2x, while misses and wrong hits reset the run combo.
 
 Record scoring is calculated entirely by the server. Record runs use fixed launch power, reload timing, and accuracy assistance so session upgrades cannot affect the all-time competition. The end card shows final score, personal best, and top-10 status. The wall-mounted **Pizza Launch Legends** board reads the ten highest saved personal records from an `OrderedDataStore`.
 

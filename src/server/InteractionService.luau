@@ -37,10 +37,14 @@ end
 
 function InteractionService.setLauncherAvailable(available: boolean)
 	if launcherPrompt then
-		launcherPrompt.Enabled = available
+		-- Keep the shared attraction visible and triggerable while occupied so a
+		-- second player gets an explicit server response instead of a vanishing UI.
+		launcherPrompt.Enabled = true
+		launcherPrompt.ActionText = available and "USE LAUNCHER" or "OCCUPIED"
+		launcherPrompt.ObjectText = available and "PIZZA LAUNCHER" or "ANOTHER CHEF IS PLAYING"
 	end
 	if recordRunPrompt then
-		recordRunPrompt.Enabled = available
+		recordRunPrompt.Enabled = false
 	end
 end
 

@@ -1,5 +1,86 @@
 # Pizza Launch Build Log
 
+## 2026-09-05 — surgical launcher onboarding correction
+
+### User-reported failures and root cause
+
+- The visible `HOW TO PLAY` button did nothing useful and was no longer wanted. Its replay-only button, click connection, and replay state were removed; the nonblocking automatic first-visit route remains.
+- `UPGRADES` was missing at first spawn and appeared only after gameplay. The root cause was `updateRecordUI()` gating the button on `(operating or onboardingCompleted)` and also hiding it for any timed session. `onboardingCompleted` becomes true only after a server-accepted launch, which directly caused the delayed appearance.
+- Launcher guidance still failed from inside the restaurant. The spawn-side route existed, but it ended outside and had no reliably visible interior-camera direction sign or interior return route.
+
+### Focused correction
+
+- `src/client/init.client.luau`: removed the HOW TO PLAY control/handler/replay state; initialized UPGRADES visible on creation and made only the mounted mode picker temporarily hide it; added a raycasted interior return route tied to the authoritative launcher anchor; hid first-visit interior guidance on mount; reset stale Record Run fire-button state when the mode picker opens.
+- `src/server/WorldBuilder.luau`: added a camera-facing, distance-limited interior `PIZZA LAUNCHER / TURN AROUND / FOLLOW THE ARROWS` sign and an exact-anchor `STEP HERE TO PLAY` label. The existing `USE LAUNCHER` prompt remains keyboard `E`, controller `X`, and touch-clickable.
+- `scripts/Test-RecoveryContracts.ps1`: replaced the obsolete HOW TO PLAY contracts with absence, deterministic persistent-menu, interior-camera guidance, mount-label, and mode-restart contracts.
+- `E:\projects\roblox\LAUNCHER_SYSTEM.md`: added the reusable deterministic-menu, real-camera validation, dead-tutorial removal, and persistent-UI/state-boundary rules.
+
+### Verification performed
+
+- `Test-RecoverySafety.ps1`: PASS. `Test-RecoveryContracts.ps1`: PASS.
+- `rojo build`, `rojo sourcemap`, and `git diff --check`: PASS. Final artifact `.qa-artifacts/surgical-correction-final.rbxlx` SHA-256 is `0B274E1CBF543FC65BDFECF04EA612ED75A5882994CA23A490E4AAA8892C43A2`. Rojo remained available at `127.0.0.1:34872`.
+- Disposable Studio, desktop viewport: PASS for fresh spawn with HOW TO PLAY absent, immediate UPGRADES visibility, opening the real upgrades panel before gameplay, and a readable interior direction sign from the player camera.
+- Studio iPhone 17 Pro landscape: PASS for fresh spawn, HOW TO PLAY absence, immediate UPGRADES, interior sign and floor arrows, `STEP HERE TO PLAY`, touch `USE LAUNCHER`, mode picker, Free Play launch, exit with UPGRADES restored, full 60-second Record Run expiry, compact results, Choose Mode, and entering another mode. Screenshots are in `.qa-artifacts/surgical-screenshots/`.
+- Studio Output: no game-script exception or stack trace. The unpublished disposable place produced the expected OrderedDataStore-unavailable warning and used the existing Studio fallback; no live persistence claim is made.
+- During the run, switching from completed Record Run to Free Play exposed a stale `TIME!` fire-button label. The picker now calls the existing input reset before another mode; the final contract and follow-up play check cover the clean next-mode state.
+
+### Not completed in this correction pass
+
+- A new two-client Studio session and controller-emulator pass were not repeated because this correction did not change ownership or controller bindings. Their existing server/input contracts remain passing. No push or publish was performed.
+
+## 2026-09-05 — launcher onboarding and unified mode selection
+
+### Investigation and decisions
+
+- Audited the Rojo mappings, all launcher/mount/prompt/UI/arrow/trajectory/timer/Record Run/leaderboard paths, current git state, parent Roblox documentation, and a disposable Studio build before editing. Preserved the pre-existing QA checkpoint edits, `.qa-artifacts/`, and `recovery/PizzaLaunch-before-QA.rbxl`.
+- The launcher previously exposed two separate prompts that silently chose Free Play or Record Run. The operator pose was behind/inside decorative press geometry, and another player could not see a useful busy state because the shared prompt was disabled.
+- `TRAIL READY 42` was client debug output: seven decorative arrows with six parts each (shaft, two heads, and three pepperoni), not gameplay state. A second per-frame diagnostic also replaced the walk hint with player/arrow coordinates. Both player-facing debug paths are removed.
+- Council decision: retain one server-owned launcher lease and outer mount state, then add the explicit mounted submodes `select`, `freePlay`, and `recordRun`. Both modes now share mount, aim, launch, projectile, cleanup, camera, and exit behavior.
+
+### Implementation
+
+- Added permanent `PIZZA LAUNCHER / WALK HERE TO PLAY` signage, an exact pizza-shaped use pad, one `USE LAUNCHER` prompt (`E`, controller `X`, and clickable touch), and six client-local pizza arrows raycast onto approved walkable surfaces. The last waypoint, highlight, prompt, distance validation, use pad, and mounted pose all resolve to the same authoritative interaction anchor at the clear approach point.
+- Replaced the competing world Record Run prompt with a noninteractive two-mode explanation. Mounting now opens an equal two-choice picker: `FREE PLAY — Practice launches with no time limit.` and `1-MINUTE RECORD RUN — Score as many points as you can in 60 seconds.`
+- Added visible Change Mode and Exit actions, explicit `FREE PLAY • NO TIMER`, compact timed HUD/countdown/results, post-run Choose Mode, gamepad focus/aim/RT launch/B exit, touch-responsive picker and controls, cleanup epochs for delayed callbacks, death cleanup, and server validation for lease, pose, mode transitions, countdown/run phase, and permitted launches.
+- The occupied prompt remains visible as `OCCUPIED / ANOTHER CHEF IS PLAYING`; the server rejects non-owner mounting without mutating the owner's state.
+- Kept first-visit completion session-local because the only persistence store is the competitive ordered record store. Guidance fades after the first server-accepted launch; the permanent sign/pad and How to Play replay remain.
+- Fixed an Output-audit regression in the pre-existing Studio leaderboard fallback by forward-declaring `setBoardText` before `setSampleBoard` calls it.
+- Updated `README.md`, expanded launcher/recovery contracts, and created shared reusable guidance at `E:\projects\roblox\LAUNCHER_SYSTEM.md` without moving live Pizza Launch code or changing Rojo mappings.
+
+### Verification performed
+
+- `Test-RecoverySafety.ps1`: PASS.
+- `Test-RecoveryContracts.ps1`: PASS, including prompt uniqueness, anchor/pad agreement, raycast placement, debug-text absence, server mode gates, occupied behavior, controller bindings/focus, and the Record Run board-helper ordering regression.
+- `rojo build` and `rojo sourcemap`: PASS. Final artifact `.qa-artifacts/onboarding-final-fixed.rbxlx` is 245,770 bytes, SHA-256 `399BCB714D70C1181F1B694B0528B4A9B57A0029C0F0BF1E0C666870DBD562BC`.
+- `git diff --check`: PASS. Rojo remained reachable on `127.0.0.1:34872`.
+- Disposable Roblox Studio desktop play: PASS for fresh-spawn attraction visibility, following the real route, final prompt, mount/orientation, equal mode picker, Free Play/no-timer HUD, five accepted Free Play launches, exit, reduced returning-player guidance, How to Play replay, Record Run 3-2-1 and 1:00 timer, three accepted timed launches, full 60-second expiry, compact results, Choose Mode, and switching directly to Free Play without remounting. The final countdown was rechecked after removing an overlapping duplicate toast.
+- Studio iPhone 17 Pro landscape simulation: PASS for entrance/sign/route readability, responsive picker, touch Free Play selection, aim pad, charged launch/reload, and touch exit.
+- Studio Controller Emulator: PASS for controller X mounting, initial picker focus, Button A mode activation, left-stick aim, RT charged launch, and Button B exit.
+- Latest clean final-artifact Studio log: no game-script error/stack patterns. The earlier `RecordRunService:41` error was reproduced, fixed, contract-protected, rebuilt, and absent from the clean rerun.
+
+### Remaining verification limits
+
+- Automated aiming produced accepted projectiles but did not land a scored delivery; delivery score changes and leaderboard persistence retain their existing server code/contracts but were not newly demonstrated by this UI automation.
+- Studio's Server and Clients command was exercised, but this installation spawned only the server process and would not add client windows. A genuine two-client occupied-state interaction was therefore not completed; ownership isolation is covered by the server validation and automated contracts.
+- Live OrderedDataStore access was unavailable in the unpublished disposable place. The session-best fallback/result copy was exercised; live global record writes were not claimed.
+- No push, publish, DataStore migration, Rojo mapping change, or unrelated feature removal was performed.
+
+## 2026-08-31 — Studio Play usability QA checkpoint
+
+- Clean source baseline: pushed commit `9f70415c578542b69ddbc64a45201e185d1e5e1a` on `feature/sightline-onboarding-20260831`.
+- Restore checkpoint: pushed annotated tag `checkpoint/before-studio-qa-20260831`; focused branch `qa/studio-play-usability-20260831`.
+- Required pre-edit backup: `recovery/PizzaLaunch-before-QA.rbxl`, SHA-256 `FB7F35AF38E31C08B1014084FDE5767A580FB35906C248C8036E81667679508A`. Existing Transfer and merged-recovery backups were not edited.
+- Test-access gate: Roblox Studio is installed and controllable in this session. The restored path builds a disposable QA place, opens that copy in a separate Studio process without Rojo sync, enters Play mode, captures the Play viewport, and inspects the captured image. The user's already-open Studio process remains untouched.
+- Actual baseline Play evidence found the two reported failures: no usable floor arrows were visible at fresh spawn, and the small control below `UPGRADES` rendered as unreadable symbols. Source tracing found the arrow parts centered at `Y=-0.39` below the generated Baseplate's `Y=0` top surface.
+- Fix: moved the complete arrow geometry above the floor, enlarged its cheese and pepperoni silhouette, and replaced the mystery control with a wide, high-contrast `HOW TO PLAY` GothamBold button. The route, final marker, highlight, proximity state, and replay continue to derive only from the authoritative `LauncherInteractionAnchor` attached to the real `LauncherPrompt`.
+- Scope protection: no Workspace mapping, world layout, launcher physics, camera coordinates, customer logic, scoring, upgrades, Record Run, persistence, restaurant, or street source was changed.
+
+`AUTOMATED TEST: PENDING`
+
+`STUDIO PLAY VISUAL TEST: PENDING`
+
+`MANUAL USER TEST STILL NEEDED: yes`
+
 ## 2026-08-31 — Pizza Trail destination correction
 
 - Clean starting state: pushed commit `5251bbbbc31539edcf18f7093f9795a0643e75a6` on `feature/sightline-onboarding-20260831` with no local changes.

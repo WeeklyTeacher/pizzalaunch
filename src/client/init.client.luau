@@ -1,4 +1,5 @@
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -37,6 +38,8 @@ local state = {
 	roundProgress = 0,
 	roundGoal = 3,
 	mode = "walk",
+	launcherMode = "none",
+	cleanupEpoch = 0,
 	upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 	recordRun = { status = "idle", personalBest = 0, score = 0, combo = 0, multiplier = 1 },
 	shiftEvent = nil,
@@ -56,12 +59,12 @@ local tableAvailabilityConnections = {}
 local trajectoryParts = {}
 local keyboardHeld = {}
 local touchHeld = {}
+local gamepadAim = Vector2.zero
 local shakeUntil = 0
 local shakeStrength = 0
 local operating = false
 local playerControls
 local onboardingCompleted = false
-local onboardingReplayActive = false
 local onboardingReachedLauncher = false
 local onboardingTrailActive = true
 local onboardingTrailFolder: Folder? = nil
@@ -354,9 +357,63 @@ local recordSummaryHint = makeLabel(recordSummary, "Hint", "EXIT THE LAUNCHER TO
 recordSummaryHint.TextColor3 = COLORS.cream
 recordSummaryHint.TextXAlignment = Enum.TextXAlignment.Left
 recordSummaryHint.ZIndex = 11
-local recordContinue = makeButton(recordSummary, "Continue", "BACK TO RESTAURANT", UDim2.fromOffset(160, 52), UDim2.new(1, -174, 0, 14), COLORS.green)
+local recordContinue = makeButton(recordSummary, "Continue", "CHOOSE MODE", UDim2.fromOffset(160, 52), UDim2.new(1, -174, 0, 14), COLORS.green)
 recordContinue.TextSize = 13
 recordContinue.ZIndex = 12
+
+local modeSelection = Instance.new("Frame")
+modeSelection.Name = "LauncherModeSelection"
+modeSelection.AnchorPoint = Vector2.new(0.5, 0.5)
+modeSelection.Size = UDim2.fromOffset(650, 286)
+modeSelection.Position = UDim2.fromScale(0.5, 0.5)
+modeSelection.BackgroundColor3 = COLORS.cream
+modeSelection.Visible = false
+modeSelection.ZIndex = 20
+modeSelection.Parent = gui
+addCorner(modeSelection, 22)
+addStroke(modeSelection, COLORS.darkRed, 4)
+local modeSelectionTitle = makeLabel(modeSelection, "Title", "CHOOSE HOW TO PLAY", UDim2.new(1, -76, 0, 38), UDim2.fromOffset(20, 12), 27)
+modeSelectionTitle.TextColor3 = COLORS.darkRed
+modeSelectionTitle.ZIndex = 21
+local modeSelectionSubtitle = makeLabel(modeSelection, "Subtitle", "Both modes use the same Pizza Launcher.", UDim2.new(1, -40, 0, 26), UDim2.fromOffset(20, 49), 15)
+modeSelectionSubtitle.TextColor3 = COLORS.ink
+modeSelectionSubtitle.ZIndex = 21
+local modeSelectionExit = makeButton(modeSelection, "Exit", "X", UDim2.fromOffset(42, 42), UDim2.new(1, -54, 0, 12), COLORS.darkRed)
+modeSelectionExit.TextSize = 16
+modeSelectionExit.ZIndex = 23
+
+local function makeModeChoice(name: string, titleText: string, descriptionText: string, actionText: string, position: UDim2, color: Color3)
+	local button = makeButton(modeSelection, name, "", UDim2.fromOffset(292, 176), position, color)
+	button.ZIndex = 21
+	button.Selectable = true
+	local title = makeLabel(button, "Title", titleText, UDim2.new(1, -24, 0, 52), UDim2.fromOffset(12, 14), 23)
+	title.TextColor3 = name == "FreePlay" and COLORS.ink or Color3.new(1, 1, 1)
+	title.ZIndex = 22
+	local description = makeLabel(button, "Description", descriptionText, UDim2.new(1, -28, 0, 54), UDim2.fromOffset(14, 70), 15)
+	description.Font = Enum.Font.GothamMedium
+	description.TextColor3 = name == "FreePlay" and COLORS.ink or COLORS.cream
+	description.ZIndex = 22
+	local action = makeLabel(button, "Action", actionText, UDim2.new(1, -28, 0, 34), UDim2.fromOffset(14, 132), 15)
+	action.BackgroundColor3 = name == "FreePlay" and COLORS.darkRed or COLORS.yellow
+	action.BackgroundTransparency = 0
+	action.TextColor3 = name == "FreePlay" and Color3.new(1, 1, 1) or COLORS.darkRed
+	action.ZIndex = 22
+	addCorner(action, 10)
+	return button
+end
+
+local freePlayChoice = makeModeChoice("FreePlay", "FREE PLAY", "Practice launches with no time limit.", "START FREE PLAY", UDim2.fromOffset(20, 88), COLORS.yellow)
+local recordRunChoice = makeModeChoice("RecordRun", "1-MINUTE\nRECORD RUN", "Score as many points as you can in 60 seconds.", "START RECORD RUN", UDim2.fromOffset(338, 88), COLORS.red)
+freePlayChoice.NextSelectionRight = recordRunChoice
+recordRunChoice.NextSelectionLeft = freePlayChoice
+modeSelectionExit.NextSelectionDown = freePlayChoice
+
+local changeModeButton = makeButton(gui, "ChangeMode", "CHANGE MODE", UDim2.fromOffset(150, 44), UDim2.new(1, -168, 0, 138), COLORS.yellow)
+changeModeButton.TextColor3 = COLORS.ink
+changeModeButton.TextSize = 14
+changeModeButton.Font = Enum.Font.GothamBold
+changeModeButton.TextStrokeTransparency = 1
+changeModeButton.Visible = false
 
 local controls = Instance.new("Frame")
 controls.Name = "Controls"
@@ -406,6 +463,10 @@ fireButton.TextSize = 23
 
 local shopToggle = makeButton(gui, "ShopToggle", "UPGRADES", UDim2.fromOffset(150, 54), UDim2.new(1, -168, 0, 16), COLORS.yellow)
 shopToggle.TextColor3 = COLORS.red
+-- Persistent navigation must have a deterministic first frame. Launcher and
+-- onboarding state may temporarily cover it with the mode picker, but never
+-- decide whether the upgrades system exists for this player.
+shopToggle.Visible = true
 local exitButton = makeButton(gui, "ExitLauncher", "EXIT LAUNCHER  [Q]", UDim2.fromOffset(150, 48), UDim2.new(1, -168, 0, 78), COLORS.red)
 exitButton.TextSize = 14
 exitButton.Visible = false
@@ -420,7 +481,7 @@ shopPanel.ZIndex = 6
 shopPanel.Parent = gui
 addCorner(shopPanel, 20)
 addStroke(shopPanel, COLORS.red, 3)
-local shopTitle = makeLabel(shopPanel, "Title", "UPGRADE THE PIZZA CANNON", UDim2.new(1, -24, 0, 30), UDim2.fromOffset(12, 8), 19)
+local shopTitle = makeLabel(shopPanel, "Title", "UPGRADE THE PIZZA LAUNCHER", UDim2.new(1, -24, 0, 30), UDim2.fromOffset(12, 8), 19)
 shopTitle.TextColor3 = COLORS.ink
 shopTitle.ZIndex = 7
 local shopSubtitle = makeLabel(shopPanel, "Subtitle", "SESSION-ONLY UPGRADES  •  EFFECTS APPLY RIGHT AWAY", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 37), 11)
@@ -635,12 +696,47 @@ if UserInputService.TouchEnabled then
 	recordSummaryHint.TextSize = 8
 	recordContinue.Size = UDim2.fromOffset(108, 45)
 	recordContinue.Position = UDim2.new(1, -118, 0, 11)
-	recordContinue.Text = "CONTINUE"
+	recordContinue.Text = "CHOOSE MODE"
 	recordContinue.TextSize = 9
+	modeSelection.Size = UDim2.fromOffset(560, 246)
+	modeSelectionTitle.Size = UDim2.new(1, -66, 0, 30)
+	modeSelectionTitle.Position = UDim2.fromOffset(16, 8)
+	modeSelectionTitle.TextSize = 21
+	modeSelectionSubtitle.Position = UDim2.fromOffset(16, 38)
+	modeSelectionSubtitle.TextSize = 12
+	modeSelectionExit.Size = UDim2.fromOffset(38, 38)
+	modeSelectionExit.Position = UDim2.new(1, -46, 0, 8)
+	freePlayChoice.Size = UDim2.fromOffset(250, 154)
+	freePlayChoice.Position = UDim2.fromOffset(18, 76)
+	recordRunChoice.Size = UDim2.fromOffset(250, 154)
+	recordRunChoice.Position = UDim2.fromOffset(292, 76)
+	for _, choice in { freePlayChoice, recordRunChoice } do
+		local title = choice:FindFirstChild("Title")
+		local description = choice:FindFirstChild("Description")
+		local action = choice:FindFirstChild("Action")
+		if title and title:IsA("TextLabel") then
+			title.Size = UDim2.new(1, -20, 0, 43)
+			title.Position = UDim2.fromOffset(10, 8)
+			title.TextSize = 18
+		end
+		if description and description:IsA("TextLabel") then
+			description.Size = UDim2.new(1, -22, 0, 47)
+			description.Position = UDim2.fromOffset(11, 54)
+			description.TextSize = 12
+		end
+		if action and action:IsA("TextLabel") then
+			action.Size = UDim2.new(1, -22, 0, 32)
+			action.Position = UDim2.fromOffset(11, 111)
+			action.TextSize = 12
+		end
+	end
+	changeModeButton.Size = UDim2.fromOffset(108, 38)
+	changeModeButton.Position = UDim2.new(1, -126, 0, 104)
+	changeModeButton.TextSize = 11
 
 end
 
-local walkHint = makeLabel(gui, "WalkHint", "WALK TO THE GLOWING LAUNCHER  •  PRESS E / TAP TO OPERATE", UDim2.fromOffset(500, 48), UDim2.new(0.5, -250, 1, -68), 15)
+local walkHint = makeLabel(gui, "WalkHint", "FOLLOW THE PIZZA ARROWS  •  USE THE LAUNCHER PAD", UDim2.fromOffset(500, 48), UDim2.new(0.5, -250, 1, -68), 15)
 walkHint.BackgroundTransparency = 0.05
 walkHint.BackgroundColor3 = COLORS.cream
 walkHint.TextColor3 = COLORS.red
@@ -649,29 +745,31 @@ addStroke(walkHint, COLORS.darkRed, 2)
 if UserInputService.TouchEnabled then
 	walkHint.Size = UDim2.fromOffset(390, 38)
 	walkHint.Position = UDim2.new(0.5, -195, 1, -48)
-	walkHint.Text = "WALK TO THE GLOWING LAUNCHER • TAP OPERATE"
+	walkHint.Text = "FOLLOW THE PIZZA ARROWS • TAP USE LAUNCHER"
 	walkHint.TextSize = 11
 end
 
-local onboardingHelpButton = makeButton(gui, "PizzaTrailHelp", "?  HELP", UDim2.fromOffset(92, 38), UDim2.new(1, -110, 0, 140), COLORS.yellow)
-onboardingHelpButton.TextColor3 = COLORS.darkRed
-onboardingHelpButton.TextSize = 13
-onboardingHelpButton.ZIndex = 4
-if UserInputService.TouchEnabled then
-	onboardingHelpButton.Size = UDim2.fromOffset(76, 34)
-	onboardingHelpButton.Position = UDim2.new(1, -86, 0, 104)
-	onboardingHelpButton.TextSize = 11
-end
-
 local PIZZA_TRAIL_ANCHOR_OFFSETS = {
-	-- All seven markers derive from LauncherInteractionAnchor. The first offset
-	-- lands directly ahead of spawn; the zero offset is the final floor marker.
-	Vector3.new(-14.7, 0, -1.5),
-	Vector3.new(-12, 0, -1),
-	Vector3.new(-9.4, 0, -0.5),
-	Vector3.new(-6.8, 0, -0.2),
-	Vector3.new(-4.5, 0, 0),
-	Vector3.new(-2.3, 0, 0),
+	-- Every marker derives from LauncherInteractionAnchor. The route starts in
+	-- the player's forward view, curves around the storefront edge, and finishes
+	-- at the exact center of the visible use pad.
+	Vector3.new(-14.5, 0, -3),
+	Vector3.new(-11.5, 0, -5),
+	Vector3.new(-8, 0, -5),
+	Vector3.new(-5, 0, -4),
+	Vector3.new(-2.5, 0, -2),
+	Vector3.new(0, 0, 0),
+}
+
+-- A player who walks through the entrance before noticing the launcher sees a
+-- short return route on the restaurant floor. It terminates at the same
+-- authoritative interaction anchor as the spawn-side route and prompt.
+local INTERIOR_LAUNCHER_RETURN_OFFSETS = {
+	Vector3.new(-14, 0, -40),
+	Vector3.new(-14, 0, -28),
+	Vector3.new(-14, 0, -18),
+	Vector3.new(-11, 0, -11),
+	Vector3.new(-6, 0, -5),
 	Vector3.new(0, 0, 0),
 }
 
@@ -698,7 +796,7 @@ local function makePizzaArrow(parent: Instance, position: Vector3, nextPosition:
 
 	local shaft = Instance.new("Part")
 	shaft.Name = "CheeseShaft"
-	shaft.Size = Vector3.new(1.8, 0.12, 3.2)
+	shaft.Size = Vector3.new(2.4, 0.16, 3.5)
 	shaft.CFrame = arrowFrame * CFrame.new(0, 0, 0.35)
 	shaft.Color = COLORS.yellow
 	shaft.Material = Enum.Material.Neon
@@ -708,8 +806,8 @@ local function makePizzaArrow(parent: Instance, position: Vector3, nextPosition:
 	for side = -1, 1, 2 do
 		local arrowHead = Instance.new("Part")
 		arrowHead.Name = "CheeseArrowHead"
-		arrowHead.Size = Vector3.new(1.15, 0.12, 2.8)
-		arrowHead.CFrame = arrowFrame * CFrame.new(side * 0.88, 0, -1.5) * CFrame.Angles(0, math.rad(side * 40), 0)
+		arrowHead.Size = Vector3.new(1.5, 0.16, 3.1)
+		arrowHead.CFrame = arrowFrame * CFrame.new(side, 0, -1.65) * CFrame.Angles(0, math.rad(side * 40), 0)
 		arrowHead.Color = COLORS.yellow
 		arrowHead.Material = Enum.Material.Neon
 		arrowHead.Parent = model
@@ -724,10 +822,10 @@ local function makePizzaArrow(parent: Instance, position: Vector3, nextPosition:
 		local pepperoni = Instance.new("Part")
 		pepperoni.Name = "Pepperoni"
 		pepperoni.Shape = Enum.PartType.Cylinder
-		pepperoni.Size = Vector3.new(0.12, 0.72, 0.72)
+		pepperoni.Size = Vector3.new(0.14, 0.9, 0.9)
 		pepperoni.CFrame = arrowFrame * CFrame.new(pepperoniOffset) * CFrame.Angles(0, 0, math.pi / 2)
 		pepperoni.Color = COLORS.red
-		pepperoni.Material = Enum.Material.SmoothPlastic
+		pepperoni.Material = Enum.Material.Neon
 		pepperoni.Parent = model
 		registerTrailPart(pepperoni, 0)
 	end
@@ -750,19 +848,49 @@ local function ensurePizzaTrailWorld()
 	folder:SetAttribute("ClientOnly", true)
 	folder.Parent = Workspace
 	onboardingTrailFolder = folder
-	local trailFloorY = -0.39
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Include
+	local floorSurfaces = {}
+	for _, surface in {
+		Workspace:FindFirstChild("Baseplate"),
+		world:FindFirstChild("RestaurantFloor"),
+		world:FindFirstChild("FrontSidewalk", true),
+		world:FindFirstChild("LauncherUsePad", true),
+	} do
+		if surface and surface:IsA("BasePart") then
+			table.insert(floorSurfaces, surface)
+		end
+	end
+	raycastParams.FilterDescendantsInstances = floorSurfaces
 	local trailPoints = {}
 	for _, offset in PIZZA_TRAIL_ANCHOR_OFFSETS do
-		table.insert(trailPoints, Vector3.new(interactionAnchor.Position.X + offset.X, trailFloorY, interactionAnchor.Position.Z + offset.Z))
+		local horizontalPoint = Vector3.new(interactionAnchor.Position.X + offset.X, 0, interactionAnchor.Position.Z + offset.Z)
+		local floorHit = Workspace:Raycast(horizontalPoint + Vector3.new(0, 12, 0), Vector3.new(0, -30, 0), raycastParams)
+		if floorHit then
+			table.insert(trailPoints, Vector3.new(horizontalPoint.X, floorHit.Position.Y + 0.14, horizontalPoint.Z))
+		end
 	end
 	for index, position in trailPoints do
 		local nextPosition = trailPoints[index + 1] or (position + Vector3.new(0, 0, -1))
 		makePizzaArrow(folder, position, nextPosition, index)
 	end
+	local interiorTrailPoints = {}
+	for _, offset in INTERIOR_LAUNCHER_RETURN_OFFSETS do
+		local horizontalPoint = Vector3.new(interactionAnchor.Position.X + offset.X, 0, interactionAnchor.Position.Z + offset.Z)
+		local floorHit = Workspace:Raycast(horizontalPoint + Vector3.new(0, 12, 0), Vector3.new(0, -30, 0), raycastParams)
+		if floorHit then
+			table.insert(interiorTrailPoints, Vector3.new(horizontalPoint.X, floorHit.Position.Y + 0.14, horizontalPoint.Z))
+		end
+	end
+	for index, position in interiorTrailPoints do
+		local nextPosition = interiorTrailPoints[index + 1] or (position + Vector3.new(0, 0, 1))
+		makePizzaArrow(folder, position, nextPosition, 100 + index)
+	end
 
 	local highlight = Instance.new("Highlight")
-	highlight.Name = "PizzaCannonInteractionHighlight"
-	highlight.Adornee = interactionAnchor
+	highlight.Name = "PizzaLauncherInteractionHighlight"
+	local usePad = world:FindFirstChild("LauncherUsePad", true)
+	highlight.Adornee = (usePad and usePad:IsA("BasePart")) and usePad or interactionAnchor
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.FillColor = COLORS.yellow
 	highlight.FillTransparency = 0.82
@@ -775,9 +903,13 @@ end
 
 local function updateOnboardingWalkHint()
 	if onboardingTrailActive and not onboardingReachedLauncher then
-		walkHint.Text = "Follow the pizza arrows to the Pizza Cannon!"
+		walkHint.Text = "Follow the pizza arrows to the Pizza Launcher!"
+	elseif UserInputService.TouchEnabled then
+		walkHint.Text = "Tap USE LAUNCHER on the pizza pad!"
+	elseif UserInputService.GamepadEnabled then
+		walkHint.Text = "Press X to USE LAUNCHER on the pizza pad!"
 	else
-		walkHint.Text = "Press E or tap the Pizza Cannon to start!"
+		walkHint.Text = "Press E to USE LAUNCHER on the pizza pad!"
 	end
 end
 
@@ -795,14 +927,18 @@ local function setPizzaTrailVisible(visible: boolean, immediate: boolean?)
 	if onboardingHighlight then
 		onboardingHighlight.Enabled = onboardingReachedLauncher and not operating
 	end
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local interiorGuide = world and world:FindFirstChild("InteriorLauncherBillboard", true)
+	if interiorGuide and interiorGuide:IsA("BillboardGui") then
+		interiorGuide.Enabled = visible
+	end
 	updateOnboardingWalkHint()
 end
 
-local function beginPizzaTrail(replay: boolean)
-	if onboardingCompleted and not replay then
+local function beginPizzaTrail()
+	if onboardingCompleted then
 		return
 	end
-	onboardingReplayActive = replay
 	onboardingReachedLauncher = false
 	tutorial.Visible = false
 	setPizzaTrailVisible(true, true)
@@ -810,9 +946,13 @@ end
 
 local function showFirstPizzaHint()
 	tutorialTitle.Text = "AIM  •  CHARGE  •  LAUNCH!"
-	tutorialText.Text = UserInputService.TouchEnabled
-		and "DRAG / ARROWS • AIM\nHOLD + RELEASE"
-		or "MOUSE / W A S D TO AIM\nHOLD SPACE OR CLICK, THEN RELEASE"
+	if UserInputService.TouchEnabled then
+		tutorialText.Text = "DRAG / ARROWS • AIM\nHOLD + RELEASE"
+	elseif UserInputService.GamepadEnabled then
+		tutorialText.Text = "LEFT STICK • AIM\nHOLD RT, THEN RELEASE"
+	else
+		tutorialText.Text = "MOUSE / W A S D TO AIM\nHOLD SPACE OR CLICK, THEN RELEASE"
+	end
 	restoreTutorialAppearance()
 	tutorial.Visible = true
 end
@@ -826,7 +966,7 @@ local function updatePizzaTrail()
 			part.Transparency = math.clamp(baseTransparency + pulse, 0, 0.1)
 		end
 	end
-	if operating or (onboardingCompleted and not onboardingReplayActive) then
+	if operating or onboardingCompleted then
 		return
 	end
 	if os.clock() < onboardingNextDistanceCheck then
@@ -850,13 +990,6 @@ local function updatePizzaTrail()
 		updateOnboardingWalkHint()
 	end
 end
-
-onboardingHelpButton.Activated:Connect(function()
-	beginPizzaTrail(true)
-	if operating then
-		showFirstPizzaHint()
-	end
-end)
 
 local trajectoryFolder = Instance.new("Folder")
 trajectoryFolder.Name = "LocalAimGuide"
@@ -943,30 +1076,33 @@ local function updateRecordUI()
 	local run = state.recordRun or { status = "idle", score = 0, combo = 0, multiplier = 1, personalBest = 0 }
 	local status = run.status or "idle"
 	local session = status ~= "idle"
+	local selectingMode = operating and state.launcherMode == "select"
 	recordHud.Visible = operating and (status == "countdown" or status == "running" or status == "saving")
 	recordScore.Text = string.format("SCORE\n%d", run.score or 0)
 	recordCombo.Text = string.format("COMBO %d\nx%.2f", run.combo or 0, run.multiplier or 1)
 	recordBest.Text = string.format("PERSONAL BEST  %d", run.personalBest or 0)
 	recordCombo.TextColor3 = (run.combo or 0) >= 4 and COLORS.yellow or COLORS.green
-	roundCard.Visible = not session
-	stats.Visible = not session
-	shopToggle.Visible = not session
-	onboardingHelpButton.Visible = not session
+	roundCard.Visible = not session and not selectingMode and (operating or onboardingCompleted)
+	stats.Visible = not session and not selectingMode
+	shopToggle.Visible = not selectingMode
+	changeModeButton.Visible = operating and state.launcherMode == "freePlay" and not session
 	if session then
 		local canAim = operating and (status == "countdown" or status == "running")
 		controls.Visible = canAim
 		touchAimPad.Visible = canAim and UserInputService.TouchEnabled
-		if onboardingCompleted and not onboardingReplayActive then
+		if onboardingCompleted then
 			tutorial.Visible = false
 		end
 	end
 	if status == "saving" then
 		recordSummary.Visible = true
+		recordContinue.Visible = false
 		recordSummaryTitle.Text = "TIME!"
-		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nChecking the Legends board...", run.score or 0)
-		recordSummaryHint.Text = "YOUR SCORE WAS CALCULATED ON THE SERVER"
+		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nSaving your best score...", run.score or 0)
+		recordSummaryHint.Text = "YOUR RESULT IS READY — CHOOSE ANOTHER MODE NEXT"
 	elseif status == "finished" then
 		recordSummary.Visible = true
+		recordContinue.Visible = true
 		if run.madeTopTen and run.rank then
 			recordSummaryTitle.Text = string.format("LEGEND!  #%d", run.rank)
 		else
@@ -974,12 +1110,13 @@ local function updateRecordUI()
 		end
 		local rankLine = run.madeTopTen and string.format("GLOBAL TOP 10  -  RANK #%d", run.rank) or "GLOBAL TOP 10  -  NOT THIS TIME"
 		if not run.globalBoardAvailable then
-			rankLine = UserInputService.TouchEnabled and "GLOBAL BOARD: STUDIO SAMPLE" or "GLOBAL BOARD: STUDIO SAMPLE / RECONNECTING"
+			rankLine = "GLOBAL RECORDS UNAVAILABLE RIGHT NOW"
 		end
 		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nPERSONAL BEST  %d\n%s", run.score or 0, run.personalBest or 0, rankLine)
-		recordSummaryHint.Text = run.globalBoardAvailable and "SCORE SAVED SEPARATELY FROM THE BOARD - TRY AGAIN ANYTIME" or (run.globalBoardMessage or "Studio: enable API Services for live records.")
+		recordSummaryHint.Text = run.globalBoardAvailable and "CHOOSE MODE TO PLAY AGAIN" or "THIS SERVER STILL REMEMBERS YOUR BEST — CHOOSE MODE TO PLAY AGAIN"
 	else
 		recordSummary.Visible = false
+		recordContinue.Visible = false
 	end
 	if not session then
 		countdownLabel.Visible = false
@@ -1420,6 +1557,7 @@ local function resetLauncherInput()
 	aimPitch = (Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH)
 	table.clear(keyboardHeld)
 	table.clear(touchHeld)
+	gamepadAim = Vector2.zero
 	shakeUntil = 0
 	shakeStrength = 0
 	fireButton.Text = "HOLD\nLAUNCH"
@@ -1433,19 +1571,32 @@ local function applyMode()
 	end
 	local runStatus = recordStatus()
 	local recordSession = runStatus ~= "idle"
+	local launcherMode = state.launcherMode or "none"
+	local selectingMode = operating and launcherMode == "select"
+	local activePlay = operating and (launcherMode == "freePlay" or (launcherMode == "recordRun" and (runStatus == "countdown" or runStatus == "running")))
+	if selectingMode then
+		resetLauncherInput()
+	end
 	shopPanel.Visible = false
 	shopToggle.Text = "UPGRADES"
-	controls.Visible = operating and (not recordSession or runStatus == "countdown" or runStatus == "running")
-	touchAimPad.Visible = operating and UserInputService.TouchEnabled
+	shopToggle.Visible = not selectingMode
+	controls.Visible = activePlay
+	touchAimPad.Visible = activePlay and UserInputService.TouchEnabled
 	exitButton.Visible = operating
 	walkHint.Visible = not operating
+	modeSelection.Visible = selectingMode
 	setMovementLocked(operating)
+	if selectingMode and UserInputService.GamepadEnabled then
+		GuiService.SelectedObject = freePlayChoice
+	elseif not selectingMode and GuiService.SelectedObject and modeSelection:IsAncestorOf(GuiService.SelectedObject) then
+		GuiService.SelectedObject = nil
+	end
 
 	if operating then
 		onboardingReachedLauncher = true
 		setPizzaTrailVisible(false, false)
 		if onboardingHighlight then onboardingHighlight.Enabled = false end
-		if not onboardingCompleted or onboardingReplayActive then
+		if activePlay and not onboardingCompleted then
 			showFirstPizzaHint()
 		else
 			tutorial.Visible = false
@@ -1455,9 +1606,10 @@ local function applyMode()
 		controls.Visible = false
 		touchAimPad.Visible = false
 		exitButton.Visible = false
+		modeSelection.Visible = false
 		tutorial.Visible = false
-		if not onboardingCompleted or onboardingReplayActive then
-			beginPizzaTrail(onboardingReplayActive)
+		if not onboardingCompleted then
+			beginPizzaTrail()
 		else
 			onboardingReachedLauncher = false
 			setPizzaTrailVisible(false, true)
@@ -1563,7 +1715,19 @@ shopToggle.Activated:Connect(function()
 	exitButton.Visible = operating and not shopPanel.Visible
 end)
 recordContinue.Activated:Connect(function()
+	modeRemote:FireServer("chooseMode")
+end)
+freePlayChoice.Activated:Connect(function()
+	modeRemote:FireServer("freePlay")
+end)
+recordRunChoice.Activated:Connect(function()
+	modeRemote:FireServer("recordRun")
+end)
+modeSelectionExit.Activated:Connect(function()
 	modeRemote:FireServer("walk")
+end)
+changeModeButton.Activated:Connect(function()
+	modeRemote:FireServer("chooseMode")
 end)
 exitButton.Activated:Connect(function()
 	if operating then
@@ -1588,7 +1752,7 @@ local aimKeyMap = {
 	[Enum.KeyCode.S] = "down", [Enum.KeyCode.Down] = "down",
 }
 UserInputService.InputBegan:Connect(function(input, processed)
-	if operating and input.KeyCode == Enum.KeyCode.Q then
+	if operating and (input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.ButtonB) then
 		modeRemote:FireServer("walk")
 		return
 	end
@@ -1598,6 +1762,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	local aimKey = aimKeyMap[input.KeyCode]
 	if aimKey then
 		keyboardHeld[aimKey] = true
+	elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
+		beginCharge(input)
 	elseif input.KeyCode == Enum.KeyCode.Space then
 		beginCharge(input)
 	elseif processed then
@@ -1614,15 +1780,21 @@ UserInputService.InputEnded:Connect(function(input, _processed)
 	if aimKey then
 		keyboardHeld[aimKey] = false
 	end
-	if input == activeFireInput or (charging and input.KeyCode == Enum.KeyCode.Space) then
+	if input == activeFireInput or (charging and (input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonR2)) then
 		launch()
 	end
 end)
 UserInputService.InputChanged:Connect(function(input, processed)
-	if not operating or processed then
+	if not operating then
 		return
 	end
-	if input.UserInputType == Enum.UserInputType.MouseMovement then
+	if input.KeyCode == Enum.KeyCode.Thumbstick1 then
+		gamepadAim = Vector2.new(input.Position.X, input.Position.Y)
+		return
+	end
+	if processed then
+		return
+	elseif input.UserInputType == Enum.UserInputType.MouseMovement then
 		setAimFromScreen(input.Position)
 	elseif input.UserInputType == Enum.UserInputType.Touch and input ~= activeFireInput then
 		setAimFromScreen(input.Position)
@@ -1630,19 +1802,23 @@ UserInputService.InputChanged:Connect(function(input, processed)
 end)
 
 stateRemote.OnClientEvent:Connect(function(newState)
+	local previousLauncherMode = state.launcherMode
 	local changedMode = (newState.mode == "launcher") ~= operating
 	state = newState
 	state.upgrades = state.upgrades or { tips = 0, assist = 0, reload = 0, power = 0 }
 	state.recordRun = state.recordRun or { status = "idle", personalBest = 0, score = 0, combo = 0, multiplier = 1 }
+	state.launcherMode = state.launcherMode or (state.mode == "launcher" and "freePlay" or "none")
+	local changedLauncherMode = state.launcherMode ~= previousLauncherMode
 	coinsLabel.Text = string.format("COINS  %d", state.coins or 0)
 	comboLabel.Text = string.format("COMBO  x%d", state.combo or 0)
 	local eventSuffix = state.shiftEvent and string.format("  -  EVENT %s", state.shiftEvent.icon or "!") or ""
-	roundTitle.Text = string.format("ROUND %d • %s%s", state.round or 1, state.roundName or "FIRST ORDERS", eventSuffix)
+	local freePlayPrefix = state.launcherMode == "freePlay" and "FREE PLAY • NO TIMER  •  " or ""
+	roundTitle.Text = string.format("%sROUND %d • %s%s", freePlayPrefix, state.round or 1, state.roundName or "FIRST ORDERS", eventSuffix)
 	targetLabel.Text = "SERVE ANY HUNGRY CUSTOMER"
 	progressFill.Size = UDim2.fromScale(math.clamp((state.roundProgress or 0) / math.max(state.roundGoal or 1, 1), 0, 1), 1)
 	roundCard.BackgroundColor3 = state.roundColor or COLORS.green
 	updateShop(state.upgrades)
-	if changedMode then
+	if changedMode or changedLauncherMode then
 		applyMode()
 	else
 		updateRecordUI()
@@ -1657,9 +1833,8 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		local reloadTime = state.payload and state.payload.reloadTime or Config.RELOAD_TIME
 		reloadReadyAt = os.clock() + reloadTime
 		playLauncherFire(reloadTime)
-		if not onboardingCompleted or onboardingReplayActive then
+		if not onboardingCompleted then
 			onboardingCompleted = true
-			onboardingReplayActive = false
 			onboardingReachedLauncher = false
 			setPizzaTrailVisible(false, true)
 			if onboardingHighlight then onboardingHighlight.Enabled = false end
@@ -1732,7 +1907,11 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		elseif payload.shiftEventEnded and payload.eventMessage then
 			showEventBanner({ title = payload.shiftEventEnded.title or "SHIFT EVENT", icon = "OK", detail = payload.eventMessage })
 		end
+		local reloadEpoch = state.cleanupEpoch or 0
 		task.delay(payload.reloadDelay or 0.35, function()
+			if not operating or (state.cleanupEpoch or 0) ~= reloadEpoch then
+				return
+			end
 			local status = recordStatus()
 			ready = status == "idle" or status == "running"
 			fireButton.Text = "HOLD\nLAUNCH"
@@ -1741,7 +1920,6 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	elseif state.event == "recordCountdown" then
 		ready = true
 		charging = false
-		showFeedback("RECORD RUN!", COLORS.yellow, "Far tables score more - keep the combo alive")
 	elseif state.event == "recordStarted" then
 		ready = true
 		showFeedback("LAUNCH!", COLORS.green, "60 seconds - hit the glowing order")
@@ -1752,6 +1930,8 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	elseif state.event == "recordFinished" then
 		ready = false
 		charging = false
+	elseif state.event == "modeSelected" and state.payload then
+		showFeedback(state.payload.result or "FREE PLAY", COLORS.green, state.payload.detail or "Practice launches with no time limit.")
 	elseif state.event == "purchaseResult" and state.payload then
 		if state.payload.success then
 			showEventBanner({ title = state.payload.result, icon = "UP", detail = state.payload.changeMessage or state.payload.effect or "Upgrade applied now!" })
@@ -1765,14 +1945,14 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	elseif state.event == "shiftEventEnded" and state.payload then
 		showEventBanner({ title = state.payload.title or "SHIFT EVENT", icon = "OK", detail = state.payload.detail })
 	elseif state.event == "modeChanged" and state.payload then
-		if onboardingCompleted and not onboardingReplayActive then
+		if onboardingCompleted then
 			showFeedback(state.payload.result or (operating and "READY!" or "LET'S WALK!"), operating and COLORS.green or COLORS.yellow,
 				operating and "Aim for the glowing delivery plate" or "Explore, greet customers, or check the register")
 		end
 	elseif state.event == "notice" and state.payload then
 		showFeedback(state.payload.result or "PIZZA PLACE", state.payload.color or COLORS.yellow, state.payload.detail)
 	elseif state.event == "welcome" then
-		beginPizzaTrail(false)
+		beginPizzaTrail()
 	end
 end)
 
@@ -1802,10 +1982,10 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 		countdownLabel.Visible = false
 	end
 	if status ~= "idle" then
-		recordTitle.Text = "RECORD RUN  -  CHOOSE A GLOWING TABLE"
+		recordTitle.Text = "1-MINUTE RECORD RUN"
 	end
-	local horizontalInput = ((keyboardHeld.right or touchHeld.right) and 1 or 0) - ((keyboardHeld.left or touchHeld.left) and 1 or 0)
-	local verticalInput = ((keyboardHeld.up or touchHeld.up) and 1 or 0) - ((keyboardHeld.down or touchHeld.down) and 1 or 0)
+	local horizontalInput = ((keyboardHeld.right or touchHeld.right) and 1 or 0) - ((keyboardHeld.left or touchHeld.left) and 1 or 0) + gamepadAim.X
+	local verticalInput = ((keyboardHeld.up or touchHeld.up) and 1 or 0) - ((keyboardHeld.down or touchHeld.down) and 1 or 0) + gamepadAim.Y
 	aimYaw = math.clamp(aimYaw + horizontalInput * deltaTime * 0.72, -1, 1)
 	aimPitch = math.clamp(aimPitch + verticalInput * deltaTime * 0.72, 0, 1)
 	if charging then
@@ -1895,7 +2075,7 @@ task.defer(function()
 	if world then
 		ensurePizzaTrailWorld()
 		if not onboardingCompleted then
-			beginPizzaTrail(false)
+			beginPizzaTrail()
 		end
 		local function watchTable(tableModel)
 			if tableModel:IsA("Model") and tableModel:GetAttribute("TableId") then
@@ -1927,7 +2107,7 @@ player.CharacterAdded:Connect(function(character)
 		end
 		if not onboardingCompleted then
 			task.defer(function()
-				beginPizzaTrail(false)
+				beginPizzaTrail()
 			end)
 		end
 	end

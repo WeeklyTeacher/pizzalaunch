@@ -130,6 +130,8 @@ local function sendState(player: Player, eventName: string?, payload: { [string]
 		roundColor = round.color,
 		upgrades = state.upgrades,
 		mode = state.mode,
+		launcherMode = state.launcherMode,
+		cleanupEpoch = state.cleanupEpoch,
 		recordRun = RecordRunService.getSnapshot(player),
 		shiftEvent = ShiftEventService.getSnapshot(),
 		payload = payload,
@@ -777,6 +779,12 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 	if not state or state.shotActive or state.mode ~= "launcher" or launcherOccupant ~= player then
 		return
 	end
+	if state.launcherMode ~= "freePlay" and state.launcherMode ~= "recordRun" then
+		return
+	end
+	if state.launcherMode == "recordRun" and not RecordRunService.isSession(player) then
+		return
+	end
 	if not RecordRunService.canLaunch(player) then
 		return
 	end
@@ -872,7 +880,7 @@ local function onPurchase(player: Player, upgradeId: any)
 		return
 	end
 	if RecordRunService.isSession(player) then
-		sendState(player, "purchaseResult", { result = "FINISH THE RECORD RUN FIRST", success = false })
+		sendState(player, "purchaseResult", { result = "FINISH THE 1-MINUTE RECORD RUN FIRST", success = false })
 		return
 	end
 	local level = state.upgrades[upgradeId]
@@ -927,18 +935,12 @@ local function restoreMovement(character: Model, moveToExit: boolean)
 	end
 end
 
--- This is deliberately the one route out of a launcher session.  It is safe to
--- call more than once because every mutable launcher resource is cleared before
--- the player and prompt are restored.
-local function cleanupLauncherSession(player: Player, reason: string, options: { cancelRun: boolean?, moveToExit: boolean?, notifyClient: boolean? }?)
+local function clearActiveShot(player: Player)
 	local state = states[player]
-	if not state then
-		return
+	if state then
+		state.shotActive = false
+		state.lastLaunch = -100
 	end
-	options = options or {}
-	state.cleanupEpoch = (state.cleanupEpoch or 0) + 1
-	state.shotActive = false
-	state.lastLaunch = -100
 	local shot = activeShots[player]
 	activeShots[player] = nil
 	if shot then
@@ -949,6 +951,19 @@ local function cleanupLauncherSession(player: Player, reason: string, options: {
 			shot.pizza:Destroy()
 		end
 	end
+end
+
+-- This is deliberately the one route out of a launcher session.  It is safe to
+-- call more than once because every mutable launcher resource is cleared before
+-- the player and prompt are restored.
+local function cleanupLauncherSession(player: Player, reason: string, options: { cancelRun: boolean?, moveToExit: boolean?, notifyClient: boolean? }?)
+	local state = states[player]
+	if not state then
+		return
+	end
+	options = options or {}
+	state.cleanupEpoch = (state.cleanupEpoch or 0) + 1
+	clearActiveShot(player)
 	if options.cancelRun then
 		RecordRunService.cancel(player)
 	end
@@ -957,6 +972,7 @@ local function cleanupLauncherSession(player: Player, reason: string, options: {
 		state.resumeTargetId = nil
 	end
 	state.mode = "walk"
+	state.launcherMode = "none"
 	if launcherOccupant == player then
 		launcherOccupant = nil
 		InteractionService.setLauncherAvailable(true)
@@ -979,6 +995,10 @@ local function setPlayerMode(player: Player, requestedMode: string)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if requestedMode == "launcher" then
+		if launcherOccupant == player and state.mode == "launcher" then
+			sendState(player, "notice", { result = "LAUNCHER IN USE", detail = "Choose a mode or keep playing." })
+			return
+		end
 		-- A finished/saving run must never make the next free-play launcher session
 		-- use Record Run restrictions or fixed physics. Route stale state through
 		-- the same cleanup path rather than only changing the Record Run flag.
@@ -986,7 +1006,7 @@ local function setPlayerMode(player: Player, requestedMode: string)
 			cleanupLauncherSession(player, "reenterLauncher", { cancelRun = true, moveToExit = false, notifyClient = false })
 		end
 		if launcherOccupant and launcherOccupant ~= player then
-			sendState(player, "notice", { result = "LAUNCHER BUSY", detail = "Another chef is serving right now." })
+			sendState(player, "notice", { result = "LAUNCHER OCCUPIED", detail = "Another chef is playing. Try again in a moment." })
 			return
 		end
 		if not character or not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
@@ -1003,15 +1023,77 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		updateDeliveryZones(state.upgrades.assist, false)
 		applyProgressionVisuals(state)
 		state.mode = "launcher"
+		state.launcherMode = "select"
 		root.CFrame = Config.LAUNCHER_OPERATOR_CFRAME
 		root.Anchored = true
 		humanoid.WalkSpeed = 0
 		humanoid.JumpPower = 0
 		humanoid.AutoRotate = false
-		sendState(player, "modeChanged", { result = "READY TO LAUNCH!", mode = "launcher" })
+		sendState(player, "modeChanged", { result = "CHOOSE HOW TO PLAY", mode = "launcher" })
 	elseif requestedMode == "walk" then
 		cleanupLauncherSession(player, "playerExit", { cancelRun = true, moveToExit = state.mode == "launcher", notifyClient = false })
 		sendState(player, "modeChanged", { result = "BACK ON THE FLOOR", mode = "walk" })
+	end
+end
+
+local function selectLauncherMode(player: Player, requestedMode: string)
+	local state = states[player]
+	if not state or state.mode ~= "launcher" or launcherOccupant ~= player or state.shotActive then
+		return
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") or not root.Anchored then
+		return
+	end
+	local runStatus = RecordRunService.getSnapshot(player).status
+	if requestedMode == "chooseMode" then
+		if runStatus == "countdown" or runStatus == "running" or runStatus == "saving" then
+			sendState(player, "notice", { result = "RUN IN PROGRESS", detail = "Finish the run or use Exit Launcher." })
+			return
+		end
+		if RecordRunService.isSession(player) then
+			RecordRunService.cancel(player)
+		end
+		if state.resumeTargetId then
+			state.targetId = state.resumeTargetId
+			state.resumeTargetId = nil
+		end
+		state.launcherMode = "select"
+		updateDeliveryZones(state.upgrades.assist, false)
+		sendState(player, "modeSelection", { result = "CHOOSE HOW TO PLAY" })
+		return
+	end
+	if state.launcherMode ~= "select" then
+		return
+	end
+	if requestedMode == "freePlay" then
+		if RecordRunService.isSession(player) then
+			RecordRunService.cancel(player)
+		end
+		state.launcherMode = "freePlay"
+		updateDeliveryZones(state.upgrades.assist, false)
+		sendState(player, "modeSelected", { result = "FREE PLAY", detail = "Practice launches with no time limit." })
+	elseif requestedMode == "recordRun" then
+		if runStatus == "countdown" or runStatus == "running" or runStatus == "saving" then
+			return
+		end
+		if RecordRunService.isSession(player) then
+			RecordRunService.cancel(player)
+		end
+		state.resumeTargetId = state.resumeTargetId or state.targetId
+		state.launcherMode = "recordRun"
+		PropService.resetAll()
+		local started, reason = RecordRunService.begin(player)
+		if started then
+			updateDeliveryZones(0, true)
+			local snapshot = RecordRunService.getSnapshot(player)
+			state.targetId = snapshot.targetId or state.targetId
+		else
+			state.launcherMode = "select"
+			sendState(player, "notice", { result = "RECORD RUN UNAVAILABLE", detail = reason or "Try again in a moment." })
+		end
 	end
 end
 
@@ -1023,6 +1105,14 @@ local function initializeCharacter(player: Player, character: Model)
 	task.defer(function()
 		if character.Parent then
 			restoreMovement(character, false)
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.Died:Once(function()
+					if states[player] then
+						cleanupLauncherSession(player, "characterDied", { cancelRun = true, moveToExit = false, notifyClient = true })
+					end
+				end)
+			end
 			local root = character:FindFirstChild("HumanoidRootPart")
 			if root and root:IsA("BasePart") then
 				root.CFrame = Config.WALK_SPAWN_CFRAME
@@ -1043,6 +1133,7 @@ local function addPlayer(player: Player)
 		lastLaunch = -100,
 		shotActive = false,
 		mode = "walk",
+		launcherMode = "none",
 		upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 		cleanupEpoch = 0,
 	}
@@ -1076,8 +1167,13 @@ function GameService.start()
 	launchRemote.OnServerEvent:Connect(onLaunch)
 	purchaseRemote.OnServerEvent:Connect(onPurchase)
 	modeRemote.OnServerEvent:Connect(function(player, requestedMode)
+		if typeof(requestedMode) ~= "string" then
+			return
+		end
 		if requestedMode == "walk" then
 			setPlayerMode(player, "walk")
+		elseif requestedMode == "freePlay" or requestedMode == "recordRun" or requestedMode == "chooseMode" then
+			selectLauncherMode(player, requestedMode)
 		end
 	end)
 	local world = Workspace:WaitForChild("PizzaLaunchWorld")
@@ -1104,9 +1200,10 @@ function GameService.start()
 		end
 		if eventName == "recordEnding" then
 			PropService.resetAll()
-			-- Timer completion releases the cannon immediately, including a pizza
-			-- still in flight, while preserving the server-side result save.
-			cleanupLauncherSession(player, "recordCompleted", { cancelRun = false, moveToExit = true, notifyClient = false })
+			-- End the competitive shot window immediately. The player keeps the
+			-- launcher lease while the compact result card saves, then explicitly
+			-- chooses another mode or exits.
+			clearActiveShot(player)
 		end
 		sendState(player, eventName, nil)
 	end)
@@ -1115,25 +1212,9 @@ function GameService.start()
 			setPlayerMode(player, "launcher")
 		end,
 		recordRun = function(player)
-			local state = states[player]
-			if not state or state.shotActive then
-				return
-			end
+			-- Legacy handler retained for compatibility with recovered Studio places.
+			-- Current Rojo worlds do not create a competing RecordRunPrompt.
 			setPlayerMode(player, "launcher")
-			if state.mode ~= "launcher" or launcherOccupant ~= player then
-				return
-			end
-			state.resumeTargetId = state.targetId
-			PropService.resetAll()
-			local started, reason = RecordRunService.begin(player)
-			if started then
-				updateDeliveryZones(0, true)
-				local snapshot = RecordRunService.getSnapshot(player)
-				state.targetId = snapshot.targetId or state.targetId
-				sendState(player, "recordCountdown", nil)
-			else
-				sendState(player, "notice", { result = "RECORD RUN BUSY", detail = reason })
-			end
 		end,
 		register = function(player)
 			local state = states[player]

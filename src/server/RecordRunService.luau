@@ -16,6 +16,7 @@ local nameCache = {}
 local refreshBusy = false
 local lastBoardRefreshAt = 0
 local lastBoardEntries = nil
+local setBoardText: (string) -> ()
 
 local SAMPLE_BOARD = {
 	{ name = "Chef Pepper", score = 1280 },
@@ -30,7 +31,7 @@ local function warnStore(operation: string, err: any)
 end
 
 local function studioFallbackMessage(): string
-	return "Global leaderboard is available in the published game.\nStudio API access is currently off.\n\nFor Studio testing: File > Experience Settings > Security >\nEnable Studio Access to API Services."
+	return "GLOBAL RECORDS ARE UNAVAILABLE IN THIS TEST SESSION.\nYOUR BEST STILL COUNTS UNTIL YOU LEAVE."
 end
 
 local function setSampleBoard(message: string)
@@ -86,7 +87,7 @@ local function notify(player: Player, eventName: string)
 	end
 end
 
-local function setBoardText(text: string)
+setBoardText = function(text: string)
 	if legendsLabel and legendsLabel.Parent then
 		legendsLabel.Text = text
 	end
@@ -278,7 +279,7 @@ end
 function RecordRunService.begin(player: Player): (boolean, string?)
 	local run = runs[player]
 	if not run or run.status == "countdown" or run.status == "running" or run.status == "saving" then
-		return false, "A record run is already active."
+		return false, "A 1-Minute Record Run is already active."
 	end
 	run.token += 1
 	local token = run.token
