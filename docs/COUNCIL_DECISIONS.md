@@ -28,3 +28,13 @@ All six council specialties inspected their actual source. Final cross-review fo
 The layout/prop frozen hashes were replaced by executing the real modules across rounds and resets. Mapping, canonical recovery hashes and unchanged bootstrap safeguards remain. Source wiring assertions were updated to the extracted ownership boundaries, with executable client bootstrap and GameService handler tests beneath them. No failing assertion was bypassed.
 
 Acceptance requires recovery safety/contracts, all Luau specs, compilation, fresh Rojo build, full diff review and observed single-player Studio checks. Real two/four-player physics, native touch/controller and live persistence remain separately recorded requirements; doubles cannot establish those claims.
+
+## Milestone 1 route and isolation decisions
+
+Use an activity-only snapshot channel instead of extending launcher GameState: a runner reward must not invoke mounted target, camera or input presentation. Shared rewards use the same quiet channel, including when a past contributor is now in Record Run. Only actor-specific reward receipts claim earned coins; public milestone notifications never imply an AFK reward.
+
+Real walking QA rejected the initial direct far-side route: it crossed the trash bin at X43/Z149 and the bench. The corrected guide stays at Z145, then turns around each obstacle; Sunny uses two clearance corners. Return trips reverse the approach/crosswalk route instead of pointing diagonally through the van. Existing props remain untouched. Client guidance uses close corner arrival, not nearest-point skipping. Actual authored-collider tests reproduce the old obstruction and pass the revised outbound/return envelopes.
+
+Queue transparency does not add launcher capacity. No independent practice lane is added without evidence that the runner plus honest waiting remains inadequate; observing real player abandonment is still an owner playtest requirement.
+
+Fresh multiplayer QA exposed a pre-existing build-only ground defect: a project `Position` value live-synced to Y=-10 but the binary place opened at Y=0. This put the baseplate top at Y10 and lifted walking avatars above prompt range. Repair the exact mapped Baseplate with an explicit CFrame at the same intended Y=-10 before the multiplayer checkpoint. RojoBuild.spec now compares every other mapping property to the protected baseline and inspects the actual binary transform. The M2 floor reveal remains a separate Y=-12 decision. Unknown Workspace objects are untouched. Reference: [Rojo CFrame property format](https://rojo.space/docs/v7/properties/).

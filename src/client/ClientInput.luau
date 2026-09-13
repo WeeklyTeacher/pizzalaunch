@@ -48,7 +48,7 @@ function ClientInput.bind(context)
 	connect(inputService.InputBegan, function(input, processed)
 		if inputService:GetFocusedTextBox() then return end
 		if context.isOperating() and (input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.ButtonB) then
-			context.modeRemote:FireServer("walk")
+			context.modeRemote:FireServer("walk", inputState.epoch)
 			return
 		end
 		if not inputState.aimable or inputState.blocked then return end

@@ -9,6 +9,7 @@ Work only in this repository. Required overhaul branch: `feat/astra-overhaul-202
 - Canonical recovery inputs and the tracked recovery place are immutable. Generated places, Studio saves, screenshots, tools, and bulk QA evidence belong in ignored `.qa-artifacts`; never commit them.
 - Preserve the pre-existing untracked `PizzaLaunch-Astra-Working_1_0.rbxl` untouched.
 - Workspace must have no `$path`; `$ignoreUnknownInstances` must remain true. Never modify, replace, or delete `StudioRestaurant`.
+- Map the Baseplate transform with `CFrame`, never `Position` alone: real fresh-build QA found that Position was lost in serialization. Run the actual binary ground-parity test after any mapping change.
 - Stage exact intended paths. Review full diff, run checks, commit coherent passing slices, push immediately to the required branch, and verify the remote hash.
 
 ## Game contracts
@@ -16,6 +17,7 @@ Work only in this repository. Required overhaul branch: `feat/astra-overhaul-202
 - Exactly two launcher modes: FREE PLAY and 1-MINUTE RECORD RUN. One physical launcher prompt and one mounted picker. Free Play is untimed; Record Run has a three-second countdown and 60-second run.
 - Server owns lease, character mounting, mode, time, physics, hits, scoring, rewards, customers, purchases, persistence, and cleanup. Client payloads are requests.
 - A bystander must never alter the current operator's competitive state or physical lane. Walking activities have separate order state and award session coins only.
+- Runner/queue/shared progress use `RestaurantActivity`, not the launcher's GameState handler. Preserve clearance corners around the far-side bin/bench and the crosswalk return route.
 - Preserve `PizzaLaunch_RecordRun_AllTime_v1`, numeric historical records, all six table centers, ballistic anchors, and launch tuning unless a replacement is explicitly tested and documented.
 - Preserve desktop, landscape touch, tablet, controller, immediate upgrades visibility, spawn route, and interior return cue.
 - Cleanup is idempotent and invalidates stale asynchronous work across exit, death, removal, replacement, disconnect, mode switches, countdown cancellation, and results.

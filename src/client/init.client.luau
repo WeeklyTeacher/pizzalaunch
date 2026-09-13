@@ -17,6 +17,7 @@ local Feedback = require(script.Feedback)
 local LauncherInputState = require(script.LauncherInputState)
 local ClientInput = require(script.ClientInput)
 local ClientCamera = require(script.ClientCamera)
+local ActivityHUD = require(script.ActivityHUD)
 local inputState = LauncherInputState.new((Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH), Config.CHARGE_TIME)
 
 local player = Players.LocalPlayer
@@ -27,6 +28,9 @@ local launchRemote = remotes:WaitForChild(Config.LAUNCH_REMOTE)
 local stateRemote = remotes:WaitForChild(Config.STATE_REMOTE)
 local purchaseRemote = remotes:WaitForChild(Config.PURCHASE_REMOTE)
 local modeRemote = remotes:WaitForChild(Config.MODE_REMOTE)
+local activityRemote = remotes:WaitForChild(Config.ACTIVITY_REMOTE)
+local takeoutRemote = remotes:WaitForChild(Config.TAKEOUT_REMOTE)
+local queueRemote = remotes:WaitForChild(Config.QUEUE_REMOTE)
 
 local COLORS = UITheme.colors
 local addCorner, addStroke, makeLabel = UITheme.addCorner, UITheme.addStroke, UITheme.makeLabel
@@ -51,6 +55,8 @@ local trajectoryParts = {}
 local shakeUntil = 0
 local shakeStrength = 0
 local operating = false
+local activityHud
+local activityGuidance = false
 local restoreTutorialAppearance
 local cameraController = ClientCamera.new({ player = player, playerGui = playerGui, Workspace = Workspace, GuiService = GuiService, ContextActionService = ContextActionService, UserInputService = UserInputService })
 local uiEpoch = 0
@@ -197,6 +203,19 @@ end
 
 local function applyPresentation()
 	local view = UIPresentation.select(state, shopPanel.Visible, onboarding.onboardingCompleted)
+	local objective = false
+	if activityHud then
+		activityHud.setContext(operating, view.shop or view.picker)
+		objective = activityHud.hasObjective()
+	end
+	if objective ~= activityGuidance then
+		activityGuidance = objective
+		if objective then
+			onboarding.setPizzaTrailVisible(false, true)
+		elseif not operating and not onboarding.onboardingCompleted then
+			onboarding.beginPizzaTrail()
+		end
+	end
 	modeSelection.Visible = view.picker
 	shopPanel.Visible = view.shop
 	shopToggle.Visible = view.upgrades
@@ -204,8 +223,8 @@ local function applyPresentation()
 	controls.Visible = view.controls
 	touchAimPad.Visible = view.controls and UserInputService.TouchEnabled
 	exitButton.Visible = view.exit
-	walkHint.Visible = view.walking
-	roundCard.Visible = view.round
+	walkHint.Visible = view.walking and not objective
+	roundCard.Visible = view.round and not objective
 	stats.Visible = view.stats
 	recordHud.Visible = view.recordHud
 	recordSummary.Visible = view.results
@@ -389,6 +408,18 @@ local function updateTargetVisuals()
 end
 
 local effects = Feedback.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, TextService = TextService, COLORS = COLORS, ui = ui, getState = function() return state end })
+activityHud = ActivityHUD.new({
+	gui = ui.gui, player = player, Workspace = Workspace, UserInputService = UserInputService, GuiService = GuiService,
+	activityRemote = activityRemote, takeoutRemote = takeoutRemote, queueRemote = queueRemote, exitButton = exitButton,
+	onChanged = applyPresentation,
+	onEconomy = function(coins, upgrades)
+		-- Activity snapshots can refresh this player's wallet and shop. They do
+		-- not enter the launcher state handler or rebuild competitive visuals.
+		if type(coins) == "number" then state.coins = coins; coinsLabel.Text = string.format("COINS  %d", coins) end
+		if type(upgrades) == "table" then state.upgrades = upgrades end
+		updateShop(state.upgrades)
+	end,
+})
 restoreTutorialAppearance = function()
 	tutorial.BackgroundTransparency = 0.03
 	for _, descendant in tutorial:GetDescendants() do
@@ -414,6 +445,7 @@ end
 local function applyMode()
 	operating = state.mode == "launcher"
 	shopPanel.Visible = false
+	activityHud.setContext(operating, false)
 	cameraController.setMounted(operating)
 	local selectingMode = operating and state.launcherMode == "select"
 	cameraController.setPicker(modeSelection, freePlayChoice, selectingMode)
@@ -426,6 +458,7 @@ local function applyMode()
 	else
 		tutorial.Visible = false
 		if not onboarding.onboardingCompleted then onboarding.beginPizzaTrail() else onboarding.setPizzaTrailVisible(false, true) end
+		if activityHud.hasObjective() then onboarding.setPizzaTrailVisible(false, true) end
 		for _, dot in trajectoryParts do dot.Transparency = 1 end
 		landingRing.Transparency = 1
 		landingLight.Enabled = false
@@ -434,11 +467,12 @@ local function applyMode()
 	updateTargetVisuals()
 end
 
-local function releaseLocalPresentation()
+local function releaseLocalPresentation(reason)
 	if operating or state.mode == "launcher" then
 		invalidLeaseEpoch = math.max(invalidLeaseEpoch, state.cleanupEpoch or 0)
-		modeRemote:FireServer("walk")
+		modeRemote:FireServer("walk", state.cleanupEpoch or 0)
 	end
+	activityHud.resetLocal(reason == "replacement")
 	resetLauncherInput()
 	state = table.clone(state)
 	state.mode = "walk"
@@ -459,23 +493,23 @@ shopToggle.Activated:Connect(function()
 	applyPresentation()
 end)
 recordContinue.Activated:Connect(function()
-	modeRemote:FireServer("chooseMode")
+	modeRemote:FireServer("chooseMode", state.cleanupEpoch or 0)
 end)
 freePlayChoice.Activated:Connect(function()
-	modeRemote:FireServer("freePlay")
+	modeRemote:FireServer("freePlay", state.cleanupEpoch or 0)
 end)
 recordRunChoice.Activated:Connect(function()
-	modeRemote:FireServer("recordRun")
+	modeRemote:FireServer("recordRun", state.cleanupEpoch or 0)
 end)
 modeSelectionExit.Activated:Connect(function()
-	modeRemote:FireServer("walk")
+	modeRemote:FireServer("walk", state.cleanupEpoch or 0)
 end)
 changeModeButton.Activated:Connect(function()
-	modeRemote:FireServer("chooseMode")
+	modeRemote:FireServer("chooseMode", state.cleanupEpoch or 0)
 end)
 exitButton.Activated:Connect(function()
 	if operating then
-		modeRemote:FireServer("walk")
+		modeRemote:FireServer("walk", state.cleanupEpoch or 0)
 	end
 end)
 stateRemote.OnClientEvent:Connect(function(newState)
@@ -638,6 +672,7 @@ end)
 
 RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
 	onboarding.updatePizzaTrail()
+	activityHud.render()
 	inputController.render()
 	if operating and not cameraController.isAlive() then releaseLocalPresentation() end
 	if not operating then
@@ -769,8 +804,8 @@ task.defer(function()
 	end
 end)
 
-cameraController.watchCharacter(function()
-	releaseLocalPresentation()
+cameraController.watchCharacter(function(reason)
+	releaseLocalPresentation(reason)
 end, function(character)
 	if player.Character ~= character then return end
 	if not operating then cameraController.setMounted(false) end

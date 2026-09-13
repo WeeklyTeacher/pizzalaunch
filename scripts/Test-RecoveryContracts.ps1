@@ -30,7 +30,8 @@ foreach ($relativePath in $transferInvariantHashes.Keys) {
     $actual = Get-NormalizedSourceHash (Join-Path $root $relativePath)
     Assert-True ($actual -eq $transferInvariantHashes[$relativePath]) "$relativePath remains byte-identical to Transfer"
 }
-Assert-True ((Get-NormalizedSourceHash (Join-Path $root 'default.project.json')) -eq '2CAB2897048D4EA3A3F1B23EE29B8E1C41E520FAECF18F9D002774431970A000') 'Rojo project mapping remains unchanged from the protected visual-expansion checkpoint'
+# RojoBuild.spec compares the protected mapping structurally, allowing only the
+# reviewed Position-to-CFrame serialization repair, and inspects a real build.
 
 $worldPath = Join-Path $root 'src\server\WorldBuilder.luau'
 $world = Get-Content -LiteralPath $worldPath -Raw

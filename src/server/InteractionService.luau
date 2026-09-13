@@ -17,6 +17,12 @@ local function connectPrompt(item: ProximityPrompt, handlers)
 		table.insert(connections, item.Triggered:Connect(function(player)
 			handlers.customer(player, item:GetAttribute("TableId"))
 		end))
+	elseif item.Name == "TakeoutPickupPrompt" and handlers.takeoutPickup then
+		table.insert(connections, item.Triggered:Connect(handlers.takeoutPickup))
+	elseif item.Name == "TakeoutDeliveryPrompt" and handlers.takeoutDelivery then
+		table.insert(connections, item.Triggered:Connect(function(player)
+			handlers.takeoutDelivery(player, item:GetAttribute("DestinationId"))
+		end))
 	end
 end
 
@@ -35,13 +41,13 @@ function InteractionService.start(world: Instance, handlers)
 	end
 end
 
-function InteractionService.setLauncherAvailable(available: boolean)
+function InteractionService.setLauncherAvailable(available: boolean, reservedName: string?)
 	if launcherPrompt then
 		-- Keep the shared attraction visible and triggerable while occupied so a
 		-- second player gets an explicit server response instead of a vanishing UI.
 		launcherPrompt.Enabled = true
-		launcherPrompt.ActionText = available and "USE LAUNCHER" or "OCCUPIED"
-		launcherPrompt.ObjectText = available and "PIZZA LAUNCHER" or "ANOTHER CHEF IS PLAYING"
+		launcherPrompt.ActionText = reservedName and "RESERVED TURN" or (available and "USE LAUNCHER" or "OCCUPIED")
+		launcherPrompt.ObjectText = reservedName and ("NEXT: " .. reservedName) or (available and "PIZZA LAUNCHER" or "JOIN LINE OR DO TAKEOUT")
 	end
 	if recordRunPrompt then
 		recordRunPrompt.Enabled = false

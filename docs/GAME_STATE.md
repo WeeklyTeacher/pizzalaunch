@@ -36,4 +36,12 @@ Recovery generation now discovers every required script through Rojo and checks 
 
 ## Next checkpoint
 
-Complete Milestone 0 fresh-build runtime check and checkpoint, then independent Takeout Runner and honest FIFO launcher reservations. Use a separate RestaurantActivity snapshot channel so walking activity never updates an operator's target presentation. Visual work follows the runner loop.
+Milestone 0 is pushed as `10a454628daa63cc94f483444fd08280b213363d`; source and fresh-place runtime checks completed as recorded in TEST_MATRIX. Implement independent Takeout Runner and honest FIFO launcher reservations. Use a separate RestaurantActivity snapshot channel so walking activity never updates an operator's target presentation. Visual work follows the runner loop.
+
+## Milestone 1 implementation
+
+TakeoutRunner owns per-player walking orders, immutable completion receipts, request cadence, character identity and travel plausibility. TakeoutConfig supplies two destinations and explicit clearance corners around street props. TakeoutWorld owns nonphysical pickup/drop-off fixtures and a compact NOW PLAYING display; it never modifies unknown models. Pickups remain independently available even without a launcher operator. Rewards are 8 session coins plus an optional 2 within 16 seconds; no deadline removes the ordinary reward.
+
+LauncherQueue owns FIFO entries and 15-second reservations. Reservation never mounts or moves a character; GameService still acquires a healthy nearby character lease. Activity request IDs/epochs reject duplicates and stale joins/leaves; mode requests now also carry the launcher cleanup epoch. Occupied prompts remain enabled, with JOIN LINE / DO TAKEOUT ORDERS choices, positions and real mode/time. Unlimited Free Play says NO TIME LIMIT. EXIT & PASS TURN uses ordinary cleanup.
+
+RestaurantActivity carries queue, runner, station, wallet and shared milestone snapshots independently from launcher GameState. ActivityHUD/ActivityPresentation own walking objectives, nonphysical local carry/route visuals, reservation cues and quiet wallet updates. No walking reward refreshes an operator's competitive target presentation. SharedMilestone counts 12 successful Free Play/takeout completions and gives 10 session coins only to present actual contributors; Record Run never contributes. No paid or persistent coin economy added.

@@ -17,6 +17,11 @@ local ShotPolicy = require(script.Parent.ShotPolicy)
 local ProjectileService = require(script.Parent.ProjectileService)
 local DeliveryScoring = require(script.Parent.DeliveryScoring)
 local PlayerProgression = require(script.Parent.PlayerProgression)
+local LauncherQueue = require(script.Parent.LauncherQueue)
+local TakeoutRunner = require(script.Parent.TakeoutRunner)
+local TakeoutConfig = require(ReplicatedStorage.Shared.TakeoutConfig)
+local TakeoutWorld = require(script.Parent.TakeoutWorld)
+local SharedMilestone = require(script.Parent.SharedMilestone)
 
 local CustomerFeedback = require(script.Parent.CustomerFeedback)
 local Effects = require(script.Parent.ServerEffects)
@@ -40,6 +45,14 @@ local launchRemote: RemoteEvent
 local stateRemote: RemoteEvent
 local purchaseRemote: RemoteEvent
 local modeRemote: RemoteEvent
+local activityRemote: RemoteEvent
+local takeoutRemote: RemoteEvent
+local queueRemote: RemoteEvent
+local runner
+local launcherQueue
+local sharedMilestone
+local sendActivity
+local broadcastActivity
 local launcherLease = LauncherLease.new()
 local cleanupLauncherSession
 local characterConnections = {}
@@ -65,6 +78,15 @@ local function createRemotes()
 	modeRemote = Instance.new("RemoteEvent")
 	modeRemote.Name = Config.MODE_REMOTE
 	modeRemote.Parent = folder
+	activityRemote = Instance.new("RemoteEvent")
+	activityRemote.Name = Config.ACTIVITY_REMOTE
+	activityRemote.Parent = folder
+	takeoutRemote = Instance.new("RemoteEvent")
+	takeoutRemote.Name = Config.TAKEOUT_REMOTE
+	takeoutRemote.Parent = folder
+	queueRemote = Instance.new("RemoteEvent")
+	queueRemote.Name = Config.QUEUE_REMOTE
+	queueRemote.Parent = folder
 end
 
 local function tableDefinition(tableId: number)
@@ -144,6 +166,75 @@ local function setLeaderstats(player: Player, state)
 			item.Value = value
 		end
 	end
+end
+
+local function livingRoot(player, expectedCharacter)
+	local character = player.Character
+	if not states[player] or not player.Parent or not character or not character.Parent
+		or (expectedCharacter and character ~= expectedCharacter) then return nil end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not ShotPolicy.isFinite(humanoid.Health) or humanoid.Health <= 0 or not root or not root:IsA("BasePart")
+		or not ShotPolicy.isFinite(root.Position.X) or not ShotPolicy.isFinite(root.Position.Y) or not ShotPolicy.isFinite(root.Position.Z) then return nil end
+	return root
+end
+
+local function stationSnapshot()
+	local owner = launcherLease.owner
+	local state = owner and states[owner]
+	local record = owner and RecordRunService.getSnapshot(owner) or {}
+	local isRecord = state ~= nil and state.launcherMode == "recordRun"
+	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+	local anchor = world and world:FindFirstChild("LauncherInteractionAnchor", true)
+	return {
+		occupied = owner ~= nil, operatorUserId = owner and owner.UserId or nil,
+		operatorName = owner and (owner.DisplayName or owner.Name) or nil,
+		launcherMode = state and state.launcherMode or "none", recordStatus = isRecord and record.status or nil,
+		score = isRecord and record.score or nil,
+		endsAt = isRecord and record.endsAt or nil, countdownEndsAt = isRecord and record.countdownEndsAt or nil,
+		interactionPosition = anchor and anchor:IsA("BasePart") and anchor.Position or nil,
+		waitingCount = launcherQueue and launcherQueue:snapshot(owner).waitingCount or 0,
+	}
+end
+
+sendActivity = function(player, eventName, payload)
+	local state = states[player]
+	if not state or not player.Parent or not runner or not launcherQueue then return end
+	activityRemote:FireClient(player, {
+		event = eventName or "activity", payload = payload, activityEpoch = state.activityEpoch, character = player.Character,
+		runner = runner:getSnapshot(player), queue = launcherQueue:snapshot(player), station = stationSnapshot(),
+		shared = sharedMilestone and sharedMilestone:snapshot() or nil,
+		coins = state.coins, upgrades = table.clone(state.upgrades),
+	})
+end
+
+broadcastActivity = function(eventName, payload)
+	if not launcherQueue then return end
+	for player in states do sendActivity(player, eventName, payload) end
+	TakeoutWorld.update(stationSnapshot(), sharedMilestone and sharedMilestone:snapshot() or nil)
+	local reserved = launcherQueue.reservation
+	InteractionService.setLauncherAvailable(launcherLease.owner == nil, reserved and (reserved.player.DisplayName or reserved.player.Name) or nil)
+end
+
+local function invalidateActivity(player, reason)
+	local state = states[player]
+	if not state then return end
+	state.activityEpoch += 1
+	state.activityRequests = { queue = 0, takeout = 0 }
+	if runner then runner:cancel(player, reason) end
+	if launcherQueue then launcherQueue:cancel(player, reason) end
+end
+
+local function activityRequest(player, scope, epoch, requestId): boolean
+	local state = states[player]
+	if not state or state.mode ~= "walk" or not livingRoot(player) or epoch ~= state.activityEpoch
+		or not ShotPolicy.isFinite(requestId) or requestId % 1 ~= 0 or requestId < 1 or requestId > 2147483647
+		or requestId <= state.activityRequests[scope] then return false end
+	local now = Workspace:GetServerTimeNow()
+	if now - (state.activityRequestTimes[scope] or -100) < 0.2 then return false end
+	state.activityRequests[scope] = requestId
+	state.activityRequestTimes[scope] = now
+	return true
 end
 
 local function worldTable(tableId: number): Model?
@@ -326,6 +417,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			payload.eventBonus = shiftOutcome.bonus or 0
 			payload.fastServiceBonus = shiftOutcome.fastService and shiftOutcome.bonus or nil
 			payload.eventMessage = shiftOutcome.message
+			if sharedMilestone then sharedMilestone:contribute(player, "freePlay") end
 		end
 
 		pizza.Anchored = true
@@ -595,8 +687,9 @@ cleanupLauncherSession = function(player: Player, reason: string, options: { can
 	state.mode = "walk"
 	state.launcherMode = "none"
 	if launcherLease:release(player, options.moveToExit and Config.LAUNCHER_EXIT_CFRAME or nil) then
-		InteractionService.setLauncherAvailable(true)
+		launcherQueue:step()
 	end
+	broadcastActivity()
 	if options.notifyClient then
 		sendState(player, "launcherReset", { result = "BACK ON THE FLOOR", reason = reason })
 	end
@@ -622,15 +715,17 @@ local function setPlayerMode(player: Player, requestedMode: string)
 			cleanupLauncherSession(player, "reenterLauncher", { cancelRun = true, moveToExit = false, notifyClient = false })
 		end
 		if launcherLease.owner and launcherLease.owner ~= player then
-			sendState(player, "notice", { result = "LAUNCHER OCCUPIED", detail = "Another chef is playing. Try again in a moment." })
+			sendActivity(player, "launcherOccupied", { result = "LAUNCHER OCCUPIED" })
 			return
 		end
-		if not character or not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
+		if not livingRoot(player) then return end
+		if not launcherQueue:canMount(player) then
+			sendActivity(player, "launcherOccupied", { result = "TURN RESERVED", detail = "The next chef has a short chance to approach." })
 			return
 		end
 		local world = Workspace:FindFirstChild("PizzaLaunchWorld")
 		local interactionAnchor = world and world:FindFirstChild("LauncherInteractionAnchor", true)
-		if not interactionAnchor or not interactionAnchor:IsA("BasePart") or (root.Position - interactionAnchor.Position).Magnitude > 17 then
+		if not interactionAnchor or not interactionAnchor:IsA("BasePart") or not ((root.Position - interactionAnchor.Position).Magnitude <= 17) then
 			return
 		end
 		if not launcherLease:acquire(player, character, Config.LAUNCHER_OPERATOR_CFRAME) then return end
@@ -638,11 +733,14 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		state.lastRequestId = 0
 		state.mode = "launcher"
 		state.launcherMode = "select"
+		launcherQueue:accepted(player)
+		invalidateActivity(player, "mounted")
 		InteractionService.setLauncherAvailable(false)
 		LayoutService.setRound(state.round)
 		updateDeliveryZones(state.upgrades.assist, false)
 		applyProgressionVisuals(state)
 		sendState(player, "modeChanged", { result = "CHOOSE HOW TO PLAY", mode = "launcher" })
+		broadcastActivity()
 	elseif requestedMode == "walk" then
 		cleanupLauncherSession(player, "playerExit", { cancelRun = true, moveToExit = state.mode == "launcher", notifyClient = false })
 		sendState(player, "modeChanged", { result = "BACK ON THE FLOOR", mode = "walk" })
@@ -682,6 +780,7 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 		state.launcherMode = "select"
 		updateDeliveryZones(state.upgrades.assist, false)
 		sendState(player, "modeSelection", { result = "CHOOSE HOW TO PLAY" })
+		broadcastActivity()
 		return
 	end
 	if state.launcherMode ~= "select" then
@@ -698,6 +797,7 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 		state.launcherMode = "freePlay"
 		updateDeliveryZones(state.upgrades.assist, false)
 		sendState(player, "modeSelected", { result = "FREE PLAY", detail = "Practice launches with no time limit." })
+		broadcastActivity()
 	elseif requestedMode == "recordRun" then
 		if runStatus == "countdown" or runStatus == "running" or runStatus == "saving" then
 			return
@@ -733,6 +833,7 @@ end
 local function initializeCharacter(player: Player, character: Model)
 	if player.Character ~= character then return end
 	disconnectCharacter(player)
+	invalidateActivity(player, "characterRespawn")
 	cleanupLauncherSession(player, "characterRespawn", { cancelRun = true, notifyClient = true })
 	ProjectileService.bindCharacter(player, character)
 	local connections = {}
@@ -746,6 +847,7 @@ local function initializeCharacter(player: Player, character: Model)
 		initialized = true
 		table.insert(connections, humanoid.Died:Connect(function()
 			if player.Character == character and character:FindFirstChildOfClass("Humanoid") == humanoid and states[player] then
+				invalidateActivity(player, "characterDied")
 				cleanupLauncherSession(player, "characterDied", { cancelRun = true, notifyClient = true })
 			end
 		end))
@@ -770,8 +872,12 @@ local function addPlayer(player: Player)
 		launcherMode = "none",
 		upgrades = { tips = 0, assist = 0, reload = 0, power = 0 },
 		cleanupEpoch = 0,
+		activityEpoch = 0,
+		activityRequests = { queue = 0, takeout = 0 },
+		activityRequestTimes = {},
 	}
 	RecordRunService.addPlayer(player)
+	runner:addPlayer(player)
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -787,6 +893,7 @@ local function addPlayer(player: Player)
 	end)
 	player.CharacterRemoving:Connect(function(character)
 		if player.Character == character or launcherLease.character == character then
+			invalidateActivity(player, "characterRemoving")
 			cleanupLauncherSession(player, "characterRemoving", { cancelRun = true, notifyClient = true })
 			disconnectCharacter(player)
 		end
@@ -797,6 +904,7 @@ local function addPlayer(player: Player)
 	task.delay(0.8, function()
 		if player.Parent then
 			sendState(player, "welcome", nil)
+			sendActivity(player, "activity", nil)
 		end
 	end)
 end
@@ -806,8 +914,9 @@ function GameService.start()
 	ShiftEventService.reset()
 	launchRemote.OnServerEvent:Connect(onLaunch)
 	purchaseRemote.OnServerEvent:Connect(onPurchase)
-	modeRemote.OnServerEvent:Connect(function(player, requestedMode)
-		if typeof(requestedMode) ~= "string" then
+	modeRemote.OnServerEvent:Connect(function(player, requestedMode, requestEpoch)
+		local state = states[player]
+		if not state or requestEpoch ~= state.cleanupEpoch or typeof(requestedMode) ~= "string" then
 			return
 		end
 		if requestedMode == "walk" then
@@ -817,6 +926,61 @@ function GameService.start()
 		end
 	end)
 	local world = Workspace:WaitForChild("PizzaLaunchWorld")
+	TakeoutWorld.start(world)
+	sharedMilestone = SharedMilestone.new({
+		target = 12, reward = 10,
+		isPresent = function(player) return states[player] ~= nil and player.Parent ~= nil end,
+		award = function(player, coins, cycle)
+			local state = states[player]
+			if not state or not player.Parent then return end
+			state.coins += coins
+			setLeaderstats(player, state)
+			sendActivity(player, "restaurantReward", { coinsEarned = coins, cycle = cycle })
+		end,
+		notify = function(_, completed)
+			broadcastActivity(completed and "restaurantMilestone" or "restaurantProgress")
+		end,
+	})
+	runner = TakeoutRunner.new({
+		config = TakeoutConfig, now = function() return Workspace:GetServerTimeNow() end,
+		getState = function(player) return states[player] end,
+		award = function(player, receipt)
+			local state = states[player]
+			if not state or not player.Parent then return end
+			state.coins += receipt.coinsEarned
+			setLeaderstats(player, state)
+			if sharedMilestone then sharedMilestone:contribute(player, "takeout") end
+		end,
+		notify = sendActivity,
+	})
+	launcherQueue = LauncherQueue.new({
+		now = function() return Workspace:GetServerTimeNow() end,
+		getOwner = function() return launcherLease.owner end,
+		isEligible = function(player, character)
+			local state = states[player]
+			local root = livingRoot(player, character)
+			return state ~= nil and state.mode == "walk" and root ~= nil and not root.Anchored
+		end,
+		notify = sendActivity, reservationSeconds = 15,
+	})
+	queueRemote.OnServerEvent:Connect(function(player, action, epoch, requestId)
+		if not activityRequest(player, "queue", epoch, requestId) then return end
+		if action == "join" then
+			local root = livingRoot(player)
+			local anchor = world:FindFirstChild("LauncherInteractionAnchor", true)
+			if not root or not anchor or not ((root.Position - anchor.Position).Magnitude <= 22) then
+				sendActivity(player, "queueRejected", { reason = "approachLauncher" }); return
+			end
+			local accepted, reason = launcherQueue:join(player)
+			sendActivity(player, accepted and "queueChanged" or "queueRejected", { reason = reason })
+		elseif action == "leave" then launcherQueue:cancel(player, "cancelled") end
+		broadcastActivity()
+	end)
+	takeoutRemote.OnServerEvent:Connect(function(player, action, epoch, requestId, orderId)
+		if not activityRequest(player, "takeout", epoch, requestId) then return end
+		if action == "route" then sendActivity(player, "takeoutRoute")
+		elseif action == "cancel" and typeof(orderId) == "string" then runner:cancel(player, "cancelled", orderId) end
+	end)
 	CustomerService.start(world, function(lifecycleName)
 		if lifecycleName == "entered" then
 			local door = world:FindFirstChild("FrontGlassDoor", true)
@@ -850,8 +1014,16 @@ function GameService.start()
 			clearActiveShot(player)
 		end
 		sendState(player, eventName, nil)
+		broadcastActivity()
 	end)
 	InteractionService.start(world, {
+		takeoutPickup = function(player)
+			runner:pickup(player)
+		end,
+		takeoutDelivery = function(player, destinationId)
+			local order = runner:getSnapshot(player)
+			if order.status == "carrying" and order.destinationId == destinationId then runner:deliver(player, order.orderId) end
+		end,
 		launcher = function(player)
 			setPlayerMode(player, "launcher")
 		end,
@@ -885,8 +1057,15 @@ function GameService.start()
 		end,
 	})
 	task.spawn(function()
+		local nextActivityAt = 0
 		while world.Parent do
 			task.wait(0.25)
+			runner:step()
+			local queueChanged = launcherQueue:step()
+			if queueChanged or Workspace:GetServerTimeNow() >= nextActivityAt then
+				nextActivityAt = Workspace:GetServerTimeNow() + 1
+				broadcastActivity()
+			end
 			local owner = launcherLease.owner
 			if owner and not launcherLease:isValid(owner) then
 				cleanupLauncherSession(owner, "invalidMountedCharacter", { cancelRun = true, notifyClient = true })
@@ -899,8 +1078,11 @@ function GameService.start()
 	end)
 	Players.PlayerAdded:Connect(addPlayer)
 	Players.PlayerRemoving:Connect(function(player)
+		invalidateActivity(player, "playerLeaving")
 		cleanupLauncherSession(player, "playerLeaving", { cancelRun = false, moveToExit = false, notifyClient = false })
 		RecordRunService.removePlayer(player)
+		runner:removePlayer(player)
+		if sharedMilestone then sharedMilestone:removePlayer(player) end
 		disconnectCharacter(player)
 		states[player] = nil
 	end)

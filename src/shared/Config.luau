@@ -5,6 +5,9 @@ Config.LAUNCH_REMOTE = "LaunchPizza"
 Config.STATE_REMOTE = "GameState"
 Config.PURCHASE_REMOTE = "PurchaseUpgrade"
 Config.MODE_REMOTE = "LauncherMode"
+Config.ACTIVITY_REMOTE = "RestaurantActivity"
+Config.TAKEOUT_REMOTE = "TakeoutAction"
+Config.QUEUE_REMOTE = "QueueAction"
 
 Config.RECORD_RUN_DURATION = 60
 Config.RECORD_RUN_COUNTDOWN = 3
