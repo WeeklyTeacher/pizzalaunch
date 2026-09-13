@@ -13,3 +13,6 @@ sourcemap.json
 /recovery/*.rbxl.lock
 /.qa-artifacts/
 /recovery/PizzaLaunch-before-QA.rbxl
+
+# Existing owner working place; preserve locally and never stage it.
+/PizzaLaunch-Astra-Working_1_0.rbxl

@@ -12,6 +12,17 @@ local RecordRunService = require(script.Parent.RecordRunService)
 local ShiftEventService = require(script.Parent.ShiftEventService)
 local WorldActivityService = require(script.Parent.WorldActivityService)
 
+local LauncherLease = require(script.Parent.LauncherLease)
+local ShotPolicy = require(script.Parent.ShotPolicy)
+local ProjectileService = require(script.Parent.ProjectileService)
+local DeliveryScoring = require(script.Parent.DeliveryScoring)
+local PlayerProgression = require(script.Parent.PlayerProgression)
+
+local CustomerFeedback = require(script.Parent.CustomerFeedback)
+local Effects = require(script.Parent.ServerEffects)
+local playSound, coinBurst, confettiBurst = Effects.playSound, Effects.coinBurst, Effects.confettiBurst
+local createSplat, impactRing = Effects.createSplat, Effects.impactRing
+
 local GameService = {}
 
 local SOUND = {
@@ -29,27 +40,9 @@ local launchRemote: RemoteEvent
 local stateRemote: RemoteEvent
 local purchaseRemote: RemoteEvent
 local modeRemote: RemoteEvent
-local launcherOccupant: Player?
-local activeShots: { [Player]: { pizza: BasePart, connection: RBXScriptConnection? } } = {}
-
-local function playSound(parent: Instance, soundId: string, volume: number, playbackSpeed: number?)
-	local sound = Instance.new("Sound")
-	sound.SoundId = soundId
-	sound.Volume = volume
-	sound.PlaybackSpeed = playbackSpeed or 1
-	sound.RollOffMaxDistance = 140
-	sound.RollOffMinDistance = 10
-	sound.Parent = parent
-	sound:Play()
-	sound.Ended:Once(function()
-		sound:Destroy()
-	end)
-	task.delay(5, function()
-		if sound.Parent then
-			sound:Destroy()
-		end
-	end)
-end
+local launcherLease = LauncherLease.new()
+local cleanupLauncherSession
+local characterConnections = {}
 
 local function createRemotes()
 	local old = ReplicatedStorage:FindFirstChild(Config.REMOTES_FOLDER)
@@ -132,6 +125,8 @@ local function sendState(player: Player, eventName: string?, payload: { [string]
 		mode = state.mode,
 		launcherMode = state.launcherMode,
 		cleanupEpoch = state.cleanupEpoch,
+		shotActive = state.shotActive,
+		reloadDelay = math.max(0, state.lastLaunch + ShotPolicy.reloadTime(Config, state, RecordRunService.isSession(player)) - Workspace:GetServerTimeNow()),
 		recordRun = RecordRunService.getSnapshot(player),
 		shiftEvent = ShiftEventService.getSnapshot(),
 		payload = payload,
@@ -253,297 +248,30 @@ local function endShiftEvent(eventData, message: string?)
 	end
 end
 
-local function reactionText(customer: Model, text: string)
-	local marker = customer:FindFirstChild("WaitingMarker", true)
-	local label = marker and marker:FindFirstChild("Label", true)
-	if label and label:IsA("TextLabel") then
-		if string.find(text, "NOM") then
-			label.Text = "YUM"
-		elseif string.find(text, "HEY") then
-			label.Text = "?"
-		elseif string.find(text, "WHOA") or string.find(text, "DUCK") then
-			label.Text = "!"
-		elseif string.find(text, "YES") or string.find(text, "WOOHOO") or string.find(text, "BEST") then
-			label.Text = "★"
-		else
-			label.Text = "🍕"
-		end
-	end
+local customerFeedback = CustomerFeedback.new({
+	getOwner = function() return launcherLease.owner end,
+	worldTable = worldTable,
+	tableDefinition = tableDefinition,
+	customerService = CustomerService,
+	coinBurst = coinBurst,
+})
+
+local function reactionText(customer, text)
+	customerFeedback:text(customer, text)
 end
 
-local function resetCustomer(customer: Model, token: number)
-	task.delay(1.25, function()
-		if not customer.Parent or customer:GetAttribute("ReactionToken") ~= token then
-			return
-		end
-		for _, descendant in customer:GetDescendants() do
-			if descendant:IsA("BasePart") then
-				local reset = descendant:GetAttribute("ResetCFrame")
-				if typeof(reset) == "CFrame" then
-					TweenService:Create(descendant, TweenInfo.new(0.28, Enum.EasingStyle.Quad), { CFrame = reset }):Play()
-				end
-			end
-		end
-		local faceGui = customer:FindFirstChild("Face", true)
-		local faceLabel = faceGui and faceGui:FindFirstChild("Label")
-		if faceLabel and faceLabel:IsA("TextLabel") then
-			faceLabel.Text = "^  ^\n\\___/"
-		end
-		local customerName = customer:GetAttribute("CustomerName") or "CUSTOMER"
-		reactionText(customer, string.format("%s IS HUNGRY!\nPIZZA, PLEASE!", string.upper(customerName)))
-	end)
-end
-
-local function coinBurst(position: Vector3, color: Color3)
-	local folder = Instance.new("Folder")
-	folder.Name = "CoinBurst"
-	folder.Parent = Workspace
-	for index = 1, 9 do
-		local coin = Instance.new("Part")
-		coin.Name = "Coin"
-		coin.Shape = Enum.PartType.Cylinder
-		coin.Size = Vector3.new(0.25, 1.3, 1.3)
-		coin.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.pi / 2)
-		coin.Anchored = true
-		coin.CanCollide = false
-		coin.CanTouch = false
-		coin.CanQuery = false
-		coin.Material = Enum.Material.Neon
-		coin.Color = index % 3 == 0 and color or Color3.fromRGB(255, 211, 55)
-		coin.Parent = folder
-		local angle = index / 9 * math.pi * 2
-		local target = position + Vector3.new(math.cos(angle) * 7, 5 + (index % 3) * 2, math.sin(angle) * 4)
-		TweenService:Create(coin, TweenInfo.new(0.65, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Position = target,
-			Transparency = 1,
-			Orientation = Vector3.new(0, index * 70, 90),
-		}):Play()
-	end
-	task.delay(0.8, function()
-		folder:Destroy()
-	end)
-end
-
-local function confettiBurst(position: Vector3)
-	local folder = Instance.new("Folder")
-	folder.Name = "BirthdayConfetti"
-	folder.Parent = Workspace
-	local colors = {
-		Color3.fromRGB(255, 85, 96), Color3.fromRGB(255, 211, 55),
-		Color3.fromRGB(76, 200, 124), Color3.fromRGB(82, 180, 235),
-	}
-	for index = 1, 18 do
-		local piece = Instance.new("Part")
-		piece.Name = "Confetti"
-		piece.Size = Vector3.new(0.22, 0.65, 0.35)
-		piece.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
-		piece.Anchored = true
-		piece.CanCollide = false
-		piece.CanTouch = false
-		piece.CanQuery = false
-		piece.Material = Enum.Material.Neon
-		piece.Color = colors[(index - 1) % #colors + 1]
-		piece.Parent = folder
-		local angle = index / 18 * math.pi * 2
-		local distance = 4 + index % 4
-		TweenService:Create(piece, TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Position = position + Vector3.new(math.cos(angle) * distance, 6 + index % 5, math.sin(angle) * distance),
-			Orientation = Vector3.new(index * 43, index * 71, index * 29),
-			Transparency = 1,
-		}):Play()
-	end
-	task.delay(1, function()
-		folder:Destroy()
-	end)
-end
-
-local function customerReaction(tableId: number, reaction: string)
-	local tableModel = worldTable(tableId)
-	local customer = tableModel and tableModel:FindFirstChild("Customer")
-	if not customer or not customer:IsA("Model") then
-		return
-	end
-	local token = (customer:GetAttribute("ReactionToken") or 0) + 1
-	customer:SetAttribute("ReactionToken", token)
-	CustomerService.markReacting(customer, 1.7)
-	local head = customer:FindFirstChild("Head")
-	local torso = customer:FindFirstChild("Torso")
-	local leftArm = customer:FindFirstChild("LeftArm")
-	local rightArm = customer:FindFirstChild("RightArm")
-	local faceGui = customer:FindFirstChild("Face", true)
-	local faceLabel = faceGui and faceGui:FindFirstChild("Label")
-
-	if reaction == "success" then
-		reactionText(customer, "YES! PIZZA!\nBEST DAY EVER!")
-		if faceLabel and faceLabel:IsA("TextLabel") then
-			faceLabel.Text = "*  *\n\\___/"
-		end
-		if head and head:IsA("BasePart") then
-			TweenService:Create(head, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { CFrame = head.CFrame + Vector3.new(0, 1.8, 0) }):Play()
-			coinBurst(head.Position + Vector3.new(0, 4, 0), tableDefinition(tableId).color)
-		end
-		for _, arm in { leftArm, rightArm } do
-			if arm and arm:IsA("BasePart") then
-				local side = arm.Name == "LeftArm" and -1 or 1
-				TweenService:Create(arm, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-					CFrame = arm.CFrame * CFrame.new(side * 0.6, 2, 0) * CFrame.Angles(0, 0, math.rad(side * -115)),
-				}):Play()
-			end
-		end
-	elseif reaction == "crowd" then
-		reactionText(customer, "PIZZA STREAK!\nWOOHOO!")
-		if faceLabel and faceLabel:IsA("TextLabel") then
-			faceLabel.Text = "^  ^\n\\___/"
-		end
-		if head and head:IsA("BasePart") then
-			TweenService:Create(head, TweenInfo.new(0.3, Enum.EasingStyle.Back), { CFrame = head.CFrame + Vector3.new(0, 1.25, 0) }):Play()
-		end
-		if torso and torso:IsA("BasePart") then
-			TweenService:Create(torso, TweenInfo.new(0.3, Enum.EasingStyle.Back), { CFrame = torso.CFrame + Vector3.new(0, 0.55, 0) }):Play()
-		end
-		for _, arm in { leftArm, rightArm } do
-			if arm and arm:IsA("BasePart") then
-				local side = arm.Name == "LeftArm" and -1 or 1
-				TweenService:Create(arm, TweenInfo.new(0.32, Enum.EasingStyle.Back), {
-					CFrame = arm.CFrame * CFrame.new(side * 0.45, 1.6, 0) * CFrame.Angles(0, 0, math.rad(side * -105)),
-				}):Play()
-			end
-		end
-	elseif reaction == "wrong" then
-		reactionText(customer, "HEY! NOT MY ORDER!\n...STILL SMELLS GOOD")
-		if faceLabel and faceLabel:IsA("TextLabel") then
-			faceLabel.Text = "O  O\n  o"
-		end
-		for _, bodyPart in { head, torso, leftArm, rightArm } do
-			if bodyPart and bodyPart:IsA("BasePart") then
-				TweenService:Create(bodyPart, TweenInfo.new(0.22, Enum.EasingStyle.Back), { CFrame = bodyPart.CFrame + Vector3.new(3, 0.5, 0) }):Play()
-			end
-		end
-	else
-		reactionText(customer, "WHOA! FLYING PIZZA!\nDUCK!")
-		if faceLabel and faceLabel:IsA("TextLabel") then
-			faceLabel.Text = ">  <\n  O"
-		end
-		for _, bodyPart in { head, torso } do
-			if bodyPart and bodyPart:IsA("BasePart") then
-				TweenService:Create(bodyPart, TweenInfo.new(0.18), { CFrame = bodyPart.CFrame + Vector3.new(0, -2, 0) }):Play()
-			end
-		end
-	end
-	resetCustomer(customer, token)
-end
-
-local function surfaceNormal(hit: BasePart, point: Vector3): Vector3
-	local localPoint = hit.CFrame:PointToObjectSpace(point)
-	local half = hit.Size * 0.5
-	local normalized = Vector3.new(
-		math.abs(localPoint.X) / math.max(half.X, 0.01),
-		math.abs(localPoint.Y) / math.max(half.Y, 0.01),
-		math.abs(localPoint.Z) / math.max(half.Z, 0.01)
-	)
-	local localNormal
-	if normalized.X >= normalized.Y and normalized.X >= normalized.Z then
-		localNormal = Vector3.new(math.sign(localPoint.X), 0, 0)
-	elseif normalized.Y >= normalized.Z then
-		localNormal = Vector3.new(0, math.sign(localPoint.Y), 0)
-	else
-		localNormal = Vector3.new(0, 0, math.sign(localPoint.Z))
-	end
-	return hit.CFrame:VectorToWorldSpace(localNormal)
-end
-
-local function splatFolder(): Folder
-	local folder = Workspace:FindFirstChild("PizzaMess")
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = "PizzaMess"
-		folder.Parent = Workspace
-	end
-	while #folder:GetChildren() >= 24 do
-		folder:GetChildren()[1]:Destroy()
-	end
-	return folder :: Folder
-end
-
-local function createSplat(hit: BasePart, position: Vector3, color: Color3)
-	local normal = surfaceNormal(hit, position)
-	local splat = Instance.new("Part")
-	splat.Name = "CheesySplat"
-	splat.Shape = Enum.PartType.Cylinder
-	splat.Size = Vector3.new(0.12, math.random(40, 65) / 10, math.random(40, 65) / 10)
-	splat.CFrame = CFrame.lookAt(position + normal * 0.1, position + normal) * CFrame.Angles(0, math.pi / 2, 0)
-	splat.Anchored = true
-	splat.CanCollide = false
-	splat.CanTouch = false
-	splat.CanQuery = false
-	splat.Material = Enum.Material.SmoothPlastic
-	splat.Color = color
-	splat.Transparency = 0.08
-	splat.Parent = splatFolder()
-
-	for index = 1, 3 do
-		local blob = Instance.new("Part")
-		blob.Name = "SauceBlob"
-		blob.Shape = Enum.PartType.Ball
-		local scale = math.random(7, 14) / 10
-		blob.Size = Vector3.new(scale, scale, scale)
-		blob.Position = position + normal * 0.35 + Vector3.new(math.random(-16, 16) / 10, math.random(-9, 14) / 10, math.random(-16, 16) / 10)
-		blob.Anchored = true
-		blob.CanCollide = false
-		blob.CanTouch = false
-		blob.CanQuery = false
-		blob.Color = index == 1 and Color3.fromRGB(191, 48, 43) or color
-		blob.Parent = splat
-	end
-
-	task.delay(7, function()
-		if splat.Parent then
-			for _, descendant in splat:GetDescendants() do
-				if descendant:IsA("BasePart") then
-					TweenService:Create(descendant, TweenInfo.new(1), { Transparency = 1 }):Play()
-				end
-			end
-			TweenService:Create(splat, TweenInfo.new(1), { Transparency = 1 }):Play()
-			task.delay(1.1, function()
-				if splat.Parent then
-					splat:Destroy()
-				end
-			end)
-		end
-	end)
-end
-
-local function impactRing(position: Vector3, color: Color3)
-	local ring = Instance.new("Part")
-	ring.Name = "PizzaImpact"
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Size = Vector3.new(0.18, 2, 2)
-	ring.CFrame = CFrame.new(position + Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0, math.pi / 2)
-	ring.Anchored = true
-	ring.CanCollide = false
-	ring.CanTouch = false
-	ring.CanQuery = false
-	ring.Material = Enum.Material.Neon
-	ring.Color = color
-	ring.Transparency = 0.1
-	ring.Parent = Workspace
-	TweenService:Create(ring, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(0.18, 15, 15),
-		Transparency = 1,
-	}):Play()
-	task.delay(0.65, function()
-		ring:Destroy()
-	end)
+local function customerReaction(tableId, reaction)
+	customerFeedback:react(tableId, reaction)
 end
 
 local function finishShot(player: Player, pizza: BasePart, result: string, hitPosition: Vector3?, tableId: number?)
 	local state = states[player]
-	if not state or pizza:GetAttribute("Resolved") then
+	if not state or pizza:GetAttribute("Resolved") or not launcherLease:isValid(player) or not RecordRunService.canLaunch(player)
+		or not ProjectileService.resolve(player, pizza, state.cleanupEpoch) then
 		return
 	end
 	pizza:SetAttribute("Resolved", true)
 	state.shotActive = false
-	activeShots[player] = nil
 	local recordSession = RecordRunService.isSession(player)
 	local effectiveReload = recordSession and Config.RELOAD_TIME or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12)
 	local payload = {
@@ -562,19 +290,11 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 
 	if acceptedDelivery and tableId and hitPosition then
 		local definition = tableDefinition(tableId)
-		local horizontal = Vector3.new(hitPosition.X - definition.position.X, 0, hitPosition.Z - definition.position.Z)
 		local round = roundDefinition(state.round)
-		local assistScale = recordSession and 1.12 or (1 + state.upgrades.assist * 0.12) * round.accuracyScale
-		local accuracy = Config.ACCURACY[#Config.ACCURACY]
-		for _, tier in Config.ACCURACY do
-			if horizontal.Magnitude <= tier.radius * assistScale then
-				accuracy = tier
-				break
-			end
-		end
+		local accuracy, distance = DeliveryScoring.accuracy(Config, definition.position, hitPosition, state, recordSession)
 		payload.result = accuracy.name
 		payload.color = accuracy.color
-		payload.accuracy = math.floor(horizontal.Magnitude * 10 + 0.5) / 10
+		payload.accuracy = distance
 
 		if recordSession then
 			local recordResult = RecordRunService.recordSuccess(player, tableId, accuracy.name)
@@ -594,11 +314,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			state.combo += 1
 			state.bestCombo = math.max(state.bestCombo, state.combo)
 			state.roundProgress += 1
-			local comboBonus = math.min((state.combo - 1) * 2, 12)
-			local unmultipliedReward = accuracy.coins + comboBonus
-			-- The reward multiplier and all event bonuses are calculated only here,
-			-- on the server. Record Run never enters this branch.
-			local deliveryReward = math.floor(unmultipliedReward * (1 + state.upgrades.tips * 0.25) + 0.5)
+			local deliveryReward, comboBonus, unmultipliedReward = DeliveryScoring.freePlayReward(accuracy, state.combo, state.upgrades.tips)
 			local serviceTime = Workspace:GetServerTimeNow() - (state.targetSetAt or Workspace:GetServerTimeNow())
 			shiftOutcome = ShiftEventService.recordDelivery(tableId, accuracy.name, serviceTime)
 			local earned = deliveryReward + (shiftOutcome.bonus or 0)
@@ -632,8 +348,9 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			end
 		end
 		playSound(pizza, accuracy.name == "PERFECT!" and SOUND.perfect or SOUND.success, accuracy.name == "PERFECT!" and 0.75 or 0.65, 1.05)
+		local completedEpoch = state.cleanupEpoch
 		task.delay(0.62, function()
-			if not pizza.Parent then
+			if not pizza.Parent or states[player] ~= state or state.cleanupEpoch ~= completedEpoch or launcherLease.owner ~= player then
 				return
 			end
 			local tableModel = worldTable(tableId)
@@ -715,112 +432,50 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 	setLeaderstats(player, state)
 	sendState(player, "shotResult", payload)
 	task.delay(1.45, function()
-		if pizza.Parent then
-			pizza:Destroy()
-		end
+		ProjectileService.removeVisual(player, pizza)
 	end)
 end
 
-local function makePizza(player: Player, direction: Vector3, charge: number): BasePart
+local function onLaunch(player: Player, directionValue: any, chargeValue: any, requestId: any, requestEpoch: any)
 	local state = states[player]
-	local pizza = Instance.new("Part")
-	pizza.Name = string.format("%s_Pizza", player.Name)
-	pizza.Shape = Enum.PartType.Cylinder
-	pizza.Size = Vector3.new(0.65, 6, 6)
-	pizza.CFrame = CFrame.new(Config.LAUNCH_ORIGIN + direction * 1.8) * CFrame.Angles(0, 0, math.pi / 2)
-	pizza.Color = Color3.fromRGB(255, 199, 63)
-	pizza.Material = Enum.Material.SmoothPlastic
-	pizza.CustomPhysicalProperties = PhysicalProperties.new(0.65, 0.38, 0.62, 1, 1)
-	pizza:SetAttribute("OwnerUserId", player.UserId)
-	pizza.Parent = Workspace
-
-	for index, offset in {
-		Vector3.new(0.42, -1.5, -0.9), Vector3.new(0.42, 1.2, -1.2),
-		Vector3.new(0.42, -0.4, 1.35), Vector3.new(0.42, 1.35, 0.8),
-	} do
-		local topping = Instance.new("Part")
-		topping.Name = string.format("Pepperoni%d", index)
-		topping.Shape = Enum.PartType.Ball
-		topping.Size = Vector3.new(1.05, 0.35, 1.05)
-		topping.Color = Color3.fromRGB(190, 46, 45)
-		topping.Material = Enum.Material.SmoothPlastic
-		topping.CFrame = pizza.CFrame * CFrame.new(offset)
-		topping.CanCollide = false
-		topping.CanTouch = false
-		topping.CanQuery = false
-		topping.Massless = true
-		topping.Parent = pizza
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = pizza
-		weld.Part1 = topping
-		weld.Parent = topping
-	end
-
-	local powerLevel = RecordRunService.isSession(player) and 0 or state.upgrades.power
-	local speed = Config.speedFromCharge(charge, powerLevel)
-	pizza.AssemblyLinearVelocity = direction.Unit * speed
-	pizza.AssemblyAngularVelocity = Vector3.new(direction.Z * 17, 5, -direction.X * 17)
-	pizza:SetNetworkOwner(nil)
-	playSound(pizza, SOUND.launch, 0.72, 1.06)
-	task.delay(0.16, function()
-		if pizza.Parent then
-			playSound(pizza, SOUND.whoosh, 0.28, 1.3)
-		end
-	end)
-	return pizza
-end
-
-local function isFinite(value: number): boolean
-	return value == value and value > -math.huge and value < math.huge
-end
-
-local function onLaunch(player: Player, directionValue: any, chargeValue: any)
-	local state = states[player]
-	if not state or state.shotActive or state.mode ~= "launcher" or launcherOccupant ~= player then
-		return
-	end
-	if state.launcherMode ~= "freePlay" and state.launcherMode ~= "recordRun" then
-		return
-	end
-	if state.launcherMode == "recordRun" and not RecordRunService.isSession(player) then
-		return
-	end
-	if not RecordRunService.canLaunch(player) then
-		return
-	end
-	if typeof(directionValue) ~= "Vector3" or typeof(chargeValue) ~= "number" then
-		return
-	end
-	if not isFinite(chargeValue) or not isFinite(directionValue.X) or not isFinite(directionValue.Y) or not isFinite(directionValue.Z) then
-		return
-	end
-	if directionValue.Magnitude < 0.9 then
-		return
-	end
-	local direction = directionValue.Unit
-	local pitch = math.asin(math.clamp(direction.Y, -1, 1))
-	local yaw = math.atan2(direction.X, -direction.Z)
-	if pitch < Config.MIN_PITCH - 0.02 or pitch > Config.MAX_PITCH + 0.02 or math.abs(yaw) > Config.MAX_YAW + 0.02 or direction.Z > -0.3 then
-		return
+	if not state then return end
+	if launcherLease.owner == player and not launcherLease:isValid(player) then
+		cleanupLauncherSession(player, "invalidMountedCharacter", { cancelRun = true, notifyClient = true })
 	end
 	local now = Workspace:GetServerTimeNow()
-	local reloadTime = RecordRunService.isSession(player) and Config.RELOAD_TIME or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12)
-	if now - state.lastLaunch < reloadTime then
+	local recordSession = RecordRunService.isSession(player)
+	local accepted, reason = ShotPolicy.validate(Config, state, launcherLease:isValid(player),
+		RecordRunService.canLaunch(player), recordSession, directionValue, chargeValue, requestId, requestEpoch, now)
+	if not accepted then
+		local reloadTime = ShotPolicy.reloadTime(Config, state, recordSession)
+		sendState(player, "launchRejected", {
+			requestId = ShotPolicy.isFinite(requestId) and requestId or nil,
+			requestEpoch = requestEpoch == state.cleanupEpoch and requestEpoch or -1,
+			shotActive = state.shotActive, reason = reason,
+			reloadDelay = math.max(0, state.lastLaunch + reloadTime - now), reloadTime = reloadTime,
+		})
 		return
 	end
+	state.lastRequestId = requestId
 	state.lastLaunch = now
 	state.shotActive = true
-
-	local pizza = makePizza(player, direction, math.clamp(chargeValue, 0, 1))
-	sendState(player, "launched", { reloadTime = reloadTime })
+	local epoch = state.cleanupEpoch
+	local powerLevel = RecordRunService.isSession(player) and 0 or state.upgrades.power
+	local pizza = ProjectileService.create(Config, player, accepted.direction, accepted.charge, powerLevel, playSound, SOUND)
+	local shot = ProjectileService.track(player, pizza, epoch)
+	sendState(player, "launched", {
+		requestId = requestId, requestEpoch = epoch, shotActive = true,
+		reloadTime = accepted.reloadTime, reloadDelay = accepted.reloadTime,
+	})
 	local bornAt = now
 	local connection: RBXScriptConnection
 	connection = pizza.Touched:Connect(function(hit)
-		if pizza:GetAttribute("Resolved") or hit:IsDescendantOf(pizza) or Workspace:GetServerTimeNow() - bornAt < 0.13 then
+		if not ProjectileService.isCurrent(player, pizza, epoch) or states[player] ~= state
+			or state.cleanupEpoch ~= epoch or not launcherLease:isValid(player) or not RecordRunService.canLaunch(player)
+			or pizza:GetAttribute("Resolved") or hit:IsDescendantOf(pizza) or Workspace:GetServerTimeNow() - bornAt < 0.13 then
 			return
 		end
-		local character = player.Character
-		if character and hit:IsDescendantOf(character) then
+		if ProjectileService.isCharacterPart(hit) then
 			return
 		end
 
@@ -848,10 +503,11 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any)
 			finishShot(player, pizza, hit.Name == "RestaurantFloor" and "FLOOR PIZZA!" or "SAUCY SPLAT!", pizza.Position, nil)
 		end
 	end)
-	activeShots[player] = { pizza = pizza, connection = connection }
+	shot.connection = connection
 
 	task.delay(Config.PROJECTILE_LIFETIME, function()
-		if pizza.Parent and not pizza:GetAttribute("Resolved") then
+		if ProjectileService.isCurrent(player, pizza, epoch) and states[player] == state
+			and state.cleanupEpoch == epoch and not pizza:GetAttribute("Resolved") then
 			if connection.Connected then
 				connection:Disconnect()
 			end
@@ -875,35 +531,19 @@ end
 
 local function onPurchase(player: Player, upgradeId: any)
 	local state = states[player]
-	local definition = typeof(upgradeId) == "string" and Config.UPGRADES[upgradeId] or nil
-	if not state or not definition then
+	local purchase, reason, cost = PlayerProgression.purchase(Config, state, upgradeId, RecordRunService.isSession(player))
+	if not purchase then
+		if reason then sendState(player, "purchaseResult", { result = reason, success = false, cost = cost }) end
 		return
 	end
-	if RecordRunService.isSession(player) then
-		sendState(player, "purchaseResult", { result = "FINISH THE 1-MINUTE RECORD RUN FIRST", success = false })
-		return
+	local definition, oldLevel, newLevel = purchase.definition, purchase.oldLevel, purchase.newLevel
+	if ShotPolicy.canPresent(player, launcherLease.owner, state) then
+		if upgradeId == "assist" then updateDeliveryZones(newLevel, false) end
+		applyProgressionVisuals(state)
 	end
-	local level = state.upgrades[upgradeId]
-	local cost = definition.costs[level + 1]
-	if not cost then
-		sendState(player, "purchaseResult", { result = "MAX LEVEL!", success = false })
-		return
-	end
-	if state.coins < cost then
-		sendState(player, "purchaseResult", { result = "NEED MORE COINS", success = false, cost = cost })
-		return
-	end
-	local oldLevel = level
-	state.coins -= cost
-	state.upgrades[upgradeId] += 1
-	local newLevel = state.upgrades[upgradeId]
-	if upgradeId == "assist" then
-		updateDeliveryZones(newLevel, false)
-	end
-	applyProgressionVisuals(state)
 	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
 	local console = world and world:FindFirstChild("OperatorConsole", true)
-	if console and console:IsA("BasePart") then
+	if ShotPolicy.canPresent(player, launcherLease.owner, state) and console and console:IsA("BasePart") then
 		coinBurst(console.Position + Vector3.new(0, 4, 0), Color3.fromRGB(75, 200, 116))
 		playSound(console, SOUND.success, 0.28, 1.25)
 	end
@@ -919,49 +559,30 @@ local function onPurchase(player: Player, upgradeId: any)
 	})
 end
 
-local function restoreMovement(character: Model, moveToExit: boolean)
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		root.Anchored = false
-		if moveToExit then
-			root.CFrame = Config.LAUNCHER_EXIT_CFRAME
-		end
-	end
-	if humanoid then
-		humanoid.WalkSpeed = 16
-		humanoid.JumpPower = 50
-		humanoid.AutoRotate = true
-	end
-end
-
 local function clearActiveShot(player: Player)
 	local state = states[player]
 	if state then
 		state.shotActive = false
 		state.lastLaunch = -100
 	end
-	local shot = activeShots[player]
-	activeShots[player] = nil
-	if shot then
-		if shot.connection and shot.connection.Connected then
-			shot.connection:Disconnect()
-		end
-		if shot.pizza.Parent then
-			shot.pizza:Destroy()
-		end
-	end
+	ProjectileService.clear(player)
 end
 
 -- This is deliberately the one route out of a launcher session.  It is safe to
 -- call more than once because every mutable launcher resource is cleared before
 -- the player and prompt are restored.
-local function cleanupLauncherSession(player: Player, reason: string, options: { cancelRun: boolean?, moveToExit: boolean?, notifyClient: boolean? }?)
+cleanupLauncherSession = function(player: Player, reason: string, options: { cancelRun: boolean?, moveToExit: boolean?, notifyClient: boolean? }?)
 	local state = states[player]
 	if not state then
 		return
 	end
 	options = options or {}
+	local wasOwner = launcherLease.owner == player
+	if wasOwner then
+		customerFeedback:clear(player)
+		-- Release the lane in a stable pose; old prop callbacks cannot affect the next chef.
+		PropService.resetAll()
+	end
 	state.cleanupEpoch = (state.cleanupEpoch or 0) + 1
 	clearActiveShot(player)
 	if options.cancelRun then
@@ -973,13 +594,8 @@ local function cleanupLauncherSession(player: Player, reason: string, options: {
 	end
 	state.mode = "walk"
 	state.launcherMode = "none"
-	if launcherOccupant == player then
-		launcherOccupant = nil
+	if launcherLease:release(player, options.moveToExit and Config.LAUNCHER_EXIT_CFRAME or nil) then
 		InteractionService.setLauncherAvailable(true)
-	end
-	local character = player.Character
-	if character then
-		restoreMovement(character, options.moveToExit == true)
 	end
 	if options.notifyClient then
 		sendState(player, "launcherReset", { result = "BACK ON THE FLOOR", reason = reason })
@@ -995,7 +611,7 @@ local function setPlayerMode(player: Player, requestedMode: string)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if requestedMode == "launcher" then
-		if launcherOccupant == player and state.mode == "launcher" then
+		if launcherLease.owner == player and state.mode == "launcher" then
 			sendState(player, "notice", { result = "LAUNCHER IN USE", detail = "Choose a mode or keep playing." })
 			return
 		end
@@ -1005,7 +621,7 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		if RecordRunService.isSession(player) then
 			cleanupLauncherSession(player, "reenterLauncher", { cancelRun = true, moveToExit = false, notifyClient = false })
 		end
-		if launcherOccupant and launcherOccupant ~= player then
+		if launcherLease.owner and launcherLease.owner ~= player then
 			sendState(player, "notice", { result = "LAUNCHER OCCUPIED", detail = "Another chef is playing. Try again in a moment." })
 			return
 		end
@@ -1017,18 +633,15 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		if not interactionAnchor or not interactionAnchor:IsA("BasePart") or (root.Position - interactionAnchor.Position).Magnitude > 17 then
 			return
 		end
-		launcherOccupant = player
+		if not launcherLease:acquire(player, character, Config.LAUNCHER_OPERATOR_CFRAME) then return end
+		state.cleanupEpoch += 1
+		state.lastRequestId = 0
+		state.mode = "launcher"
+		state.launcherMode = "select"
 		InteractionService.setLauncherAvailable(false)
 		LayoutService.setRound(state.round)
 		updateDeliveryZones(state.upgrades.assist, false)
 		applyProgressionVisuals(state)
-		state.mode = "launcher"
-		state.launcherMode = "select"
-		root.CFrame = Config.LAUNCHER_OPERATOR_CFRAME
-		root.Anchored = true
-		humanoid.WalkSpeed = 0
-		humanoid.JumpPower = 0
-		humanoid.AutoRotate = false
 		sendState(player, "modeChanged", { result = "CHOOSE HOW TO PLAY", mode = "launcher" })
 	elseif requestedMode == "walk" then
 		cleanupLauncherSession(player, "playerExit", { cancelRun = true, moveToExit = state.mode == "launcher", notifyClient = false })
@@ -1038,13 +651,15 @@ end
 
 local function selectLauncherMode(player: Player, requestedMode: string)
 	local state = states[player]
-	if not state or state.mode ~= "launcher" or launcherOccupant ~= player or state.shotActive then
+	if not state or state.mode ~= "launcher" or launcherLease.owner ~= player or state.shotActive then
 		return
 	end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") or not root.Anchored then
+	if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") or not root.Anchored
+		or not launcherLease:isValid(player) then
+		cleanupLauncherSession(player, "invalidMountedCharacter", { cancelRun = true, notifyClient = true })
 		return
 	end
 	local runStatus = RecordRunService.getSnapshot(player).status
@@ -1060,6 +675,10 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 			state.targetId = state.resumeTargetId
 			state.resumeTargetId = nil
 		end
+		customerFeedback:clear(player)
+		ProjectileService.clear(player)
+		state.cleanupEpoch += 1
+		state.lastRequestId = 0
 		state.launcherMode = "select"
 		updateDeliveryZones(state.upgrades.assist, false)
 		sendState(player, "modeSelection", { result = "CHOOSE HOW TO PLAY" })
@@ -1072,6 +691,10 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 		if RecordRunService.isSession(player) then
 			RecordRunService.cancel(player)
 		end
+		customerFeedback:clear(player)
+		ProjectileService.clear(player)
+		state.cleanupEpoch += 1
+		state.lastRequestId = 0
 		state.launcherMode = "freePlay"
 		updateDeliveryZones(state.upgrades.assist, false)
 		sendState(player, "modeSelected", { result = "FREE PLAY", detail = "Practice launches with no time limit." })
@@ -1083,6 +706,10 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 			RecordRunService.cancel(player)
 		end
 		state.resumeTargetId = state.resumeTargetId or state.targetId
+		customerFeedback:clear(player)
+		ProjectileService.clear(player)
+		state.cleanupEpoch += 1
+		state.lastRequestId = 0
 		state.launcherMode = "recordRun"
 		PropService.resetAll()
 		local started, reason = RecordRunService.begin(player)
@@ -1097,28 +724,35 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 	end
 end
 
+local function disconnectCharacter(player)
+	for _, connection in characterConnections[player] or {} do connection:Disconnect() end
+	characterConnections[player] = nil
+	ProjectileService.unbindCharacter(player)
+end
+
 local function initializeCharacter(player: Player, character: Model)
-	local state = states[player]
-	if state then
-		cleanupLauncherSession(player, "characterRespawn", { cancelRun = true, moveToExit = false, notifyClient = false })
+	if player.Character ~= character then return end
+	disconnectCharacter(player)
+	cleanupLauncherSession(player, "characterRespawn", { cancelRun = true, notifyClient = true })
+	ProjectileService.bindCharacter(player, character)
+	local connections = {}
+	characterConnections[player] = connections
+	local initialized = false
+	local function initializeReadyCharacter()
+		if initialized or player.Character ~= character or not states[player] then return end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if not humanoid or not root or not root:IsA("BasePart") then return end
+		initialized = true
+		table.insert(connections, humanoid.Died:Connect(function()
+			if player.Character == character and character:FindFirstChildOfClass("Humanoid") == humanoid and states[player] then
+				cleanupLauncherSession(player, "characterDied", { cancelRun = true, notifyClient = true })
+			end
+		end))
+		if humanoid.Health > 0 and launcherLease.owner ~= player then root.CFrame = Config.WALK_SPAWN_CFRAME end
 	end
-	task.defer(function()
-		if character.Parent then
-			restoreMovement(character, false)
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				humanoid.Died:Once(function()
-					if states[player] then
-						cleanupLauncherSession(player, "characterDied", { cancelRun = true, moveToExit = false, notifyClient = true })
-					end
-				end)
-			end
-			local root = character:FindFirstChild("HumanoidRootPart")
-			if root and root:IsA("BasePart") then
-				root.CFrame = Config.WALK_SPAWN_CFRAME
-			end
-		end
-	end)
+	table.insert(connections, character.ChildAdded:Connect(initializeReadyCharacter))
+	initializeReadyCharacter()
 end
 
 local function addPlayer(player: Player)
@@ -1150,6 +784,12 @@ local function addPlayer(player: Player)
 	end
 	player.CharacterAdded:Connect(function(character)
 		initializeCharacter(player, character)
+	end)
+	player.CharacterRemoving:Connect(function(character)
+		if player.Character == character or launcherLease.character == character then
+			cleanupLauncherSession(player, "characterRemoving", { cancelRun = true, notifyClient = true })
+			disconnectCharacter(player)
+		end
 	end)
 	if player.Character then
 		initializeCharacter(player, player.Character)
@@ -1187,6 +827,7 @@ function GameService.start()
 	end)
 	LayoutService.start(world)
 	PropService.start(world)
+	ProjectileService.start(world)
 	WorldActivityService.start(world)
 	updateDeliveryZones(0, false)
 	RecordRunService.start(world, function(player, eventName)
@@ -1199,7 +840,10 @@ function GameService.start()
 			state.targetId = snapshot.targetId
 		end
 		if eventName == "recordEnding" then
-			PropService.resetAll()
+			if launcherLease.owner == player then customerFeedback:clear(player) end
+			state.cleanupEpoch += 1
+			state.lastRequestId = 0
+			if launcherLease.owner == player then PropService.resetAll() end
 			-- End the competitive shot window immediately. The player keeps the
 			-- launcher lease while the compact result card saves, then explicitly
 			-- chooses another mode or exits.
@@ -1242,7 +886,11 @@ function GameService.start()
 	})
 	task.spawn(function()
 		while world.Parent do
-			task.wait(1)
+			task.wait(0.25)
+			local owner = launcherLease.owner
+			if owner and not launcherLease:isValid(owner) then
+				cleanupLauncherSession(owner, "invalidMountedCharacter", { cancelRun = true, notifyClient = true })
+			end
 			local expired = ShiftEventService.expire()
 			if expired then
 				endShiftEvent(expired, "Event time ended. No penalty - keep serving!")
@@ -1253,6 +901,7 @@ function GameService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		cleanupLauncherSession(player, "playerLeaving", { cancelRun = false, moveToExit = false, notifyClient = false })
 		RecordRunService.removePlayer(player)
+		disconnectCharacter(player)
 		states[player] = nil
 	end)
 	for _, player in Players:GetPlayers() do

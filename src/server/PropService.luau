@@ -1,4 +1,5 @@
 local Workspace = game:GetService("Workspace")
+local LayoutService = require(script.Parent.LayoutService)
 
 local PropService = {}
 
@@ -12,11 +13,8 @@ local function register(prop: BasePart)
 		reset = prop.CFrame
 		prop:SetAttribute("ResetCFrame", reset)
 	end
-	registered[prop] = {
-		canCollide = prop.CanCollide,
-		canTouch = prop.CanTouch,
-		transparency = prop.Transparency,
-	}
+	LayoutService.capture(prop)
+	registered[prop] = true
 	prop:SetAttribute("PropState", "Ready")
 end
 
@@ -30,14 +28,17 @@ local function resetProp(prop: BasePart)
 	prop.AssemblyLinearVelocity = Vector3.zero
 	prop.AssemblyAngularVelocity = Vector3.zero
 	prop.CFrame = prop:GetAttribute("ResetCFrame")
-	prop.CanCollide = data.canCollide
-	prop.CanTouch = data.canTouch
-	prop.Transparency = data.transparency
+	LayoutService.apply(prop)
 	prop:SetAttribute("RecentlyHit", false)
 	prop:SetAttribute("PropState", "Ready")
 end
 
 function PropService.start(world: Instance)
+	-- Invalidate outstanding resets before replacing the registry.
+	for prop in registered do
+		prop:SetAttribute("ResetToken", (prop:GetAttribute("ResetToken") or 0) + 1)
+		resetProp(prop)
+	end
 	table.clear(registered)
 	activeCount = 0
 	for _, descendant in world:GetDescendants() do
@@ -48,7 +49,7 @@ function PropService.start(world: Instance)
 end
 
 function PropService.knock(prop: BasePart, pizzaVelocity: Vector3): boolean
-	if not prop:GetAttribute("ReactiveProp") or prop:GetAttribute("RecentlyHit") or activeCount >= 8 then
+	if not prop:GetAttribute("ReactiveProp") or prop:GetAttribute("LayoutRoundActive") == false or prop:GetAttribute("RecentlyHit") or activeCount >= 8 then
 		return false
 	end
 	register(prop)
@@ -66,7 +67,7 @@ function PropService.knock(prop: BasePart, pizzaVelocity: Vector3): boolean
 	prop:ApplyImpulse((direction * (48 / sizeScale) + Vector3.new(0, 34 / sizeScale, 0)) * prop.AssemblyMass)
 	prop:ApplyAngularImpulse(Vector3.new(math.random(-22, 22), math.random(-22, 22), math.random(-22, 22)) * prop.AssemblyMass / sizeScale)
 
-	local token = Workspace:GetServerTimeNow()
+	local token = (prop:GetAttribute("ResetToken") or 0) + 1
 	prop:SetAttribute("ResetToken", token)
 	local delaySeconds = math.clamp(3.4 + sizeScale, 3.8, 5)
 	task.delay(delaySeconds, function()
@@ -80,7 +81,7 @@ end
 function PropService.resetAll()
 	for prop in registered do
 		if prop.Parent then
-			prop:SetAttribute("ResetToken", Workspace:GetServerTimeNow())
+			prop:SetAttribute("ResetToken", (prop:GetAttribute("ResetToken") or 0) + 1)
 			resetProp(prop)
 		end
 	end

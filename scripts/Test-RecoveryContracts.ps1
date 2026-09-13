@@ -20,10 +20,12 @@ function Get-NormalizedSourceHash([string]$Path) {
 }
 
 $transferInvariantHashes = @{
-    'src\server\LayoutService.luau' = 'CAC15A2013C3A8E6E6AAF3BE948803CC9D72BD92F87A30C166C267F6FBCD2D6D'
-    'src\server\PropService.luau' = 'CB4C89F36DDF3ED91E85447D9D849C38F3CF844E69DE3BE708D9EA72CCC031E2'
     'src\server\init.server.luau' = '6EA4502197116E37571D53A7A24A0C1227DBC8270C3614A3518DD3B8F161D7C4'
 }
+# Layout/Prop hashes used to freeze a known visibility bug. Execute their actual
+# modules instead: authored defaults, rounds 3/4, downward transitions, repeated
+# startup and stale reset callbacks. Canonical backup/mapping guards remain.
+& (Join-Path $PSScriptRoot 'Test-Behavior.ps1')
 foreach ($relativePath in $transferInvariantHashes.Keys) {
     $actual = Get-NormalizedSourceHash (Join-Path $root $relativePath)
     Assert-True ($actual -eq $transferInvariantHashes[$relativePath]) "$relativePath remains byte-identical to Transfer"
@@ -35,7 +37,10 @@ $world = Get-Content -LiteralPath $worldPath -Raw
 $config = Get-Content -LiteralPath (Join-Path $root 'src\shared\Config.luau') -Raw
 $customers = Get-Content -LiteralPath (Join-Path $root 'src\server\CustomerService.luau') -Raw
 $gameService = Get-Content -LiteralPath (Join-Path $root 'src\server\GameService.luau') -Raw
-$client = Get-Content -LiteralPath (Join-Path $root 'src\client\init.client.luau') -Raw
+$shotPolicy = Get-Content -LiteralPath (Join-Path $root 'src\server\ShotPolicy.luau') -Raw
+# Construction and presentation now live in focused modules; retain source
+# wiring checks across those files in addition to executable policy tests.
+$client = (Get-ChildItem -LiteralPath (Join-Path $root 'src\client') -Filter '*.luau' -File | Sort-Object Name | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
 $dialogue = Get-Content -LiteralPath (Join-Path $root 'src\server\CustomerDialogue.luau') -Raw
 $shiftEvents = Get-Content -LiteralPath (Join-Path $root 'src\server\ShiftEventService.luau') -Raw
 $worldActivity = Get-Content -LiteralPath (Join-Path $root 'src\server\WorldActivityService.luau') -Raw
@@ -80,9 +85,9 @@ foreach ($stateName in @('Entering', 'WalkingToSeat', 'SeatedWaiting', 'Served',
 Assert-True ($gameService.Contains('local function onLaunch')) 'authoritative pizza launch handler is present'
 Assert-True ($gameService.Contains('RecordRunService.begin(player)')) 'Record Run start path is present'
 Assert-True ($gameService.Contains('clearActiveShot(player)') -and $gameService.Contains('state.launcherMode = "select"')) 'Record Run completion stops shots and returns through the shared mode picker'
-Assert-True ($gameService.Contains('state.launcherMode ~= "freePlay" and state.launcherMode ~= "recordRun"')) 'server rejects launch requests while mode selection is open'
+Assert-True ($gameService.Contains('ShotPolicy.validate(') -and $shotPolicy.Contains('state.launcherMode ~= "freePlay" and state.launcherMode ~= "recordRun"')) 'server routes launches through the behavior-tested playable-mode policy'
 Assert-True ($gameService.Contains('requestedMode == "freePlay" or requestedMode == "recordRun" or requestedMode == "chooseMode"')) 'mode remote accepts only explicit launcher transitions'
-Assert-True ($gameService.Contains('launcherOccupant ~= player') -and $gameService.Contains('not root.Anchored')) 'mode selection validates the live mounted launcher owner'
+Assert-True ($gameService.Contains('launcherLease.owner ~= player') -and $gameService.Contains('launcherLease:isValid(player)')) 'mode selection validates the behavior-tested live mounted lease'
 Assert-True ($interaction.Contains('launcherPrompt.Enabled = true') -and $interaction.Contains('"OCCUPIED"')) 'shared launcher remains visibly occupied for waiting players'
 Assert-True ($recordRun.Contains('Config.RECORD_RUN_DURATION') -and $recordRun.Contains('Config.RECORD_RUN_COUNTDOWN')) 'Record Run retains server-owned countdown and duration'
 Assert-True ($recordRun.IndexOf('local setBoardText: (string) -> ()') -lt $recordRun.IndexOf('local function setSampleBoard')) 'Record Run forward-declares the board writer before Studio fallback use'
@@ -115,31 +120,31 @@ Assert-True ($client.Contains('folder:SetAttribute("ClientOnly", true)')) 'Pizza
 Assert-True ($client.Contains('Follow the pizza arrows to the Pizza Launcher!')) 'first-spawn hint uses simple player language'
 Assert-True ($client.Contains('Press E to USE LAUNCHER on the pizza pad!') -and $client.Contains('Tap USE LAUNCHER on the pizza pad!')) 'launcher-reached hint supports keyboard and touch'
 Assert-True (-not $client.Contains('HowToPlayButton') -and -not $client.Contains('howToPlayButton')) 'inactive HOW TO PLAY control and handler are absent'
-Assert-True ($client.Contains('shopToggle.Visible = true') -and $client.Contains('shopToggle.Visible = not selectingMode')) 'UPGRADES initializes immediately and is controlled only by modal visibility'
-Assert-True ($client.Contains('if selectingMode then') -and $client.Contains('resetLauncherInput()')) 'mode picker clears stale Record Run launch-button state before another mode'
+Assert-True ($client.Contains('shopToggle.Visible = view.upgrades') -and $client.Contains('upgrades = not picker')) 'UPGRADES uses the behavior-tested initial and modal visibility policy'
+Assert-True ($client.Contains('if changed then self:reset() end') -and $client.Contains('inputState:receive(state,')) 'mode transitions use the behavior-tested input reset policy'
 Assert-True (-not $client.Contains('"?  HELP"') -and -not $client.Contains('"PizzaTrailHelp"')) 'obsolete mystery help label is absent'
 Assert-True (-not [regex]::IsMatch($client, '(?i)TRAIL READY|PLAYER %\.1f|ARROW %\.1f')) 'visible trail count and coordinate debug probes are absent'
 Assert-True (-not $client.Contains('PizzaCannonBeacon')) 'tiny launcher distance beacon is removed entirely'
 Assert-True (-not [regex]::IsMatch($client + "`n" + $gameService, '(?i)\bstuds?\b')) 'client and server feedback contain no player-facing grid-unit language'
 Assert-True ($gameService.Contains('Landing zone +%d%% -> +%d%%')) 'Wider Plates purchase feedback uses a player-readable percentage'
-Assert-True ($client.Contains('if onboardingTrailActive and not onboardingReachedLauncher and distance <= 12 then')) 'trail stays visible while the player approaches interaction range'
+Assert-True ($client.Contains('if self.onboardingTrailActive and not self.onboardingReachedLauncher and distance <= 12 then')) 'trail stays visible while the player approaches interaction range'
 Assert-True ($client.Contains('setPizzaTrailVisible(false, false)')) 'mounting the launcher fades the trail instead of snapping it away'
 Assert-True ($client.Contains('AIM  •  CHARGE  •  LAUNCH!')) 'mounted onboarding uses the compact first-pizza corner hint'
 Assert-True ($client.Contains('"FREE PLAY", "Practice launches with no time limit."') -and $client.Contains('"1-MINUTE\nRECORD RUN", "Score as many points as you can in 60 seconds."')) 'mode picker explains both choices in plain language'
 Assert-True ($client.Contains('Enum.KeyCode.Thumbstick1') -and $client.Contains('Enum.KeyCode.ButtonR2') -and $client.Contains('Enum.KeyCode.ButtonB')) 'controller can aim, launch, and exit'
-Assert-True ($client.Contains('GuiService.SelectedObject = freePlayChoice')) 'controller focus enters the mode picker predictably'
+Assert-True ($client.Contains('cameraController.setPicker(modeSelection, freePlayChoice, selectingMode)') -and $client.Contains('GuiService.SelectedObject = choice')) 'controller focus routes through the behavior-tested camera and selection owner'
 Assert-True ($client.Contains('local INTERIOR_LAUNCHER_RETURN_OFFSETS') -and $client.Contains('Vector3.new(-14, 0, -40)') -and $client.Contains('makePizzaArrow(folder, position, nextPosition, 100 + index)')) 'first-time guidance includes an interior route back to the launcher pad'
 Assert-True ($client.Contains('InteriorLauncherBillboard') -and $client.Contains('interiorGuide.Enabled = visible')) 'interior guidance is hidden with the first-time route on mount'
-Assert-True ($client.Contains('if onboardingCompleted then') -and $client.Contains('return')) 'automatic Pizza Trail does not replay after completion'
+Assert-True ($client.Contains('if self.onboardingCompleted then') -and $client.Contains('return')) 'automatic Pizza Trail does not replay after completion'
 Assert-True ($client.Contains('player.CharacterAdded:Connect') -and $client.Contains('beginPizzaTrail()')) 'incomplete Pizza Trail is restored after respawn'
 $acceptedLaunchIndex = $client.IndexOf('if state.event == "launched"')
 $onboardingCompleteIndex = $client.IndexOf('onboardingCompleted = true', $acceptedLaunchIndex)
 Assert-True ($acceptedLaunchIndex -ge 0 -and $onboardingCompleteIndex -gt $acceptedLaunchIndex) 'first-pizza completion waits for the server-accepted launch event'
 Assert-True ($client.Contains('YOU''RE COOKING!') -and $client.Contains('Serve hungry customers for coins.')) 'accepted first launch shows the compact completion banner'
 Assert-True ($world.Contains('ring:SetAttribute("DeliveryZone", true)')) 'Wider Plates owns a physical server-visible delivery zone'
-Assert-True ($gameService.Contains('updateDeliveryZones(newLevel, false)')) 'Wider Plates updates the authoritative zone immediately after purchase'
+Assert-True ($gameService.Contains('ShotPolicy.canPresent(player, launcherLease.owner, state)') -and $gameService.Contains('updateDeliveryZones(newLevel, false)')) 'Wider Plates presentation is routed through the behavior-tested owner policy'
 Assert-True ($gameService.Contains('RecordRunService.isSession(player) and 0 or state.upgrades.power')) 'Hotter Oven remains disabled for Record Run fairness'
-Assert-True ($gameService.Contains('local effectiveReload = recordSession and Config.RELOAD_TIME')) 'Speedy Oven reload remains server-authoritative and Record Run neutral'
+Assert-True ($gameService.Contains('ShotPolicy.reloadTime(Config, state, recordSession)')) 'Speedy Oven uses behavior-tested authoritative competitive-neutral reload policy'
 Assert-True ($gameService.Contains('payload.tipBonus')) 'Bigger Tips exposes its extra reward in delivery feedback'
 foreach ($eventName in @('DinnerRush', 'BirthdayTable', 'FoodCritic')) {
     Assert-True ($shiftEvents.Contains('"' + $eventName + '"')) "shift event service contains $eventName"

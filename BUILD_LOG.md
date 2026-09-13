@@ -1,5 +1,16 @@
 # Pizza Launch Build Log
 
+## 2026-09-13 — Astra overhaul baseline and Milestone 0 in progress
+
+- Required branch confirmed: `feat/astra-overhaul-20260913-101719`; starting HEAD and GitHub branch both `81e3f930b6210359e6ee4c64a90f0b83e9c7dac8`. Origin is WeeklyTeacher/pizzalaunch. Git push dry-run passed; GitHub CLI is absent, so Git verifies access directly.
+- No pre-existing tracked/staged changes. Preserved the untracked local `PizzaLaunch-Astra-Working_1_0.rbxl`; it is not a build target or staging input.
+- Read all tracked source and testing/recovery scripts, requested project documentation/configuration, recent history/tags, and historical screenshot evidence before edits. Six Astra Ultra council specialties audited actual source in bounded waves. Current decisions and acceptance criteria are in `docs/COUNCIL_DECISIONS.md`.
+- Baseline recovery safety and contract tests passed. Transfer SHA-256 remains `73B3D5DF3B72F9B13350790759B715BC0E510BB7A41FED3C895F58BD17F11088`; tracked recovery artifact remains `8C1C1B815626970FE6C228247338D52637B15B379022BD5A217AE936B976EE4B`.
+- Rojo 7.7.0 responds at `127.0.0.1:34872`. Read-only connected Studio inspection found unpublished `pizzalaunch` in Edit mode, server source present, mapped Baseplate, no `StudioRestaurant`. Initial Output has an existing MaterialManager plugin profiling stack; no gameplay runtime test has yet been performed.
+- Added durable agent instructions, game state, council decisions, and test matrix. These supersede conflicting historical plans, not historical test evidence.
+- First implementation: LayoutService captures authored presentation once and owns round activation; PropService restores pose then reapplies current layout, with monotonic reset tokens. Actual Luau behavioral test passed for rounds 1/3/4, downward transitions, repeated startup/reset, inactive knock rejection, and stale delayed resets. The two frozen source hashes were replaced by this executable regression test; canonical integrity/mapping guards remain.
+- Milestone 0 is IN PROGRESS, not released. Studio runtime regressions, complete integrated checks, fresh build, review, commit and push remain pending. No publishing, paid products, live DataStore access, recovery-input changes, or StudioRestaurant edits.
+
 ## 2026-09-05 — surgical launcher onboarding correction
 
 ### User-reported failures and root cause
@@ -425,3 +436,12 @@ The earlier build was treated as a prototype. This pass replaced weak systems in
 
 - Full Motor6D walk cycles, multiple simultaneous NPCs per table, random table relocation, and cross-lane pathfinding remain deferred until dedicated multiplayer observation proves they improve the game without obstructing shots.
 - Record score persistence, personal-best behavior, and the global top-10 schema were intentionally left unchanged.
+# 2026-09-13 — Milestone 0 verified checkpoint
+
+Implemented immutable Record Run submissions and retry-safe personal bests; owner-only plate presentation; playable input with correlated launch replies; round-owned visibility; character/lease/shot/customer/prop cleanup; avatar collision isolation; dynamic guarded recovery generation; focused server/client extraction. No canonical source removed, no anchors/store/modes changed, no recovery input modified.
+
+Validation: recovery safety and contracts PASS; 29 sources compile and 11 actual-Luau test files PASS; clean Rojo build PASS; optional recovery copy includes all 29 scripts with canonical/Workspace verification PASS; full integrated council diff review and `git diff --check` PASS. CRLF warnings inspected with `--ignore-cr-at-eol`; changes are substantive, no automatic reset performed.
+
+Actual Studio: connected-place E mount, picker Space gate, Free Play launch/miss/reload, invalid request then valid launch, Q restoration, natural Record Run results/choose-mode, mounted death/respawn, and initialized rounds 1/3/4/1 module probe PASS. Separate fresh Rojo place: mount/picker, 3.002-second countdown, cancellation, collision-group matrix and walking restoration PASS. Output inspected: expected unavailable unpublished DataStore warnings; corrected QA-only probe errors documented in TEST_MATRIX. Both sessions stopped in Edit. No publishing or production data access.
+
+NOT RUN: true two/four-client hitbox/physical deflection and handoff scenarios, native touch/tablet/controller, full natural four-round progression, live DataStore/rejoin/shutdown reliability. Pending submissions are memory-only until a successful write. Source build cannot demonstrate preservation of unknown Studio geometry. Next: Takeout Runner and FIFO reservations using a separate activity channel. Pushed hash is recorded in the next log entry after commit confirmation.

@@ -1,51 +1,56 @@
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
+local serde = require("@lune/serde")
+local overlay = require("./lib/RecoveryOverlay")
 
-local inputPath = process.args[1] or "recovery/PizzaLaunchTransfer.rbxl"
-local outputPath = process.args[2] or "recovery/PizzaLaunchMerged.recovery-20260831.rbxl"
+-- Run from the repository root. Normal source builds still use `rojo build`.
+-- This optional tool only updates a COPY of the frozen recovery DataModel.
+local canonicalPath = "recovery/PizzaLaunchTransfer.rbxl"
+local canonicalHash = "73b3d5df3b72f9b13350790759b715bc0e510bb7a41fed3c895f58bd17f11088"
+local inputPath = process.args[1] or canonicalPath
+local outputPath = process.args[2] or string.format(
+	".qa-artifacts/PizzaLaunchMerged-%s-%06d.rbxl", os.date("!%Y%m%d-%H%M%S"), math.random(0, 999999)
+)
+assert(inputPath == canonicalPath, "Only the reviewed, read-only Transfer input is supported")
+assert(outputPath:match("^%.qa%-artifacts/[A-Za-z0-9][A-Za-z0-9_.%-]*%.rbxl$")
+	and not outputPath:find("..", 1, true), "Output must be a new .qa-artifacts/<name>.rbxl file")
 
-assert(inputPath ~= outputPath, "Input and output must be different paths")
-assert(fs.isFile(inputPath), "Transfer input does not exist: " .. inputPath)
-assert(not fs.isFile(outputPath), "Refusing to overwrite recovery artifact: " .. outputPath)
+local safety = process.exec("powershell", { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/Test-RecoverySafety.ps1" })
+assert(safety.ok, safety.stderr .. safety.stdout)
+local pathCheck = process.exec("powershell", {
+	"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/Test-RecoveryOutputPath.ps1", "-OutputPath", outputPath,
+})
+assert(pathCheck.ok, pathCheck.stderr .. pathCheck.stdout)
+local inputBytes = fs.readFile(inputPath)
+assert(serde.hash("sha256", inputBytes) == canonicalHash, "Canonical Transfer hash mismatch")
+local mapping = process.exec("rojo", { "sourcemap", "default.project.json" })
+assert(mapping.ok, mapping.stderr)
+local sourceMap = serde.decode("json", mapping.stdout)
+local dataModel = roblox.deserializePlace(inputBytes)
+local workspaceBefore = roblox.serializeModel({ dataModel:GetService("Workspace") }, true)
 
-local game = roblox.deserializePlace(fs.readFile(inputPath))
-
-local sourceMap = {
-	["ReplicatedStorage/Shared/Config"] = "src/shared/Config.luau",
-	["ServerScriptService/Server"] = "src/server/init.server.luau",
-	["ServerScriptService/Server/CustomerService"] = "src/server/CustomerService.luau",
-	["ServerScriptService/Server/GameService"] = "src/server/GameService.luau",
-	["ServerScriptService/Server/InteractionService"] = "src/server/InteractionService.luau",
-	["ServerScriptService/Server/LayoutService"] = "src/server/LayoutService.luau",
-	["ServerScriptService/Server/PropService"] = "src/server/PropService.luau",
-	["ServerScriptService/Server/RecordRunService"] = "src/server/RecordRunService.luau",
-	["ServerScriptService/Server/WorldBuilder"] = "src/server/WorldBuilder.luau",
-	["StarterPlayer/StarterPlayerScripts/Client"] = "src/client/init.client.luau",
-}
-
-local function instancePath(instance): string
-	local segments = { instance.Name }
-	local cursor = instance.Parent
-	while cursor and cursor ~= game do
-		table.insert(segments, 1, cursor.Name)
-		cursor = cursor.Parent
-	end
-	return table.concat(segments, "/")
-end
-
-local updated = 0
-for _, instance in game:GetDescendants() do
-	if instance:IsA("LuaSourceContainer") then
-		local path = instancePath(instance)
-		local sourcePath = sourceMap[path]
-		assert(sourcePath ~= nil, "Unreviewed script in Transfer place: " .. path)
-		assert(fs.isFile(sourcePath), "Mapped source file is missing: " .. sourcePath)
-		instance.Source = fs.readFile(sourcePath)
-		updated += 1
-	end
-end
-
-assert(updated == 10, string.format("Expected 10 reviewed scripts, updated %d", updated))
-fs.writeFile(outputPath, roblox.serializePlace(game))
-print(string.format("Created %s from read-only Transfer base with %d reviewed scripts", outputPath, updated))
+local scriptCount = overlay(dataModel, sourceMap, fs.readFile, fs.readDir, fs.isDir)
+assert(roblox.serializeModel({ dataModel:GetService("Workspace") }, true) == workspaceBefore,
+	"Recovery overlay changed Workspace")
+local outputBytes = roblox.serializePlace(dataModel)
+local roundTrip = roblox.deserializePlace(outputBytes)
+assert(roblox.serializeModel({ roundTrip:GetService("Workspace") }, true) == workspaceBefore,
+	"Recovery serialization changed Workspace")
+-- A second overlay verifies all current scripts survive binary serialization.
+overlay(roundTrip, sourceMap, fs.readFile, fs.readDir, fs.isDir, true)
+assert(serde.hash("sha256", fs.readFile(inputPath)) == canonicalHash, "Transfer changed during generation")
+assert(not fs.isFile(outputPath) and not fs.isDir(outputPath), "Refusing to overwrite an existing artifact")
+-- Keep the verified payload ignored. File-based transfer avoids Windows stdin races.
+local payloadPath = outputPath .. ".payload"
+assert(not fs.isFile(payloadPath) and not fs.isDir(payloadPath), "Refusing to overwrite an existing payload")
+fs.writeFile(payloadPath, outputBytes)
+assert(fs.readFile(payloadPath) == outputBytes, "Recovery payload verification failed")
+local write = process.exec("powershell", {
+	"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "scripts/Write-RecoveryOutput.ps1",
+	"-OutputPath", outputPath, "-PayloadPath", payloadPath,
+})
+assert(write.ok, write.stderr .. write.stdout)
+assert(fs.readFile(outputPath) == outputBytes, "Recovery output verification failed")
+assert(serde.hash("sha256", fs.readFile(inputPath)) == canonicalHash, "Transfer changed after generation")
+print(string.format("PASS: created %s with %d current scripts; canonical input and Workspace preserved", outputPath, scriptCount))
