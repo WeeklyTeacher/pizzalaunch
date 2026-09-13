@@ -55,3 +55,9 @@ The mapped ground is now at Y=-12 (top=-2), exposing 42 broad quiet floor tiles,
 ResponsiveLayout/UIPresentation use safe content and PreferredInput; essential controls keep readable sizes, upgrades scroll on phones, existing notices hide behind modal panels, and focus restores for controller navigation. Loaded-pizza detail participates in feedback cleanup; recoil is local and cannot move the gameplay origin. Desktop camera is (0,28,67) toward (0,1,-12); short safe viewports use (0,26,67) toward (0,9,-22) to clear the top HUD. Tests include observed native target projections plus actual CoreUI inset.
 
 Modern lighting requires a Technology=Future compatibility seed for current Rojo/Studio serialization. Fresh Studio verification, not only Lune decoding, established Realistic/true/.35. Runtime fill/bloom remains restrained. See ART_PROVENANCE and HERO_PREFABS for source reproduction and budgets. Paid products and persistent session coins remain absent.
+
+## Milestone 2b accepted propagation
+
+All six booths now share the accepted quiet basil/terracotta/cream construction. All six customers use the articulated rig: 152 initial render parts, 60 joints, six 10 Hz loops, bounded to 192 render parts. Original furniture and customer contact proxies, lifecycle, table centers and ballistic anchors remain unchanged. Fixed restaurant startup geometry totals 756 parts excluding avatars and transient effects.
+
+Standalone takeout on short viewports uses a 340x70 card in the safe top center; queue combinations retain their full controls. Native 667x375 inspection confirmed readable destination/reward text and normal walking controls. The fresh Realistic build passed all-six visual inspection. Next: integrate versioned mastery profiles and bounded analytics; coins/upgrades remain session-only.

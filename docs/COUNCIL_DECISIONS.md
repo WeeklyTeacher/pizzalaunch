@@ -48,3 +48,9 @@ Build a source-native LauncherArt prefab and shared PizzaVisual prefab; no purch
 Use current supported LightingStyle/PrioritizeLightingQuality in authored mapping, not runtime script writes. Native fresh-place QA exposed a migration problem that binary inspection alone missed: without an explicit Technology seed, Studio overwrote the modern settings. Retain `Technology=Future` solely as a tested serialization compatibility seed; a second fresh place opened Realistic/true correctly. References: [current Lighting API](https://create.roblox.com/docs/reference/engine/classes/Lighting), [upstream migration issue](https://github.com/rojo-rbx/rbx-dom/issues/637).
 
 The HUD follows available viewport/safe area and active input. Keep essential controls readable rather than scaling every desktop panel down. Native device simulator coverage supplements behavioral tests; real two-finger hardware and human capacity/abandonment still require owner testing.
+
+## Milestone 2b decision and acceptance
+
+Accepted propagation of the M2a slice to six existing booths/customers. Reusing the tested silhouettes was selected over new furniture, additional decoration or altered competitive geometry. Cap six rigs, ten joints each, 10 Hz animation; preserve all proxy geometry and lifecycle. Compact standalone runner objective removes the unused queue row while retaining full queued/reserved presentation.
+
+Acceptance passed: all 25 behavior specs, recovery contracts/safety, source compilation, fresh Rojo build, full diff review and whitespace check. Native fresh Studio verified six rigs/152 parts/60 joints, Realistic lighting, ground Y=-12, mounted phone composition and readable 340x70 runner card. Local five-second frame sample is diagnostic only; physical phone performance and human queue abandonment remain untested. M3 drafts stayed ignored and unmapped during this checkpoint.

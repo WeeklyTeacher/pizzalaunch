@@ -7,6 +7,10 @@ local Workspace = game:GetService("Workspace")
 
 local CustomerRig = {}
 CustomerRig.__index = CustomerRig
+CustomerRig.MAX_ACTIVE_RIGS = 6
+CustomerRig.UPDATE_INTERVAL = 0.1
+
+local activeByTable = {}
 
 local WALKING = { Entering = true, WalkingToSeat = true, Leaving = true }
 local ACCESSORIES = { "bow", "cap", "beanie" }
@@ -43,8 +47,16 @@ end
 
 function CustomerRig.install(customer)
 	local anchor = customer.PrimaryPart
-	if not anchor or customer:GetAttribute("TableId") ~= 1 then return nil end
-	local self = setmetatable({ customer = customer, anchor = anchor, joints = {}, fades = {}, state = "SeatedWaiting", stateAt = now(), visible = true }, CustomerRig)
+	local tableId = customer:GetAttribute("TableId")
+	if not anchor or typeof(tableId) ~= "number" or tableId % 1 ~= 0 or tableId < 1 or tableId > CustomerRig.MAX_ACTIVE_RIGS then return nil end
+	local previous = activeByTable[tableId]
+	if previous then
+		if not previous.customer.Parent or not previous.model.Parent then previous:destroy()
+		elseif previous.customer == customer then return previous
+		else return nil end
+	end
+	local self = setmetatable({ customer = customer, anchor = anchor, tableId = tableId, joints = {}, fades = {}, state = "SeatedWaiting", stateAt = now(), visible = true }, CustomerRig)
+	activeByTable[tableId] = self
 	local model = Instance.new("Model")
 	model.Name = "ArticulatedCustomer"
 	model:SetAttribute("SourcePrefab", "ToyCustomer_v1")
@@ -103,7 +115,7 @@ function CustomerRig.install(customer)
 	local elapsed = 0
 	self.connection = RunService.Heartbeat:Connect(function(dt)
 		elapsed += dt
-		if elapsed < 0.1 then return end
+		if elapsed < CustomerRig.UPDATE_INTERVAL then return end
 		elapsed = 0
 		self:step(now())
 	end)
@@ -224,6 +236,7 @@ end
 function CustomerRig:destroy()
 	if self.destroyed then return end
 	self.destroyed = true
+	if activeByTable[self.tableId] == self then activeByTable[self.tableId] = nil end
 	if self.connection then self.connection:Disconnect() end
 	for _, tween in self.fades do tween:Cancel() end
 	self.reaction = nil

@@ -19,6 +19,7 @@ assert(view.stationText == "1-MINUTE RECORD RUN • 0:50 • SCORE 120")
 snapshot.runner = { status = "carrying", destinationName = "SUNNY SCOOPS", normalReward = 8, quickBonus = 2, quickBonusEndsAt = 20 }
 view = Presentation.select(snapshot, 10, false, false)
 assert(view.title == "DELIVER TO SUNNY SCOOPS" and view.detail:find("QUICK BONUS %+2") and view.queueText:find("LINE #2"))
+assert(not view.standaloneCarry, "Runner plus queue keeps its complete queue presentation")
 view = Presentation.select(snapshot, 30, false, false)
 assert(view.detail:find("8 COINS ON DELIVERY") and not view.detail:find("QUICK BONUS"), "Normal reward survives expired bonus")
 snapshot.queue = { status = "reserved", reservationEndsAt = 42 }
@@ -29,6 +30,12 @@ assert(view.detail:find("Checking the line"), "Client waits for server reservati
 view = Presentation.select(snapshot, 35, true, false)
 assert(not view.visible and not view.carrying and view.passTurn, "Mounted presentation suppresses independent runner UI while offering pass turn")
 snapshot.queue = { status = "none" }
+view = Presentation.select(snapshot, 10, false, false)
+assert(view.standaloneCarry and view.compactDetail == "8 COINS ON DELIVERY • QUICK BONUS +2")
+view = Presentation.select(snapshot, 30, false, false)
+assert(view.standaloneCarry and view.compactDetail == "8 COINS ON DELIVERY", "The compact objective keeps the normal reward after the optional bonus expires")
+view = Presentation.select(snapshot, 10, true, false)
+assert(not view.standaloneCarry, "Mounted play cannot expose a compact runner card")
 snapshot.runner = { status = "idle", normalReward = 8 }
 snapshot.station = { occupied = false }
 view = Presentation.select(snapshot, 35, false, true)

@@ -235,6 +235,33 @@ activity.OnClientEvent:fire(activitySnapshot)
 render(0.016)
 assert(find("LocalTakeoutBox").CanCollide == false and find("LocalTakeoutBox").CanTouch == false and find("LocalTakeoutBox").CanQuery == false)
 assert(touchGui.Enabled and not boundActions.BlockMovement, "Runner snapshots preserve walking controls")
+local runnerCard = find("WalkingActivity")
+local runnerDetail, runnerQueue = runnerCard:FindFirstChild("Detail"), runnerCard:FindFirstChild("Queue")
+assert(runnerCard.Size.Y.Offset > 72 and runnerQueue.Visible, "Queued runner keeps the full queue row and leave control")
+local markerBeforeCompact = find("LocalTakeoutMarker").Position
+activitySnapshot.queue = { status = "none" }
+activitySnapshot.runner.quickBonusEndsAt = os.clock() + 100
+activity.OnClientEvent:fire(activitySnapshot)
+render(0.016)
+assert(runnerCard.Visible and runnerCard.Position.Y.Offset == 10 and runnerCard.Size.Y.Offset <= 72 and runnerCard.Size.X.Offset <= 340)
+assert(not runnerQueue.Visible and not runnerCard:FindFirstChild("LeaveLine").Visible and not runnerCard:FindFirstChild("DoTakeout").Visible)
+assert(runnerDetail.TextSize >= 14 and runnerDetail.Text:find("8 COINS ON DELIVERY") and runnerDetail.Text:find("QUICK BONUS %+2"))
+local runnerLeft = safeRoot.AbsoluteSize.X / 2 - runnerCard.Size.X.Offset / 2
+assert(runnerLeft >= find("Stats").Position.X.Offset + find("Stats").Size.X.Offset + 8, "Compact runner must clear the walking wallet")
+assert(runnerLeft + runnerCard.Size.X.Offset + 8 <= find("ShopToggle").Position.X.Offset, "Compact runner must clear upgrades navigation")
+assert(find("LocalTakeoutMarker").Position == markerBeforeCompact and touchGui.Enabled and not boundActions.BlockMovement)
+activitySnapshot.runner.quickBonusEndsAt = 0
+activity.OnClientEvent:fire(activitySnapshot)
+render(0.016)
+assert(runnerDetail.Text == "8 COINS ON DELIVERY", "Expired quick bonus never removes the normal reward from compact UI")
+activitySnapshot.event = "launcherOccupied"
+activity.OnClientEvent:fire(activitySnapshot)
+render(0.016)
+assert(find("OccupiedLauncherChoices").Visible and not runnerCard.Visible and find("OccupiedLauncherChoices").Position.Y.Offset >= 64)
+activitySnapshot.queue, activitySnapshot.event = { status = "waiting", position = 2 }, "queueChanged"
+activity.OnClientEvent:fire(activitySnapshot)
+render(0.016)
+assert(runnerCard.Visible and runnerCard.Position.Y.Offset >= 64 and runnerCard.Size.Y.Offset > 72 and runnerQueue.Visible)
 activitySnapshot.event, activitySnapshot.payload = "restaurantMilestone", nil
 activity.OnClientEvent:fire(activitySnapshot)
 assert(not find("Message").Text:find("earned"), "Shared celebration cannot imply an AFK reward")

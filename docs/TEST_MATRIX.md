@@ -54,3 +54,12 @@ Observed Studio: original live source and separate fresh builds. Verified ground
 Fresh normal server-validated scripted shots delivered to tables2 and1. Hero customer history observed SeatedWaiting → Served → HappyReaction → Eating → Leaving → Despawn → Entering → WalkingToSeat → SeatedWaiting. A temporary camera/HUD suppression captured the detailed pizza/customer reaction; it was restored afterward. This is an art-review view, not ordinary walking UI. Native pizza root/assembly mass matched with all27 visual parts. Final source fan was visible. Output inspected throughout; only expected unpublished DataStore warnings in final sessions.
 
 NOT RUN: physical two-finger/controller hardware, full native four-client session, human capacity/abandonment study, sustained low-end mobile performance, live DataStore/rejoin/shutdown, exhaustive max-number text and every occupied/runner combination. M1 real two-client isolation remains evidence; M2 did not repeat that complete scenario. Bulk actual captures are ignored .qa-artifacts/M2-*.png; no screenshot set is committed. Studio tests do not establish preservation of unknown geometry in a source-only build.
+
+## Milestone 2b actual acceptance
+
+- PASS: all 25 behavior specs, 41-source compilation, recovery safety/contracts, fresh Milestone2b.rbxl build, full council diff review, git diff --check.
+- PASS, native fresh Studio: six articulated customers, 152 render parts, 60 joints; every visual part noncolliding/nontouch/nonquery. Lighting Realistic and mapped ground Y=-12.
+- PASS, native 667x375 simulator: physical launcher prompt, Free Play picker click, all-six mounted composition, ordinary Exit, takeout pickup prompt and compact 340x70 objective. Destination and reward TextFits=true. Pickup positioning used a QA-only server PivotTo; this was a UI check, not a new route timing test.
+- Diagnostic only: 300 RenderStepped samples over five seconds, p50 16.87 ms, p95 18.09 ms, Studio total memory 2442.48 MB, viewport 666x374 before exact simulator reset. Host Studio measurement includes editor overhead; not a physical mobile budget claim.
+- Output inspected: expected unpublished RecordRun DataStore warnings; no observed gameplay exception. Device simulation restored and generated test place returned to Edit.
+- NOT RUN: physical low-end hardware, sustained four-player/effects performance, hardware two-finger/controller input and human queue-capacity/abandonment study. Previous genuine two-client evidence remains in the M1 section.

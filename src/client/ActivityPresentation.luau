@@ -25,6 +25,7 @@ function ActivityPresentation.select(snapshot, now: number, mounted: boolean, ro
 	local view = {
 		visible = not mounted and (reserved or waiting or carrying or routeRequested),
 		carrying = not mounted and carrying,
+		standaloneCarry = not mounted and carrying and not waiting and not reserved,
 		reserved = reserved,
 		waiting = waiting,
 		stationText = ActivityPresentation.stationText(station, now),
@@ -42,6 +43,8 @@ function ActivityPresentation.select(snapshot, now: number, mounted: boolean, ro
 	elseif carrying then
 		view.title = "DELIVER TO " .. (runner.destinationName or "YOUR DESTINATION")
 		local bonusActive = (runner.quickBonusEndsAt or 0) > now
+		view.compactDetail = bonusActive and string.format("%d COINS ON DELIVERY • QUICK BONUS +%d", normalReward, runner.quickBonus or 0)
+			or string.format("%d COINS ON DELIVERY", normalReward)
 		view.detail = bonusActive and string.format("%d COINS ON DELIVERY • QUICK BONUS +%d\nFollow the takeout marker.", normalReward, runner.quickBonus or 0)
 			or string.format("%d COINS ON DELIVERY\nYour normal reward is still waiting.", normalReward)
 	elseif routeRequested then

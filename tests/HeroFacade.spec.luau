@@ -50,14 +50,22 @@ for _, eye in { V.new(-16, 6.5, 84), V.new(-16, 8, 92), V.new(0, 6.5, 84) } do
 		visibleRays += 1
 	end
 end
-local hero = world:FindFirstChild("Table_1_Mia")
-assert(hero.BoothSeat.Material == roblox.Enum.Material.Fabric and hero.BoothSeat.Transparency == 1)
-assert(hero.BoothBack.Material == roblox.Enum.Material.Fabric and hero.BoothBack.Transparency == 1)
-for _, pair in { { hero.BoothSeat, hero.HeroBoothSeat }, { hero.BoothBack, hero.HeroBoothBack } } do
-	local physical, visible = pair[1], pair[2]
-	assert(physical.Size == visible.Size and physical.CFrame == visible.CFrame)
-	assert(physical.CanCollide and not visible.CanCollide and not visible.CanTouch and not visible.CanQuery)
-	assert(visible.Material == roblox.Enum.Material.SmoothPlastic)
+local tableCount, palettes = 0, {}
+for _, hero in world:GetChildren() do
+	if not hero:IsA("Model") or not hero:GetAttribute("TableId") then continue end
+	tableCount += 1
+	palettes[hero:GetAttribute("BoothPalette")] = true
+	assert(hero.BoothSeat.Material == roblox.Enum.Material.Fabric and hero.BoothSeat.Transparency == 1)
+	assert(hero.BoothBack.Material == roblox.Enum.Material.Fabric and hero.BoothBack.Transparency == 1)
+	for _, pair in { { hero.BoothSeat, hero.HeroBoothSeat }, { hero.BoothBack, hero.HeroBoothBack } } do
+		local physical, visible = pair[1], pair[2]
+		assert(physical.Size == visible.Size and physical.CFrame == visible.CFrame)
+		assert(physical.CanCollide and not visible.CanCollide and not visible.CanTouch and not visible.CanQuery)
+		assert(visible.Material == roblox.Enum.Material.SmoothPlastic)
+		local _, saturation, value = visible.Color:ToHSV()
+		assert(saturation < 0.55 and value > 0.5, "Furniture must not return to saturated/dark visual clutter")
+	end
+	assert(hero.Rug.Material == roblox.Enum.Material.SmoothPlastic and not hero.Rug.CanCollide)
 end
-assert(hero.Rug.Material == roblox.Enum.Material.SmoothPlastic and not hero.Rug.CanCollide)
-print(string.format("PASS: hero facade keeps original collision/doors, %d sampled oven/tray/gauge view rays are unobstructed; first booth material changes are nonphysical", visibleRays))
+assert(tableCount == 6 and palettes.Basil and palettes.Terracotta and palettes.Cream)
+print(string.format("PASS: hero facade keeps original collision/doors, %d sampled oven/tray/gauge view rays are unobstructed; all six muted booth treatments are nonphysical", visibleRays))

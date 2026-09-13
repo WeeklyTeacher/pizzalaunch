@@ -314,7 +314,8 @@ function CustomerService.start(world: Instance, onLifecycle)
 		if descendant:IsA("Model") and descendant.Name == "Customer" then
 			local tableId = descendant:GetAttribute("TableId")
 			local tableModel = descendant.Parent
-			if typeof(tableId) == "number" and tableModel and tableModel:IsA("Model") then
+			if typeof(tableId) == "number" and tableId % 1 == 0 and tableId >= 1 and tableId <= CustomerRig.MAX_ACTIVE_RIGS
+				and not recordsByTable[tableId] and tableModel and tableModel:IsA("Model") then
 				local root = descendant.PrimaryPart or descendant:FindFirstChild("HumanoidRootPart")
 				local capacity = tableId <= 2 and 1 or 2
 				tableModel:SetAttribute("SeatCapacity", capacity)
@@ -332,7 +333,7 @@ function CustomerService.start(world: Instance, onLifecycle)
 					part:SetAttribute("CustomerBaseTransparency", part.Transparency)
 				end
 				recordsByTable[tableId] = record
-				if tableId == 1 then record.visual = CustomerRig.install(descendant) end
+				record.visual = CustomerRig.install(descendant)
 				applyIdentity(record)
 				setState(record, "SeatedWaiting")
 				refreshWaitingMarker(record)

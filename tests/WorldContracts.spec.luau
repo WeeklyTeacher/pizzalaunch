@@ -65,10 +65,39 @@ for index, definition in config.TABLES do
 	end
 	assert(found and (found.TableTop.CFrame.Position - definition.position - roblox.Vector3.new(0, 4.2, 0)).Magnitude < 0.00001)
 	assert(found.TargetRing:GetAttribute("DeliverySurface") and found.TargetRing:GetAttribute("DeliveryZone"))
+	local width = index <= 2 and 14 or (index <= 4 and 16 or 18)
+	local depth = index <= 2 and 9 or (index <= 4 and 10 or 11)
+	local seatOffset = depth * 0.5 + 3.2
+	assert((found.BoothSeat.Size - roblox.Vector3.new(width - 2, 1.5, 4.2)).Magnitude < 0.00001)
+	assert((found.BoothSeat.CFrame.Position - definition.position - roblox.Vector3.new(0, 2, -seatOffset - 0.5)).Magnitude < 0.00001)
+	assert((found.BoothBack.Size - roblox.Vector3.new(width - 1, index <= 2 and 6 or 7, 1.5)).Magnitude < 0.00001)
+	assert((found.BoothBack.CFrame.Position - definition.position - roblox.Vector3.new(0, 5, -seatOffset - 2.2)).Magnitude < 0.00001)
+	assert((found.TablePost.Size - roblox.Vector3.new(3, 4.2, 3)).Magnitude < 0.00001 and found.TablePost.CanCollide)
+	assert((found.TableBase.Size - roblox.Vector3.new(9, 0.8, 7)).Magnitude < 0.00001 and found.TableBase.CanCollide)
+	local legs = 0
+	for _, item in found:GetChildren() do
+		if item.Name == "HeroBoothLeg" then
+			legs += 1
+			assert(not item.CanCollide and not item.CanTouch and not item.CanQuery)
+			assert(item.CFrame.Position.Y - item.Size.Y / 2 < -0.3, "Booth legs must meet the floor")
+			assert(item.CFrame.Position.Y + item.Size.Y / 2 >= found.BoothSeat.CFrame.Position.Y - found.BoothSeat.Size.Y / 2)
+		end
+	end
+	assert(legs == 2, "Each booth needs exactly two quiet visual supports")
 end
+local partCount, lights, shadowLights = 0, 0, 0
+for _, item in world:GetDescendants() do
+	if item:IsA("BasePart") then partCount += 1 end
+	if item:IsA("PointLight") then
+		lights += 1
+		if item.Shadows then shadowLights += 1 end
+	end
+end
+assert(partCount <= 620, "Authored world exceeded its fixed geometry budget before character/activity runtime additions")
+assert(lights <= 13 and shadowLights <= 4, "Restaurant practical-light budget exceeded")
 assert(config.LAUNCH_ORIGIN == roblox.Vector3.new(0, 12, 50))
 assert(config.RECORD_RUN_DURATION == 60 and config.RECORD_RUN_COUNTDOWN == 3)
 assert(config.RECORD_RUN_STORE == "PizzaLaunch_RecordRun_AllTime_v1")
 builder.build()
 assert(protected.Parent == services.Workspace and ownedPart.Parent == protected)
-print("PASS: actual WorldBuilder preserves owner model, six ballistic anchors, one launcher prompt and competitive constants")
+print(string.format("PASS: actual WorldBuilder preserves owner model, six ballistic/furniture anchors, one launcher prompt and competitive constants; %d fixed parts, %d lights/%d shadow lights", partCount, lights, shadowLights))

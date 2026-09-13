@@ -22,6 +22,12 @@ local COLORS = {
 	steel = Color3.fromRGB(82, 88, 96),
 }
 
+local BOOTH_PALETTES = {
+	{ name = "Basil", seat = Color3.fromRGB(134, 158, 112), back = Color3.fromRGB(116, 143, 99), rug = Color3.fromRGB(212, 205, 180) },
+	{ name = "Terracotta", seat = Color3.fromRGB(186, 135, 109), back = Color3.fromRGB(164, 114, 91), rug = Color3.fromRGB(221, 202, 184) },
+	{ name = "Cream", seat = Color3.fromRGB(227, 215, 190), back = Color3.fromRGB(202, 185, 154), rug = Color3.fromRGB(218, 212, 196) },
+}
+
 local function makePart(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?): Part
 	local item = Instance.new("Part")
 	item.Name = name
@@ -545,26 +551,25 @@ local function buildTable(world: Folder, definition)
 	local boothBack = makePart(model, "BoothBack", Vector3.new(topWidth - 1, definition.id <= 2 and 6 or 7, 1.5), CFrame.new(p + Vector3.new(0, 5, -seatOffset - 2.2)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
 	boothSeat:SetAttribute("SplatSurface", true)
 	boothBack:SetAttribute("SplatSurface", true)
-	if definition.id == 1 then
-		-- One reviewed hero booth; other detailed furnishings wait for slice QA.
-		-- Realistic-lighting QA rendered Fabric nearly black. Keep its original
-		-- physical material on hidden proxies and use quiet toy upholstery art.
-		boothSeat.Transparency, boothBack.Transparency = 1, 1
-		local seatArt = makePart(model, "HeroBoothSeat", boothSeat.Size, boothSeat.CFrame, Color3.fromRGB(134, 158, 112), Enum.Material.SmoothPlastic)
-		local backArt = makePart(model, "HeroBoothBack", boothBack.Size, boothBack.CFrame, Color3.fromRGB(116, 143, 99), Enum.Material.SmoothPlastic)
-		for _, artPart in { seatArt, backArt } do
-			artPart.CanCollide, artPart.CanTouch, artPart.CanQuery = false, false, false
-		end
-		rug.Material = Enum.Material.SmoothPlastic
-		rug.Color = Color3.fromRGB(212, 205, 180)
-		for _, x in { -topWidth / 2 + 1, topWidth / 2 - 1 } do
-			local leg = makePart(model, "HeroBoothLeg", Vector3.new(0.7, 4.2, 0.7), CFrame.new(p.X + x, 1.75, p.Z - seatOffset - 0.5), COLORS.darkWood, Enum.Material.Wood)
-			leg.CanCollide, leg.CanTouch, leg.CanQuery = false, false, false
-		end
-		for _, x in { -3.4, 0, 3.4 } do
-			local seam = makePart(model, "HeroBoothSeam", Vector3.new(0.09, 4.4, 0.09), CFrame.new(p.X + x, p.Y + 5, p.Z - seatOffset - 1.4), Color3.fromRGB(142, 160, 116), Enum.Material.Fabric)
-			seam.CanCollide, seam.CanTouch, seam.CanQuery = false, false, false
-		end
+	-- The first booth passed fresh Realistic and mobile slice QA. Reuse that
+	-- nonphysical treatment without changing the six historical collision sets.
+	local palette = BOOTH_PALETTES[(definition.id - 1) % #BOOTH_PALETTES + 1]
+	model:SetAttribute("BoothPalette", palette.name)
+	boothSeat.Transparency, boothBack.Transparency = 1, 1
+	local seatArt = makePart(model, "HeroBoothSeat", boothSeat.Size, boothSeat.CFrame, palette.seat, Enum.Material.SmoothPlastic)
+	local backArt = makePart(model, "HeroBoothBack", boothBack.Size, boothBack.CFrame, palette.back, Enum.Material.SmoothPlastic)
+	for _, artPart in { seatArt, backArt } do
+		artPart.CanCollide, artPart.CanTouch, artPart.CanQuery = false, false, false
+	end
+	rug.Material, rug.Color = Enum.Material.SmoothPlastic, palette.rug
+	for _, x in { -topWidth / 2 + 1, topWidth / 2 - 1 } do
+		local leg = makePart(model, "HeroBoothLeg", Vector3.new(0.7, 4.2, 0.7), CFrame.new(p.X + x, 1.75, p.Z - seatOffset - 0.5), COLORS.darkWood, Enum.Material.Wood)
+		leg.CanCollide, leg.CanTouch, leg.CanQuery = false, false, false
+	end
+	local seamOffset = (topWidth - 1) * 0.26
+	for _, x in { -seamOffset, 0, seamOffset } do
+		local seam = makePart(model, "HeroBoothSeam", Vector3.new(0.09, 4.4, 0.09), CFrame.new(p.X + x, p.Y + 5, p.Z - seatOffset - 1.4), palette.back:Lerp(COLORS.cream, 0.3), Enum.Material.SmoothPlastic)
+		seam.CanCollide, seam.CanTouch, seam.CanQuery = false, false, false
 	end
 
 	local edge = topWidth * 0.5 - 1.15

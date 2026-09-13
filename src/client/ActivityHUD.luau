@@ -271,7 +271,9 @@ function ActivityHUD.new(context)
 		notice.Visible = not self.mounted and not self.covered and now < (self.noticeUntil or 0)
 		if now >= self.nextTextUpdate then
 			self.nextTextUpdate = now + 0.2
-			title.Text, detail.Text, queueText.Text = view.title, view.detail, view.queueText
+			local compactCarry = layout and layout.compact and view.standaloneCarry and not self.choiceOpen
+			title.Text, detail.Text, queueText.Text = view.title, compactCarry and view.compactDetail or view.detail, view.queueText
+			queueText.Visible = view.queueText ~= "" and not compactCarry
 			choiceDetail.Text = view.chefText .. "\n" .. view.stationText
 			takeout.Visible, leave.Visible = view.canDoTakeout, view.canLeaveLine
 			local camera = context.Workspace.CurrentCamera
@@ -279,14 +281,24 @@ function ActivityHUD.new(context)
 			local availableWidth = layout and layout.activityWidth or math.max(300, math.min(420, width - 36))
 			local y = layout and layout.activityY or 76
 			local cardHeight = (view.canDoTakeout or view.canLeaveLine) and 158 or 108
-			card.Position = UDim2.new(0.5, 0, 0, y)
-			card.Size = UDim2.fromOffset(availableWidth, cardHeight)
+			local cardY, cardWidth = y, availableWidth
+			if compactCarry then
+				-- Share the quiet top-center slot with launcher play. topWidth
+				-- already reserves the wallet and upgrades navigation columns.
+				cardY, cardWidth, cardHeight = 10, math.min(340, layout.topWidth), 70
+			end
+			card.Position = UDim2.new(0.5, 0, 0, cardY)
+			card.Size = UDim2.fromOffset(cardWidth, cardHeight)
+			title.Size = UDim2.new(1, -24, 0, 26)
+			title.Position = UDim2.fromOffset(12, compactCarry and 4 or 8)
+			detail.Size = UDim2.new(1, -24, 0, compactCarry and 32 or 43)
+			detail.Position = UDim2.fromOffset(12, compactCarry and 31 or 36)
 			takeout.Size = UDim2.new(0.58, -18, 0, 44)
 			leave.Size = UDim2.new(0.42, -18, 0, 44)
 			choice.Size = UDim2.fromOffset(math.min(430, availableWidth), 194)
 			choice.Position = UDim2.new(0.5, 0, 0, y)
 			notice.Size = UDim2.fromOffset(math.min(380, availableWidth), 64)
-			local noticeY = card.Visible and y + cardHeight + 8 or y
+			local noticeY = card.Visible and cardY + cardHeight + 8 or y
 			if layout then noticeY = math.min(noticeY, layout.height - 74) end
 			notice.Position = UDim2.new(0.5, 0, 0, noticeY)
 		end
