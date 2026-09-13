@@ -11,3 +11,5 @@ sourcemap.json
 /recovery/PizzaLaunchTransfer.rbxl
 /recovery/PizzaLaunchTransfer.original.rbxl
 /recovery/*.rbxl.lock
+/.qa-artifacts/
+/recovery/PizzaLaunch-before-QA.rbxl
