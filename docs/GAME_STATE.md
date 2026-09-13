@@ -1,5 +1,9 @@
 # Game state
 
+## Current implementation
+
+The pushed M0/M1/M2 checkpoints provide authoritative launcher cleanup/retries, independent Takeout Runner orders, FIFO reservations, a six-table toy pizzeria, articulated customers, detailed pizza visuals and responsive component UI. M3 adds Chef Book mastery, earned nameplates and bounded analytics; acceptance evidence follows below. Coins and upgrades remain session-only. Historical competitive records and ballistic anchors are unchanged. Earlier baseline sections are historical, not current defect reports.
+
 ## Baseline audited 2026-09-13
 
 Branch: `feat/astra-overhaul-20260913-101719`. Starting pushed commit: `81e3f930b6210359e6ee4c64a90f0b83e9c7dac8` (launcher contract/documentation checkpoint), following release tag `v1.0.0` at `79fceab`.
@@ -61,3 +65,11 @@ Modern lighting requires a Technology=Future compatibility seed for current Rojo
 All six booths now share the accepted quiet basil/terracotta/cream construction. All six customers use the articulated rig: 152 initial render parts, 60 joints, six 10 Hz loops, bounded to 192 render parts. Original furniture and customer contact proxies, lifecycle, table centers and ballistic anchors remain unchanged. Fixed restaurant startup geometry totals 756 parts excluding avatars and transient effects.
 
 Standalone takeout on short viewports uses a 340x70 card in the safe top center; queue combinations retain their full controls. Native 667x375 inspection confirmed readable destination/reward text and normal walking controls. The fresh Realistic build passed all-six visual inspection. Next: integrate versioned mastery profiles and bounded analytics; coins/upgrades remain session-only.
+
+## Milestone 3 profile, mastery and analytics
+
+ProfileModel owns validated versioned documents, monotonic mastery/stamps, earned styles and immutable save transforms. ProfileService owns serialized per-user IO, session fencing, autosave/retry and departure/shutdown drains. Studio and unpublished places always use memory. Loading/failure/locked states are distinct from confirmed new profiles; old data cannot be replaced with zero defaults. No historical Record Run migration or persistent session currency was introduced.
+
+GameService emits server-only monotonic receipts after accepted delivery, takeout and frozen Record Run completion. ProfileState/ProfileAction are separate from competitive GameState. Client ChefBook/ChefBookPresentation show five goals, six table stamps, twelve customer stamps, personal record tiers and four earned styles. Server ProfileCosmetics owns quiet nonphysical nameplates, hides them while mounted and preserves unknown namesakes. The first accepted launch completes tutorial memory/profile state; false or stale snapshots cannot revive completed onboarding.
+
+JourneyAnalytics records bounded join/route/mount/service/upgrade/queue/runner/record/profile events and distinguishes blocked first approaches from direct mounts. Only two UI route events are accepted, after character/health/epoch/proximity validation. Published server SDK sends are deferred and bounded; Studio performs no analytics calls. See PROFILE_SYSTEM and ANALYTICS for schemas, failure behavior and backend limits. Paid fulfillment remains unimplemented.

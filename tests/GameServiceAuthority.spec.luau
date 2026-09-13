@@ -13,9 +13,9 @@ local function signal()
 	end
 	return result
 end
-local events = { OnServerEvent = true, Triggered = true, CharacterAdded = true, CharacterRemoving = true,
+local events = { OnServerEvent = true, Triggered = true, Touched = true, CharacterAdded = true, CharacterRemoving = true,
 	ChildAdded = true, DescendantAdded = true, Died = true, PlayerAdded = true, PlayerRemoving = true }
-local created, snapshots, activities, stateCounts = {}, {}, {}, {}
+local created, snapshots, activities, stateCounts, profileSnapshots = {}, {}, {}, {}, {}
 local function instance(className)
 	local self = { ClassName = className, Name = className, children = {}, attributes = {}, events = {} }
 	function self:IsA(name) return name == className or name == "Instance" or (name == "BasePart" and className == "Part") end
@@ -36,12 +36,18 @@ local function instance(className)
 	function self:FindFirstChildOfClass(name) for _, child in self.children do if child:IsA(name) then return child end end return nil end
 	function self:SetAttribute(key, value) self.attributes[key] = value end
 	function self:GetAttribute(key) return self.attributes[key] end
+	function self:IsDescendantOf(ancestor)
+		local current = self.Parent
+		while current do if current == ancestor then return true end; current = current.Parent end
+		return false
+	end
 	function self:SetNetworkOwner(owner) assert(owner == nil) end
 	function self:ApplyImpulse(_) end
 	function self:ApplyAngularImpulse(_) end
 	function self:Destroy() self.Parent = nil end
 	function self:FireClient(player, snapshot)
 		if self.Name == "RestaurantActivity" then activities[player] = snapshot
+		elseif self.Name == "ProfileState" then profileSnapshots[player] = snapshot
 		else snapshots[player] = snapshot; stateCounts[player] = (stateCounts[player] or 0) + 1 end
 	end
 	setmetatable(self, {
@@ -100,6 +106,7 @@ local shared = child(replicated, "Folder", "Shared")
 local configObject = child(shared, "ModuleScript", "Config")
 local takeoutObject = child(shared, "ModuleScript", "TakeoutConfig")
 local pizzaVisualObject = child(shared, "ModuleScript", "PizzaVisual")
+local masteryObject = child(shared, "ModuleScript", "MasteryConfig")
 local takeoutConfig = loadModule("src/shared/TakeoutConfig.luau")
 local groups = {}
 local physics = {}
@@ -107,13 +114,25 @@ function physics:IsCollisionGroupRegistered(name) return groups[name] end
 function physics:RegisterCollisionGroup(name) groups[name] = true end
 function physics:CollisionGroupSetCollidable(_, _, _) end
 local services = { Players = players, Workspace = workspace, ReplicatedStorage = replicated, PhysicsService = physics, TweenService = {} }
+local guid = 0
+services.RunService = { IsStudio = function() return true end }
+services.HttpService = { GenerateGUID = function() guid += 1; return "integration-session-" .. guid end }
+services.DataStoreService = { GetDataStore = function() error("Studio integration must never use production profiles") end }
 local timers = {}
-local modules = { [configObject] = config, [takeoutObject] = takeoutConfig }
+local modules = { [configObject] = config, [takeoutObject] = takeoutConfig,
+	[masteryObject] = loadModule("src/shared/MasteryConfig.luau") }
 local parent = setmetatable({}, { __index = function(_, name) return name end })
 local overrides = {
-	game = { GetService = function(_, name) return assert(services[name], name) end },
+	game = { GetService = function(_, name) return assert(services[name], name) end, BindToClose = function() end, PlaceId = 0 },
 	script = { Parent = parent }, Instance = { new = instance },
-	task = { spawn = function() end, delay = function(_, callback) table.insert(timers, callback) end },
+	task = { spawn = function(callback, ...)
+		local thread = coroutine.create(callback)
+		local ok, message = coroutine.resume(thread, ...)
+		assert(ok, tostring(message))
+		return thread
+	end, wait = function(seconds) return coroutine.yield(seconds) end,
+		delay = function(_, callback) table.insert(timers, callback) end },
+	os = { clock = function() return now end, time = function() return 1000 + math.floor(now) end },
 	require = function(name) return assert(modules[name], tostring(name)) end,
 }
 modules[pizzaVisualObject] = loadModule("src/shared/PizzaVisual.luau", overrides)
@@ -146,9 +165,20 @@ modules.RecordRunService = {
 	cancel = function(player) runStates[player] = "idle" end,
 	removePlayer = function(player) runStates[player] = nil end,
 }
-for _, name in { "TakeoutRunner", "LauncherQueue", "SharedMilestone", "LayoutService", "PropService", "LauncherLease", "ShotPolicy", "ProjectileService", "DeliveryScoring", "PlayerProgression", "CustomerFeedback", "InteractionService" } do
+for _, name in { "ProfileModel", "ProfileService", "ProfileCosmetics", "TakeoutRunner", "LauncherQueue", "SharedMilestone", "LayoutService", "PropService", "LauncherLease", "ShotPolicy", "ProjectileService", "DeliveryScoring", "PlayerProgression", "CustomerFeedback", "InteractionService" } do
 	modules[name] = loadModule("src/server/" .. name .. ".luau", overrides)
 end
+local journeyClass = loadModule("src/server/JourneyAnalytics.luau", overrides)
+local profileClass, profileService = modules.ProfileService, nil
+modules.ProfileService = { new = function(dependencies)
+	profileService = profileClass.new(dependencies)
+	return profileService
+end }
+local analytics
+modules.JourneyAnalytics = { new = function()
+	analytics = journeyClass.new({ clock = function() return now end })
+	return analytics
+end }
 local gameService = loadModule("src/server/GameService.luau", overrides)
 gameService.start()
 local remote = replicated:FindFirstChild(config.REMOTES_FOLDER):FindFirstChild(config.MODE_REMOTE)
@@ -214,6 +244,7 @@ queueRemote.OnServerEvent:fire(walker, "join", queueEpoch, queueIds[walker])
 assert(activities[walker].queue.waitingCount == 3, "duplicate activity request cannot duplicate a queue entry")
 for _ = 1, 6 do
 	now += 0.3
+	profileService:step()
 	walkerRoot.CFrame = roblox.CFrame.new(takeoutConfig.pickupPosition)
 	pickupPrompt.Triggered:fire(walker)
 	assert(activities[walker].runner.status == "carrying")
@@ -232,6 +263,7 @@ assert(snapshots[owner] == ownerState and stateCounts[owner] == ownerCount and o
 assert(snapshots[owner].recordRun.score == 500 and snapshots[owner].recordRun.combo == 3)
 for _ = 1, 6 do
 	now += 0.3
+	profileService:step()
 	thirdRoot.CFrame = roblox.CFrame.new(takeoutConfig.pickupPosition)
 	pickupPrompt.Triggered:fire(third)
 	local order = activities[third].runner
@@ -247,6 +279,43 @@ assert(activities[owner].coins == 0 and activities[fourth].coins == 0,
 assert(activities[owner].shared.cycle == 2 and activities[owner].shared.progress == 0)
 assert(snapshots[owner] == ownerState and stateCounts[owner] == ownerCount,
 	"shared milestone during Record Run has a separate presentation channel")
+assert(profileSnapshots[walker].profile.status == "memory" and profileSnapshots[walker].profile.mastery.takeout == 6)
+assert(profileSnapshots[third].profile.mastery.takeout == 6 and profileSnapshots[owner].profile.mastery.takeout == 0)
+local profileAction = folder:FindFirstChild("ProfileAction")
+local journeyAction = folder:FindFirstChild("JourneyAction")
+local walkerEpoch = snapshots[walker].cleanupEpoch
+local function equip(player, id, epoch, requestId)
+	now += 0.6
+	profileAction.OnServerEvent:fire(player, "equip", id, epoch, requestId)
+end
+equip(walker, "tomato", walkerEpoch - 1, 1)
+assert(profileSnapshots[walker].profile.equipped == "plain", "stale profile epoch cannot equip")
+equip(walker, "gold", walkerEpoch, 2)
+assert(profileSnapshots[walker].event == "profileRejected" and profileSnapshots[walker].profile.equipped == "plain")
+equip(walker, "tomato", walkerEpoch, 3)
+assert(profileSnapshots[walker].profile.equipped == "tomato", "only the actor can equip server-earned appearance")
+equip(walker, "plain", walkerEpoch, 3)
+assert(profileSnapshots[walker].profile.equipped == "tomato", "duplicate profile request cannot mutate appearance")
+profileAction.OnServerEvent:fire(walker, "request", nil, walkerEpoch, 4)
+profileAction.OnServerEvent:fire(walker, "equip", "plain", walkerEpoch, 5)
+assert(profileSnapshots[walker].profile.equipped == "plain", "opening Chef Book cannot suppress an immediate earned selection")
+profileAction.OnServerEvent:fire(walker, "equip", "tomato", walkerEpoch, 6)
+assert(profileSnapshots[walker].profile.equipped == "plain", "rapid repeated appearance mutations remain rate limited")
+equip(owner, "plain", snapshots[owner].cleanupEpoch, 1)
+assert(snapshots[owner] == ownerState and stateCounts[owner] == ownerCount,
+	"profile callbacks and walking cosmetics never dispatch the competitive GameState channel")
+profileAction.OnServerEvent:fire(walker, "recordCompletedRun", { score = 999999, sequence = 9000 }, walkerEpoch, 4)
+assert(profileSnapshots[walker].profile.mastery.recordRuns == 0, "client cannot invent mastery or Record Run receipts")
+local takeoutCount = profileSnapshots[walker].profile.mastery.takeout
+deliveryPrompts[takeoutConfig.destinations[1].id].Triggered:fire(walker)
+assert(profileSnapshots[walker].profile.mastery.takeout == takeoutCount, "repeated physical completion cannot duplicate mastery")
+local walkerJourney = analytics:snapshot(walker)
+assert(walkerJourney.cohort == "blocked" and walkerJourney.counts.TakeoutOrderCompleted == 6 and walkerJourney.counts.ImmediateRunnerReplay == 5)
+assert(walkerJourney.counts.FirstEarnedUpgrade == 1 and analytics:snapshot(owner).counts.RecordRunStarted == 1)
+assert(profileSnapshots[owner].profile.mastery.recordRuns == 0, "partial competitive runs do not grant durable progress")
+journeyAction.OnServerEvent:fire(owner, "routeStarted", snapshots[owner].cleanupEpoch, owner.Character)
+assert(analytics:snapshot(owner).counts.LauncherRouteStarted == nil, "mounted client cannot forge walking funnel steps")
+print("PASS: actual profile service receives independent server runner receipts; scoped cosmetics and forged progression requests cannot alter competitive state")
 mode(owner, "walk", oldModeEpoch)
 assert(ownerRoot.Anchored, "old mode request cannot exit a later policy epoch")
 mode(owner, "walk")
@@ -262,3 +331,58 @@ mode(walker, "freePlay")
 assert(activities[third].station.launcherMode == "freePlay" and activities[third].station.waitingCount == 2)
 assert(activities[third].station.endsAt == nil, "Free Play public snapshot must not imply a deadline")
 print("PASS: four actual GameService client boundaries isolate runner/queue/purchases from records; reservations retain approach validation; stale mode/activity requests ignored")
+
+-- Exercise the actual shot admission/scoring/profile orchestration with only
+-- physical projectile construction replaced by a deterministic test collider.
+modules.CustomerService.claimDelivery = function() return true end
+modules.CustomerService.getInfo = function() return { name = "Mia" } end
+modules.CustomerService.served = function() end
+modules.ShiftEventService.recordDelivery = function() return { bonus = 0 } end
+modules.ShiftEventService.maybeStart = function() return nil end
+local pizza
+modules.ProjectileService.create = function()
+	pizza = child(workspace, "Part", "IntegrationPizza")
+	pizza.CFrame = roblox.CFrame.new(config.TABLES[1].position)
+	pizza.AssemblyLinearVelocity = roblox.Vector3.zero
+	return pizza
+end
+local surface = child(world, "Part", "DeliverySurface")
+surface:SetAttribute("DeliverySurface", true)
+surface:SetAttribute("TableId", 1)
+local launchRemote = folder:FindFirstChild(config.LAUNCH_REMOTE)
+local launchEpoch = snapshots[walker].cleanupEpoch
+local direction = roblox.Vector3.new(0, 0.5, -1).Unit
+launchRemote.OnServerEvent:fire(walker, direction, 0.5, 1, launchEpoch - 1)
+assert(not profileSnapshots[walker].profile.tutorialCompleted, "rejected launch cannot complete onboarding")
+for requestId = 1, 3 do
+	now += 1
+	launchRemote.OnServerEvent:fire(walker, direction, 0.5, requestId, launchEpoch)
+	assert(snapshots[walker].event == "launched")
+	now += 0.2
+	pizza.Touched:fire(surface)
+	pizza.Touched:fire(surface)
+end
+local mastery = profileSnapshots[walker].profile
+assert(mastery.tutorialCompleted and mastery.mastery.deliveries == 3 and mastery.mastery.perfect == 3)
+assert(mastery.tableStamps[1] or mastery.tableStamps["1"])
+assert(mastery.customerStamps.Mia and analytics:snapshot(walker).counts.FirstLaunch == 1)
+assert(analytics:snapshot(walker).counts.FirstSuccessfulDelivery == 1 and analytics:snapshot(walker).counts.RoundOneCompleted == 1)
+mode(walker, "chooseMode")
+mode(walker, "recordRun")
+local cancelledBefore = analytics:snapshot(walker).counts.RecordRunCancelled or 0
+runStates[walker] = "saving"
+local frozenCompletion = table.freeze({ userId = walker.UserId, score = 1370, runId = "frozen-finish-1", startedAt = now - 60, completedAt = now })
+recordChanged(walker, "recordEnding", frozenCompletion)
+recordChanged(walker, "recordEnding", frozenCompletion)
+assert(profileSnapshots[walker].profile.mastery.recordRuns == 1 and profileSnapshots[walker].profile.mastery.recordBest == 1370,
+	"profile counts frozen completed score once instead of mutable current score 500")
+runStates[walker] = "finished"
+mode(walker, "chooseMode")
+assert((analytics:snapshot(walker).counts.RecordRunCancelled or 0) == cancelledBefore,
+	"clearing completed results must never report cancellation")
+now += 1
+mode(walker, "recordRun")
+mode(walker, "walk")
+assert(analytics:snapshot(walker).counts.RecordRunCancelled == cancelledBefore + 1)
+assert(profileSnapshots[walker].profile.mastery.recordRuns == 1, "cancelled replay grants no completion mastery")
+print("PASS: actual accepted shot path stamps delivery/onboarding once; immutable completed run receipts deduplicate and active-only cancellation preserves history")

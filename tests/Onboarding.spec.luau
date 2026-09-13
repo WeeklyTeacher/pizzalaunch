@@ -13,7 +13,7 @@ local function near(actual, expected, message)
 end
 local function fixture(options)
 	options = options or {}
-	local self = { clock = 0, operating = false, input = "keyboard", requests = {}, frames = {}, tweens = {}, restored = 0 }
+	local self = { clock = 0, operating = false, input = "keyboard", requests = {}, frames = {}, tweens = {}, restored = 0, reached = 0 }
 	local function child(parent, class, name, position)
 		local item = roblox.Instance.new(class)
 		item.Name, item.Parent = name, parent
@@ -87,6 +87,7 @@ local function fixture(options)
 		getInputKind = function() return self.input end,
 		isOperating = function() return self.operating end,
 		restoreTutorialAppearance = function() self.restored += 1 end,
+		onReached = function() self.reached += 1 end,
 	})
 	function self:update()
 		self.clock += 0.2
@@ -134,6 +135,7 @@ assert(onboarding.onboardingTrailFolder == folder and #f.requests == 12, "Repeat
 f.root.Position = f.anchor.Position + Vector3.new(0, 0, 10)
 f:update()
 assert(onboarding.onboardingReachedLauncher and onboarding.onboardingHighlight.Enabled)
+assert(f.reached == 1, "Only reaching the active route emits its presentation callback")
 assert(string.find(f.ui.walkHint.Text, "Press E", 1, true))
 -- Starting takeout while standing by the launcher transfers guidance ownership
 -- without mounting or erasing this player's onboarding progress.
@@ -142,6 +144,7 @@ assert(not onboarding.onboardingHighlight.Enabled and not f.guide.Enabled, "Take
 assert(onboarding.onboardingReachedLauncher and not onboarding.onboardingCompleted)
 f:update()
 assert(not onboarding.onboardingHighlight.Enabled, "Nearby proximity updates cannot resurrect a hidden launcher cue")
+assert(f.reached == 1, "A hidden route cannot repeat its reached callback")
 onboarding.setPizzaTrailVisible(true, true)
 assert(onboarding.onboardingHighlight.Enabled and f.guide.Enabled, "Returning guidance to the launcher restores its nearby cue")
 for _, case in { { "touch", "Tap USE LAUNCHER", "HOLD + RELEASE" }, { "gamepad", "Press X", "HOLD RT" }, { "keyboard", "Press E", "HOLD SPACE" } } do

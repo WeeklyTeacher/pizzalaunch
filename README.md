@@ -16,6 +16,8 @@ Pizza Launch is a family-friendly Roblox restaurant arcade game. Walk through th
 - Follow the dotted arc and landing ring. Green is lined up, yellow is close, and orange needs adjustment.
 - In Free Play, serve any visible hungry customer. Customers celebrate, eat, leave through the side entrances, and return as new guests.
 - Deliver the round's orders, build combos, earn accuracy bonuses, and spend coins on earnings, precision, reload, and power upgrades.
+- While walking, pick up a takeout pizza and follow its marker to one of two neighborhood destinations. Earn 8 session coins, plus an optional 2 for a quick delivery.
+- If the launcher is occupied, join the line or do takeout orders. Free Play has no time limit; a released turn offers the next player a 15-second reservation to approach normally.
 
 Mobile play is landscape-only. Normal touch movement appears while walking; it is replaced by the dedicated aim pad and launch controls only while operating the cannon.
 
@@ -42,24 +44,24 @@ Requirements: Roblox Studio, the Rojo Studio plugin, and Rojo 7.7.0. This reposi
 
 ```powershell
 rokit install
-rojo serve default.project.json
+rojo serve default.project.json --address 127.0.0.1 --port 34872
 ```
 
 In Studio, open a new baseplate/place, open the Rojo plugin, connect to the local server, and sync. Press **Play** to run both the server-generated restaurant and client HUD.
 
-### Enable record persistence in Studio
+### Persistence testing
 
-The place must be published before Roblox DataStores are available. For Studio-only persistence testing, open **File > Experience Settings > Security**, enable **Enable Studio Access to API Services**, and save. Roblox recommends using this setting on a separate test version because Studio accesses the same DataStores as live servers. The published live experience does not need the Studio testing toggle.
+Do not publish or enable production DataStore access during local development. The mastery profile service always uses memory in Studio or unpublished places. Record persistence uses its existing store when available; use the isolated fault tests to verify retry and ownership behavior without touching player data.
 
-When the place is unpublished or Studio API access is off, gameplay still works: the personal best is retained for the current server session, the results card explains that the global board is unavailable, and no DataStore error is emitted.
+When record storage is unavailable, gameplay still works with session bests and honest save status. Expected unpublished-place warnings may appear in Output. Real backend rejoin and server-handoff tests require a separately approved test experience; they are not established by the local tests.
 
 To build a standalone place file instead:
 
 ```powershell
-rojo build default.project.json -o pizzalaunch.rbxlx
+rojo build default.project.json -o .qa-artifacts/PizzaLaunch-local.rbxl
 ```
 
-Open `pizzalaunch.rbxlx` in Studio and press **Play**. The generated place file and Rojo sourcemap are intentionally ignored by Git.
+Open the generated local place in Studio and press **Play**. A source-only build does not include or prove preservation of unknown Studio-owned geometry. Recovery inputs and `StudioRestaurant` must remain untouched. See [current architecture and scope](docs/GAME_STATE.md), [test evidence](docs/TEST_MATRIX.md), and [profile design](docs/PROFILE_SYSTEM.md).
 
 ## Project structure
 
@@ -67,14 +69,21 @@ Open `pizzalaunch.rbxlx` in Studio and press **Play**. The generated place file 
 src/
   shared/Config.luau          Tables, two-axis ballistics, rounds, and upgrades
   server/WorldBuilder.luau    Pizzeria, NPCs, kitchen, props, lighting, spawn
-  server/GameService.luau     Physics, validation, reactions, mess, progression
+  server/GameService.luau     Remote/lifecycle integration and delivery routing
+  server/LauncherLease.luau   Validated station ownership and character restoration
+  server/ShotPolicy.luau     Request validation and fixed competitive tuning
+  server/ProjectileService.luau  Server physics, avatar isolation and cleanup
+  server/TakeoutRunner.luau   Independent walking orders and rewards
+  server/LauncherQueue.luau   FIFO approach reservations
+  server/ProfileService.luau  Versioned mastery, safe saves and session fencing
+  server/JourneyAnalytics.luau  Bounded server events and validated route cues
   server/InteractionService.luau  Launcher/register/customer prompt routing
   server/CustomerService.luau     Server-owned seating, service, departure, arrival, and hit states
   server/LayoutService.luau       Deterministic round seating/obstacle dressing
   server/PropService.luau         Capped knockable props, exact restoration, and mode cleanup
   server/RecordRunService.luau    Timed scoring, personal bests, OrderedDataStore top 10
   server/init.server.luau     Server bootstrap
-  client/init.client.luau     Camera, controls, trajectory, HUD, touch layout
+  client/init.client.luau     Integration for camera/input/UI components and trajectory
 ```
 
 The server owns launcher occupancy, projectile creation, hit resolution, rewards, combos, rounds, record timing/scoring, reactions, prop resets, and purchases. Clients only submit a validated 3D aim direction/charge while they hold the launcher lease. World and UI assets are generated from code so the repository remains the source of truth.
@@ -91,3 +100,5 @@ All five IDs were preloaded successfully in Studio during the 2026-08-30 quality
 ## Current scope
 
 Record Run personal bests and the all-time top 10 persist through an OrderedDataStore when Roblox services are available. Coins and upgrades still last for the current server session only; economy persistence remains deferred until broader balance testing. Furniture positions are authored and stable for predictable physics. Customer occupancy changes through deterministic, server-owned entrance and seating routes that stay outside the launcher and target lanes.
+
+Chef Book adds a separate versioned profile for mastery, table/customer stamps, completed-run milestones, earned nameplates and tutorial completion. It never changes competitive tuning or converts session coins into durable currency. Local Studio profiles use memory only. See the current test matrix for backend and hardware cases that still require owner validation.

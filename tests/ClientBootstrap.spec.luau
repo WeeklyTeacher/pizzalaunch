@@ -84,6 +84,7 @@ camera.CameraSubject = humanoid
 local replicated = instance("ReplicatedStorage")
 local shared = child(replicated, "Folder", "Shared")
 local configObject = child(shared, "ModuleScript", "Config")
+local masteryObject = child(shared, "ModuleScript", "MasteryConfig")
 local remotes = child(replicated, "Folder", "PizzaLaunchRemotes")
 local launch = child(remotes, "RemoteEvent", "LaunchPizza")
 local stateRemote = child(remotes, "RemoteEvent", "GameState")
@@ -92,8 +93,11 @@ local mode = child(remotes, "RemoteEvent", "LauncherMode")
 local activity = child(remotes, "RemoteEvent", "RestaurantActivity")
 local takeout = child(remotes, "RemoteEvent", "TakeoutAction")
 local queue = child(remotes, "RemoteEvent", "QueueAction")
+local profileRemote = child(remotes, "RemoteEvent", "ProfileState")
+local profileAction = child(remotes, "RemoteEvent", "ProfileAction")
+local journeyAction = child(remotes, "RemoteEvent", "JourneyAction")
 local sent = {}
-for _, remote in { launch, purchase, mode, takeout, queue } do function remote:FireServer(...) table.insert(sent, { remote = self.Name, arguments = table.pack(...) }) end end
+for _, remote in { launch, purchase, mode, takeout, queue, profileAction, journeyAction } do function remote:FireServer(...) table.insert(sent, { remote = self.Name, arguments = table.pack(...) }) end end
 local inputService = { TouchEnabled = true, KeyboardEnabled = false, PreferredInput = roblox.Enum.PreferredInput.Touch, GamepadEnabled = false, InputBegan = signal(), InputEnded = signal(), InputChanged = signal(), WindowFocusReleased = signal(), TextBoxFocused = signal() }
 function inputService:GetFocusedTextBox() return nil end
 local selectedBefore = child(playerGui, "TextButton", "PreviouslySelected")
@@ -126,8 +130,9 @@ local overrides = { Instance = { new = instance }, task = tasks, game = game, sc
 	ColorSequence = roblox.ColorSequence, ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
 	TweenInfo = { new = function(...) return table.pack(...) end } }
 modules[configObject] = loadModule("src/shared/Config.luau")
+modules[masteryObject] = loadModule("src/shared/MasteryConfig.luau")
 overrides.require = function(name) return assert(modules[name], "Unknown module " .. tostring(name)) end
-for _, name in { "UITheme", "UIConstruction", "UIPresentation", "Onboarding", "Feedback", "LauncherInputState", "ClientInput", "ClientCamera", "ActivityPresentation", "ActivityHUD", "ResponsiveLayout", "ResponsiveUI" } do
+for _, name in { "UITheme", "UIConstruction", "UIPresentation", "Onboarding", "Feedback", "LauncherInputState", "ClientInput", "ClientCamera", "ActivityPresentation", "ActivityHUD", "ResponsiveLayout", "ResponsiveUI", "ChefBookPresentation", "ChefBook" } do
 	scriptObject[name] = name
 	scriptObject.Parent[name] = name
 	modules[name] = loadModule("src/client/" .. name .. ".luau", overrides)
@@ -203,6 +208,49 @@ local activitySnapshot = {
 	runner = { status = "idle", pickupPosition = roblox.Vector3.new(-50, 3, 98), normalReward = 8, quickBonus = 2 },
 	queue = { status = "none" }, station = { occupied = true, operatorName = "Bo", launcherMode = "freePlay", waitingCount = 1 },
 }
+assert(find("ChefBookToggle").Visible and find("ShopToggle").Visible, "Walking navigation exposes Chef Book without delaying upgrades")
+local function remoteCount(name)
+	local count = 0
+	for _, request in sent do if request.remote == name then count += 1 end end
+	return count
+end
+assert(remoteCount("JourneyAction") == 0 and remoteCount("ProfileAction") == 0, "Startup UI cannot claim a server walking context")
+local welcome = { mode = "walk", launcherMode = "none", cleanupEpoch = 0, recordRun = { status = "idle" }, upgrades = {}, event = "welcome" }
+stateRemote.OnClientEvent:fire(welcome)
+assert(remoteCount("ProfileAction") == 1 and remoteCount("JourneyAction") == 1)
+assert(sent[#sent].arguments[1] == "routeStarted" and sent[#sent].arguments[2] == 0 and sent[#sent].arguments[3] == character)
+stateRemote.OnClientEvent:fire(welcome)
+assert(remoteCount("ProfileAction") == 1 and remoteCount("JourneyAction") == 1, "Repeated walking snapshots do not flood profile or journey requests")
+local profile = { status = "memory", durable = false, persistenceAvailable = true, dirty = false,
+	mastery = { deliveries = 10, perfect = 2, great = 4, farDeliveries = 1, takeout = 3, recordRuns = 1, recordBest = 500 },
+	tableStamps = { ["1"] = true }, customerStamps = { Mia = true }, earnedCosmetics = { plain = true, basil = true }, equipped = "plain", tutorialCompleted = false }
+profileRemote.OnClientEvent:fire({ event = "profileState", cleanupEpoch = 0, character = character, profile = profile })
+assert(find("BookStatus").Text:find("LOCAL TEST") and find("TableStamp_1").Text:find("✓") and find("CustomerStamp_Mia").Text:find("✓"))
+find("ChefBookToggle").Activated:fire()
+assert(find("ChefBookPanel").Visible and find("ShopToggle").Visible and not find("WalkHint").Visible)
+inside(find("ChefBookPanel"), safeRoot.AbsoluteSize.X, safeRoot.AbsoluteSize.Y)
+assert(find("BookPages").CanvasSize.Y.Offset > find("BookPages").Size.Y.Offset and find("BookStatus").TextSize >= 14)
+local beforeLocked = #sent
+find("Nameplate_gold").Activated:fire()
+assert(#sent == beforeLocked, "Locked appearance cannot issue an equip request")
+find("Nameplate_basil").Activated:fire()
+local equip = sent[#sent]
+assert(equip.remote == "ProfileAction" and equip.arguments[1] == "equip" and equip.arguments[2] == "basil" and equip.arguments[3] == 0 and equip.arguments[4] > 1)
+assert(find("Nameplate_basil"):FindFirstChild("EquipState").Text == "EQUIP", "An unconfirmed request cannot invent equipped ownership")
+profile.equipped = "basil"
+profileRemote.OnClientEvent:fire({ event = "profileEquipped", cleanupEpoch = 0, character = character, profile = profile })
+assert(find("Nameplate_basil"):FindFirstChild("EquipState").Text == "EQUIPPED")
+inputService.PreferredInput = roblox.Enum.PreferredInput.Gamepad
+render(0.016)
+assert(guiService.SelectedObject == find("CloseBook"), "Controller focuses the visible book")
+inputService.InputBegan:fire({ KeyCode = roblox.Enum.KeyCode.ButtonB })
+assert(not find("ChefBookPanel").Visible and guiService.SelectedObject == selectedBefore)
+inputService.PreferredInput = roblox.Enum.PreferredInput.Touch
+render(0.016)
+find("ChefBookToggle").Activated:fire()
+find("ShopToggle").Activated:fire()
+assert(not find("ChefBookPanel").Visible and find("ShopPanel").Visible, "Upgrades and Chef Book never stack")
+find("ShopToggle").Activated:fire()
 activity.OnClientEvent:fire(activitySnapshot)
 render(0.016)
 assert(find("OccupiedLauncherChoices").Visible and camera.CameraType == roblox.Enum.CameraType.Custom and touchGui.Enabled)
@@ -213,6 +261,12 @@ activitySnapshot.event, activitySnapshot.queue = "queueChanged", { status = "wai
 activity.OnClientEvent:fire(activitySnapshot)
 render(0.016)
 assert(find("WalkingActivity").Visible and not find("OccupiedLauncherChoices").Visible)
+find("ChefBookToggle").Activated:fire()
+render(0.016)
+assert(find("ChefBookPanel").Visible and not find("WalkingActivity").Visible and touchGui.Enabled)
+find("CloseBook").Activated:fire()
+render(0.016)
+assert(find("WalkingActivity").Visible, "Closing the book restores the current activity objective")
 find("DoTakeout").Activated:fire()
 assert(sent[#sent].remote == "TakeoutAction" and sent[#sent].arguments[1] == "route")
 activitySnapshot.event = "takeoutRoute"
@@ -278,6 +332,7 @@ local function send(modeName, phase, epoch)
 end
 send("select", "idle", 1)
 assert(find("LauncherModeSelection").Visible and not find("Controls").Visible and not touchGui.Enabled)
+assert(not find("ChefBookToggle").Visible and not find("ChefBookPanel").Visible)
 assert(boundActions.BlockMovement)
 find("FreePlay").Activated:fire()
 assert(sent[#sent].remote == "LauncherMode" and sent[#sent].arguments[1] == "freePlay" and sent[#sent].arguments[2] == 1, "Mode requests carry their lease epoch")
@@ -313,6 +368,13 @@ assert(find("ExitLauncher").Text == "EXIT &\nPASS TURN")
 assert(not find("WalkingActivity").Visible and find("LocalTakeoutBox").Parent == nil)
 local previousRoundText = find("RoundTitle").Text
 local previousScoreText = find("Score").Text
+profile.tutorialCompleted = true
+profileRemote.OnClientEvent:fire({ event = "profileState", cleanupEpoch = 2, character = character, profile = profile })
+assert(find("RoundTitle").Text == previousRoundText and find("Score").Text == previousScoreText and find("Controls").Visible,
+	"Profile snapshots never repaint competitive targets, modes or control state")
+local priorBookStatus = find("BookStatus").Text
+profileRemote.OnClientEvent:fire({ event = "profileState", cleanupEpoch = 1, character = character, profile = { status = "loadFailed" } })
+assert(find("BookStatus").Text == priorBookStatus, "Stale lease profile replies cannot replace the current book")
 activitySnapshot.event, activitySnapshot.payload, activitySnapshot.coins = "restaurantReward", { coinsEarned = 5 }, 15
 activity.OnClientEvent:fire(activitySnapshot)
 render(0.016)
@@ -379,4 +441,25 @@ replacementHumanoid.Health = 0
 replacementHumanoid.Died:fire()
 assert(not find("Controls").Visible and touchGui.Enabled and not boundActions.BlockMovement)
 assert(replacementCamera.CameraType == roblox.Enum.CameraType.Custom and replacementCamera.FieldOfView == 76)
+local bookWalker = child(world, "Model", "BookWalker")
+local bookHumanoid = child(bookWalker, "Humanoid", "Humanoid")
+bookHumanoid.Health = 100
+local bookRoot = child(bookWalker, "Part", "HumanoidRootPart")
+bookRoot.Position, bookRoot.CFrame = roblox.Vector3.zero, roblox.CFrame.new()
+player.Character = bookWalker
+player.CharacterAdded:fire(bookWalker)
+for _, callback in table.clone(timers) do callback() end
+table.clear(timers)
+send("none", "idle", 5)
+inputService.PreferredInput = roblox.Enum.PreferredInput.Gamepad
+render(0.016)
+find("ChefBookToggle").Activated:fire()
+assert(find("ChefBookPanel").Visible and guiService.SelectedObject == find("CloseBook"))
+bookHumanoid.Health = 0
+bookHumanoid.Died:fire()
+assert(not find("ChefBookPanel").Visible and not find("ChefBookToggle").Visible and guiService.SelectedObject == selectedBefore,
+	"Walking death closes the book and restores controller focus")
+local staleStatus = find("BookStatus").Text
+profileRemote.OnClientEvent:fire({ cleanupEpoch = 5, character = replacement, profile = { status = "locked" } })
+assert(find("BookStatus").Text == staleStatus, "Old character profile packets cannot replace the new character's book")
 print("PASS: actual client bootstrap, construction, modal transitions, touch exit labels, border strokes and repeated removal restoration with explicit engine doubles")

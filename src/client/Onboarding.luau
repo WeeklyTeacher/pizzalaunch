@@ -230,6 +230,7 @@ local function updatePizzaTrail()
 		self.onboardingReachedLauncher = true
 		if self.onboardingHighlight then self.onboardingHighlight.Enabled = true end
 		updateOnboardingWalkHint()
+		if context.onReached then context.onReached() end
 	elseif self.onboardingReachedLauncher and distance > 18 then
 		self.onboardingReachedLauncher = false
 		if self.onboardingHighlight then self.onboardingHighlight.Enabled = false end

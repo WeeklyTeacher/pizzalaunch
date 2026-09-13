@@ -25,7 +25,7 @@
 
 ## D. Rojo deletion risk
 
-`default.project.json` currently describes Workspace properties and a Baseplate but has no Workspace `$path`. Rojo v7 defaults `$ignoreUnknownInstances` to true when no `$path` is present, so unknown Studio restaurant models are not presently mapped for deletion. The safety state is still implicit and therefore fragile. Recovery work will make `$ignoreUnknownInstances: true` explicit and add a checker that rejects a Workspace `$path` or a missing/false ignore flag.
+`default.project.json` describes Workspace properties and the exact mapped Baseplate, with no Workspace `$path` and explicit `$ignoreUnknownInstances: true`. RecoverySafety rejects a Workspace path or missing/false ignore flag; the binary build test protects the rest of the mapping. The mapped Baseplate now uses CFrame Y=-12 to expose the authored floor. Unknown Studio geometry remains outside source ownership; a fresh source-only build cannot prove its preservation.
 
 ## E. Ownership boundary
 

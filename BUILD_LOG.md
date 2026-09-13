@@ -497,3 +497,13 @@ The persistence council is preparing isolated draft modules under ignored .qa-ar
 # 2026-09-13 - Milestone 2b six-table visual checkpoint
 
 Accepted the tested hero treatment across six booths and customers, preserving original physical proxies and authoritative lifecycle. Compact mobile takeout now leaves the walking character visible. PASS: 41-source compilation, 25 behavior specs, recovery safety/contracts, fresh build, full diff review and whitespace checks. Fresh native Studio verified six rigs, current lighting/ground and 667x375 mounted/runner presentation; Output had only expected unpublished DataStore warnings. Local frame diagnostic and exact NOT RUN hardware/multiplayer limits are recorded in TEST_MATRIX. Generated test place returned to Edit and simulator restored. No M3 drafts, artifacts or recovery inputs are staged. Pushed hash follows in the next checkpoint after remote confirmation.
+
+# 2026-09-13 - Milestone 2b remote confirmation / M3 integration
+
+Milestone 2b pushed as `7ed71434e1dcd4470b8a29a230d9bc0dc281254b`; remote hash matched and worktree was clean. M3 integrates separately reviewed versioned mastery, earned nameplates and bounded analytics. Coins/upgrades remain shift-only. Profile review found and required regression repairs for late acquisition after departure and lost renewal responses before acceptance. Production DataStore and analytics access stay disabled in Studio.
+
+# 2026-09-13 - Milestone 3 verified profile/mastery foundation
+
+Integrated Chef Book, four earned nameplates, server receipt hooks, versioned profile persistence and bounded journey analytics. Coins/upgrades remain shift-only and historical competitive records are unchanged. PASS: recovery safety/contracts, 48-source compilation, 30 behavioral spec files, final fresh Rojo build, full council review and whitespace checks. Canonical Transfer and historical merged recovery hashes still match.
+
+Native evidence: 667x375 scrollable book and five real walking deliveries earned 50 coins, unlocked Tomato Chef and equipped its server-owned nameplate. Final 874x402 natural Record Run added exactly one completion and accepted launch completed onboarding. Actual open-book death cleared modal/focus; respawn retained same-server mastery. Tablet book and desktop restoration checks passed. Final source includes separate request/equip cadence and loading/character guards. Output contained only expected unpublished record-store warnings. Both generated test places are Edit; no production services were enabled. Real backend, physical hardware and four-client runtime limits remain explicitly NOT RUN in TEST_MATRIX. Pushed hash is recorded after confirmation in the next checkpoint.

@@ -83,9 +83,9 @@ local function harness()
 				return RecordPersistence
 			end,
 	})
-	fake.service.start({ Parent = true, FindFirstChild = function() return nil end }, function(player, event)
-		table.insert(fake.events, { player = player, event = event })
-		if fake.onEvent then fake.onEvent(player, event) end
+	fake.service.start({ Parent = true, FindFirstChild = function() return nil end }, function(player, event, submission)
+		table.insert(fake.events, { player = player, event = event, submission = submission })
+		if fake.onEvent then fake.onEvent(player, event, submission) end
 	end)
 	fake.player = { UserId = 42, Parent = true }
 	fake.service.addPlayer(fake.player)
@@ -123,13 +123,23 @@ do
 	local fake = harness()
 	fake.startRun()
 	local completed = fake.service.recordSuccess(fake.player, 6, "PERFECT!").score
-	fake.onEvent = function(player, event)
-		if event == "recordEnding" then fake.service.cancel(player) end
+	local observed
+	fake.onEvent = function(player, event, submission)
+		if event == "recordEnding" then
+			assert(table.isfrozen(submission), "Progression must receive a frozen receipt")
+			assert(submission.userId == player.UserId and submission.score == completed)
+			assert(type(submission.runId) == "string" and submission.startedAt < submission.completedAt)
+			assert(#fake.writes == 0, "Completion observer ran after persistence yielded")
+			assert(not pcall(function() submission.score = 999999 end))
+			observed = submission
+			fake.service.cancel(player)
+		end
 	end
 	fake.service.finish(fake.player)
 	assert(fake.values.u_42 == completed, "Completion was not frozen before notification")
 	assert(fake.service.getSnapshot(fake.player).status == "idle")
-	print("PASS: completed submission is captured before recordEnding notification can cancel")
+	assert(observed.score == completed and fake.service.getSnapshot(fake.player).score == 0)
+	print("PASS: frozen completed receipt reaches progression before notification cancellation or persistence yield")
 end
 
 do

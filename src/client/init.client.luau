@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local MasteryConfig = require(ReplicatedStorage.Shared.MasteryConfig)
 local UITheme = require(script.UITheme)
 local UIConstruction = require(script.UIConstruction)
 local UIPresentation = require(script.UIPresentation)
@@ -19,6 +20,7 @@ local ClientInput = require(script.ClientInput)
 local ClientCamera = require(script.ClientCamera)
 local ActivityHUD = require(script.ActivityHUD)
 local ResponsiveUI = require(script.ResponsiveUI)
+local ChefBook = require(script.ChefBook)
 local inputState = LauncherInputState.new((Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH), Config.CHARGE_TIME)
 
 local player = Players.LocalPlayer
@@ -32,6 +34,9 @@ local modeRemote = remotes:WaitForChild(Config.MODE_REMOTE)
 local activityRemote = remotes:WaitForChild(Config.ACTIVITY_REMOTE)
 local takeoutRemote = remotes:WaitForChild(Config.TAKEOUT_REMOTE)
 local queueRemote = remotes:WaitForChild(Config.QUEUE_REMOTE)
+local profileRemote = remotes:WaitForChild("ProfileState")
+local profileAction = remotes:WaitForChild("ProfileAction")
+local journeyAction = remotes:WaitForChild("JourneyAction")
 
 local COLORS = UITheme.colors
 local addCorner, addStroke, makeLabel = UITheme.addCorner, UITheme.addStroke, UITheme.makeLabel
@@ -57,6 +62,10 @@ local shakeUntil = 0
 local shakeStrength = 0
 local operating = false
 local activityHud
+local chefBook
+local profileRequestedCharacter
+local serverWalkCharacter
+local journeyRequests = {}
 local activityGuidance = false
 local restoreTutorialAppearance
 local cameraController = ClientCamera.new({ player = player, playerGui = playerGui, Workspace = Workspace, GuiService = GuiService, ContextActionService = ContextActionService, UserInputService = UserInputService })
@@ -121,7 +130,16 @@ local upgradeOrder = ui.upgradeOrder
 local touchAimPad = ui.touchAimPad
 local walkHint = ui.walkHint
 
-local onboarding = Onboarding.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, player = player, COLORS = COLORS, ui = ui, isOperating = function() return operating end, getInputKind = function() return ui.layout.inputKind end, restoreTutorialAppearance = function() restoreTutorialAppearance() end })
+local function requestJourney(action)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if operating or serverWalkCharacter ~= character or not character or not humanoid or humanoid.Health <= 0 then return end
+	if journeyRequests[action] == character then return end
+	journeyRequests[action] = character
+	journeyAction:FireServer(action, state.cleanupEpoch or 0, character)
+end
+local onboarding = Onboarding.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, player = player, COLORS = COLORS, ui = ui, isOperating = function() return operating end, getInputKind = function() return ui.layout.inputKind end, restoreTutorialAppearance = function() restoreTutorialAppearance() end,
+	onReached = function() requestJourney("launcherReached") end })
 local trajectoryFolder = Instance.new("Folder")
 trajectoryFolder.Name = "LocalAimGuide"
 trajectoryFolder.Parent = Workspace
@@ -205,9 +223,11 @@ end
 
 local function applyPresentation()
 	local view = UIPresentation.select(state, shopPanel.Visible, onboarding.onboardingCompleted)
+	if chefBook then chefBook.setContext(operating, view.shop or view.picker) end
+	local bookOpen = chefBook and chefBook.isOpen()
 	local objective = false
 	if activityHud then
-		activityHud.setContext(operating, view.shop or view.picker)
+		activityHud.setContext(operating, view.shop or view.picker or bookOpen)
 		objective = activityHud.hasObjective()
 	end
 	if objective ~= activityGuidance then
@@ -226,19 +246,21 @@ local function applyPresentation()
 	touchAimPad.Visible = view.controls and ui.layout.inputKind == "touch"
 	if ui.layout.compact or view.shop or view.picker then tutorial.Visible = false end
 	exitButton.Visible = view.exit
-	walkHint.Visible = view.walking and not objective
+	walkHint.Visible = view.walking and not objective and not bookOpen and not view.shop
 	roundCard.Visible = view.round and not objective
-	stats.Visible = view.stats
+	stats.Visible = view.stats and not bookOpen
 	recordHud.Visible = view.recordHud
 	recordSummary.Visible = view.results
 	recordContinue.Visible = view.continue
 	changeModeButton.Visible = view.changeMode
-	if view.shop or view.picker or view.results then
+	if view.shop or view.picker or view.results or bookOpen then
 		for _, item in { ui.feedback, ui.dialogueCard, ui.eventBanner, ui.roundOverlay } do item.Visible = false end
 	end
-	cameraController.setNavigation(view.shop and shopPanel or (view.results and recordSummary or nil),
-		view.shop and upgradeCards[upgradeOrder[1]].card or (view.continue and recordContinue or nil), ui.layout.inputKind)
-	inputState:setBlocked(view.shop or view.picker)
+	local bookPanel, bookChoice
+	if chefBook then bookPanel, bookChoice = chefBook.navigation(); chefBook.render() end
+	cameraController.setNavigation(bookPanel or (view.shop and shopPanel or (view.results and recordSummary or nil)),
+		bookChoice or (view.shop and upgradeCards[upgradeOrder[1]].card or (view.continue and recordContinue or nil)), ui.layout.inputKind)
+	inputState:setBlocked(view.shop or view.picker or bookOpen)
 end
 
 local function updateRecordUI()
@@ -416,7 +438,7 @@ local function updateTargetVisuals()
 end
 
 local effects = Feedback.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, TextService = TextService, COLORS = COLORS, ui = ui, getState = function() return state end,
-	isCovered = function() return shopPanel.Visible or modeSelection.Visible or recordSummary.Visible end })
+	isCovered = function() return shopPanel.Visible or modeSelection.Visible or recordSummary.Visible or (chefBook and chefBook.isOpen()) end })
 activityHud = ActivityHUD.new({
 	gui = ui.safeRoot, player = player, Workspace = Workspace, UserInputService = UserInputService, GuiService = GuiService,
 	getLayout = function() return ui.layout end,
@@ -430,6 +452,26 @@ activityHud = ActivityHUD.new({
 		updateShop(state.upgrades)
 	end,
 })
+chefBook = ChefBook.new({ gui = ui.safeRoot, config = MasteryConfig, inputService = UserInputService,
+	isAlive = cameraController.isAlive,
+	actionRemote = profileAction, getEpoch = function() return state.cleanupEpoch or 0 end,
+	getLayout = function() return ui.layout end, onChanged = applyPresentation,
+	onProfile = function(profile)
+		-- A confirmed completion can reduce guidance; an unloaded/default or
+		-- older false value can never undo a completion earned in this session.
+		if profile.tutorialCompleted == true and not onboarding.onboardingCompleted then
+			onboarding.onboardingCompleted = true
+			onboarding.setPizzaTrailVisible(false, true)
+			tutorial.Visible = false
+		end
+	end,
+})
+profileRemote.OnClientEvent:Connect(function(packet)
+	if type(packet) ~= "table" or type(packet.profile) ~= "table" then return end
+	if packet.character ~= nil and packet.character ~= player.Character then return end
+	if type(packet.cleanupEpoch) == "number" and packet.cleanupEpoch < (state.cleanupEpoch or 0) then return end
+	chefBook.receive(packet.profile)
+end)
 restoreTutorialAppearance = function()
 	tutorial.BackgroundTransparency = 0.03
 	for _, descendant in tutorial:GetDescendants() do
@@ -454,6 +496,7 @@ end
 
 local function applyMode()
 	operating = state.mode == "launcher"
+	if operating then serverWalkCharacter = nil end
 	shopPanel.Visible = false
 	activityHud.setContext(operating, false)
 	cameraController.setMounted(operating)
@@ -478,6 +521,8 @@ local function applyMode()
 end
 
 local function releaseLocalPresentation(reason)
+	serverWalkCharacter = nil
+	chefBook.close(false)
 	if operating or state.mode == "launcher" then
 		invalidLeaseEpoch = math.max(invalidLeaseEpoch, state.cleanupEpoch or 0)
 		modeRemote:FireServer("walk", state.cleanupEpoch or 0)
@@ -499,6 +544,7 @@ local inputController = ClientInput.bind({
 })
 
 shopToggle.Activated:Connect(function()
+	chefBook.close(false)
 	shopPanel.Visible = not shopPanel.Visible
 	applyPresentation()
 end)
@@ -657,6 +703,17 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	elseif state.event == "welcome" then
 		onboarding.beginPizzaTrail()
 	end
+	if state.mode == "walk" and player.Character then
+		serverWalkCharacter = player.Character
+		if profileRequestedCharacter ~= player.Character and cameraController.isAlive() then
+			profileRequestedCharacter = player.Character
+			chefBook.request()
+		end
+		if onboarding.onboardingTrailActive and not onboarding.onboardingCompleted then
+			requestJourney("routeStarted")
+			if onboarding.onboardingReachedLauncher then requestJourney("launcherReached") end
+		end
+	end
 end)
 
 RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
@@ -666,7 +723,17 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 		cameraController.setPicker(modeSelection, freePlayChoice, modeSelection.Visible)
 		applyPresentation()
 	end
+	-- Initial walking state may precede its humanoid/root replication. Retry
+	-- only unsent requests once that character is healthy and complete.
+	if serverWalkCharacter == player.Character and cameraController.isAlive() then
+		if profileRequestedCharacter ~= player.Character then
+			profileRequestedCharacter = player.Character
+			chefBook.request()
+		end
+		if onboarding.onboardingTrailActive and not onboarding.onboardingCompleted then requestJourney("routeStarted") end
+	end
 	onboarding.updatePizzaTrail()
+	chefBook.render()
 	activityHud.render()
 	inputController.render()
 	if operating and not cameraController.isAlive() then releaseLocalPresentation() end

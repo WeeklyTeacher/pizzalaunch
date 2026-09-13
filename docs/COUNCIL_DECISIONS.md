@@ -54,3 +54,13 @@ The HUD follows available viewport/safe area and active input. Keep essential co
 Accepted propagation of the M2a slice to six existing booths/customers. Reusing the tested silhouettes was selected over new furniture, additional decoration or altered competitive geometry. Cap six rigs, ten joints each, 10 Hz animation; preserve all proxy geometry and lifecycle. Compact standalone runner objective removes the unused queue row while retaining full queued/reserved presentation.
 
 Acceptance passed: all 25 behavior specs, recovery contracts/safety, source compilation, fresh Rojo build, full diff review and whitespace check. Native fresh Studio verified six rigs/152 parts/60 joints, Realistic lighting, ground Y=-12, mounted phone composition and readable 340x70 runner card. Local five-second frame sample is diagnostic only; physical phone performance and human queue abandonment remain untested. M3 drafts stayed ignored and unmapped during this checkpoint.
+
+## Milestone 3 integrated decision
+
+Keep coins and upgrades shift-only; add durable mastery and earned cosmetic nameplates through a separate versioned profile. This avoids silently changing the finite session economy or historical competitive data. Session-token fencing and immutable revision retries were selected over load-default-save behavior. Failed profile loads keep normal play available without pretending to be new players. Uncertain backend ownership is decided by atomic transforms, not stale local timestamps.
+
+Chef Book is a walking modal with readable scrolling goals/stamps, quiet navigation and explicit local/loading/save status. It cannot repaint mounted competitive state. Server receipt sequences are independently scoped to deliveries, takeout and completed runs; client requests can only read the profile or equip an earned catalog style. Cosmetics never alter physics or launcher tuning.
+
+Analytics uses a fixed event vocabulary and three bounded fields, with separate initial blocked/direct cohorts. Two UI route messages require current server proximity and character context; all rewards and achievements originate from existing authoritative outcomes. Deferred SDK failures may lose telemetry but cannot block gameplay. Paid products remain prohibited in this run.
+
+Acceptance requires the full recovery/behavior/build suite, four-player source-boundary isolation, failure/reconnect fault injection, native book/earned-style/progression and lifecycle checks, and explicit NOT RUN live backend/hardware cases. Review caught and fixed late-acquisition orphan leases, uncertain-renewal local expiry, stale book focus on death, and shared read/equip cadence suppressing immediate selection. No failing checkpoint is pushed.

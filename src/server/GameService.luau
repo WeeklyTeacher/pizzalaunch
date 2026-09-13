@@ -22,6 +22,9 @@ local TakeoutRunner = require(script.Parent.TakeoutRunner)
 local TakeoutConfig = require(ReplicatedStorage.Shared.TakeoutConfig)
 local TakeoutWorld = require(script.Parent.TakeoutWorld)
 local SharedMilestone = require(script.Parent.SharedMilestone)
+local ProfileService = require(script.Parent.ProfileService)
+local ProfileCosmetics = require(script.Parent.ProfileCosmetics)
+local JourneyAnalytics = require(script.Parent.JourneyAnalytics)
 
 local CustomerFeedback = require(script.Parent.CustomerFeedback)
 local Effects = require(script.Parent.ServerEffects)
@@ -48,6 +51,11 @@ local modeRemote: RemoteEvent
 local activityRemote: RemoteEvent
 local takeoutRemote: RemoteEvent
 local queueRemote: RemoteEvent
+local profileRemote: RemoteEvent
+local profileActionRemote: RemoteEvent
+local journeyRemote: RemoteEvent
+local profiles
+local journey
 local runner
 local launcherQueue
 local sharedMilestone
@@ -87,6 +95,40 @@ local function createRemotes()
 	queueRemote = Instance.new("RemoteEvent")
 	queueRemote.Name = Config.QUEUE_REMOTE
 	queueRemote.Parent = folder
+	profileRemote = Instance.new("RemoteEvent")
+	profileRemote.Name, profileRemote.Parent = "ProfileState", folder
+	profileActionRemote = Instance.new("RemoteEvent")
+	profileActionRemote.Name, profileActionRemote.Parent = "ProfileAction", folder
+	journeyRemote = Instance.new("RemoteEvent")
+	journeyRemote.Name, journeyRemote.Parent = "JourneyAction", folder
+end
+
+local function sendProfile(player, eventName, payload, snapshot)
+	local state = states[player]
+	if not state or not player.Parent or not profiles then return end
+	snapshot = snapshot or profiles:snapshot(player)
+	ProfileCosmetics.apply(player, snapshot, state.mode == "launcher")
+	profileRemote:FireClient(player, {
+		event = eventName or "profileState", payload = payload,
+		cleanupEpoch = state.cleanupEpoch, character = player.Character, profile = snapshot,
+	})
+end
+
+local function receiptSequence(state, domain)
+	state.receiptSequences[domain] += 1
+	return state.receiptSequences[domain]
+end
+
+local function recordCancellation(player)
+	local status = RecordRunService.getSnapshot(player).status
+	if status == "countdown" or status == "running" then
+		journey:emit(player, "RecordRunCancelled", "recordRun", "cancelled")
+	end
+end
+
+local function cancelRecordRun(player)
+	recordCancellation(player)
+	RecordRunService.cancel(player)
 end
 
 local function tableDefinition(tableId: number)
@@ -177,6 +219,27 @@ local function livingRoot(player, expectedCharacter)
 	if not humanoid or not ShotPolicy.isFinite(humanoid.Health) or humanoid.Health <= 0 or not root or not root:IsA("BasePart")
 		or not ShotPolicy.isFinite(root.Position.X) or not ShotPolicy.isFinite(root.Position.Y) or not ShotPolicy.isFinite(root.Position.Z) then return nil end
 	return root
+end
+
+local function onProfileAction(player, action, cosmeticId, epoch, requestId)
+	local state = states[player]
+	local root = livingRoot(player)
+	if not state or state.mode ~= "walk" or not root or root.Anchored or epoch ~= state.cleanupEpoch
+		or (action ~= "request" and action ~= "equip")
+		or not ShotPolicy.isFinite(requestId) or requestId % 1 ~= 0 or requestId < 1 or requestId > 2147483647
+		or requestId <= state.profileRequestId then return end
+	local now = Workspace:GetServerTimeNow()
+	-- Opening the book requests a fresh snapshot; it must not consume the
+	-- separate rate allowance for the chef's first appearance selection.
+	if now - state.profileRequestTimes[action] < 0.5 then return end
+	state.profileRequestId, state.profileRequestTimes[action] = requestId, now
+	if action == "request" then
+		sendProfile(player)
+	elseif typeof(cosmeticId) == "string" and #cosmeticId <= 24 and profiles:equip(player, cosmeticId) then
+		sendProfile(player, "profileEquipped")
+	else
+		sendProfile(player, "profileRejected", { reason = "styleUnavailable" })
+	end
 end
 
 local function stationSnapshot()
@@ -386,10 +449,12 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 		payload.result = accuracy.name
 		payload.color = accuracy.color
 		payload.accuracy = distance
+		local scoredDelivery = not recordSession
 
 		if recordSession then
 			local recordResult = RecordRunService.recordSuccess(player, tableId, accuracy.name)
 			if recordResult then
+				scoredDelivery = true
 				payload.recordPoints = recordResult.lastPoints
 				payload.recordScore = recordResult.score
 				payload.recordCombo = recordResult.combo
@@ -418,6 +483,14 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			payload.fastServiceBonus = shiftOutcome.fastService and shiftOutcome.bonus or nil
 			payload.eventMessage = shiftOutcome.message
 			if sharedMilestone then sharedMilestone:contribute(player, "freePlay") end
+		end
+		if scoredDelivery then
+			local customer = CustomerService.getInfo(tableId)
+			profiles:recordDelivery(player, table.freeze({
+				sequence = receiptSequence(state, "delivery"), tableId = tableId,
+				accuracy = accuracy.name, customerName = customer and customer.name or nil,
+			}))
+			journey:emit(player, "FirstSuccessfulDelivery", recordSession and "recordRun" or "freePlay", "completed")
 		end
 
 		pizza.Anchored = true
@@ -460,6 +533,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 				payload.roundReward = round.reward
 				payload.completedRound = state.round
 				payload.completedRoundName = round.name
+				if state.round == 1 then journey:emit(player, "RoundOneCompleted", "freePlay", "completed") end
 				state.roundProgress = 0
 				if state.round < #Config.ROUNDS then
 					state.round += 1
@@ -550,6 +624,8 @@ local function onLaunch(player: Player, directionValue: any, chargeValue: any, r
 	local powerLevel = RecordRunService.isSession(player) and 0 or state.upgrades.power
 	local pizza = ProjectileService.create(Config, player, accepted.direction, accepted.charge, powerLevel, playSound, SOUND)
 	local shot = ProjectileService.track(player, pizza, epoch)
+	profiles:completeTutorial(player)
+	journey:emit(player, "FirstLaunch", recordSession and "recordRun" or "freePlay", "accepted")
 	sendState(player, "launched", {
 		requestId = requestId, requestEpoch = epoch, shotActive = true,
 		reloadTime = accepted.reloadTime, reloadDelay = accepted.reloadTime,
@@ -624,6 +700,7 @@ local function onPurchase(player: Player, upgradeId: any)
 		return
 	end
 	local definition, oldLevel, newLevel = purchase.definition, purchase.oldLevel, purchase.newLevel
+	journey:emit(player, "FirstEarnedUpgrade", state.mode == "walk" and "lobby" or "freePlay", "earned")
 	if ShotPolicy.canPresent(player, launcherLease.owner, state) then
 		if upgradeId == "assist" then updateDeliveryZones(newLevel, false) end
 		applyProgressionVisuals(state)
@@ -664,6 +741,9 @@ cleanupLauncherSession = function(player: Player, reason: string, options: { can
 		return
 	end
 	options = options or {}
+	-- Departure removes the run just after cleanup; count its cancellation here
+	-- while the authenticated player session and original status still exist.
+	if not options.cancelRun and reason == "playerLeaving" then recordCancellation(player) end
 	local wasOwner = launcherLease.owner == player
 	if wasOwner then
 		customerFeedback:clear(player)
@@ -673,7 +753,7 @@ cleanupLauncherSession = function(player: Player, reason: string, options: { can
 	state.cleanupEpoch = (state.cleanupEpoch or 0) + 1
 	clearActiveShot(player)
 	if options.cancelRun then
-		RecordRunService.cancel(player)
+		cancelRecordRun(player)
 	end
 	if state.resumeTargetId then
 		state.targetId = state.resumeTargetId
@@ -681,6 +761,7 @@ cleanupLauncherSession = function(player: Player, reason: string, options: { can
 	end
 	state.mode = "walk"
 	state.launcherMode = "none"
+	sendProfile(player)
 	if launcherLease:release(player, options.moveToExit and Config.LAUNCHER_EXIT_CFRAME or nil) then
 		launcherQueue:step()
 	end
@@ -710,11 +791,13 @@ local function setPlayerMode(player: Player, requestedMode: string)
 			cleanupLauncherSession(player, "reenterLauncher", { cancelRun = true, moveToExit = false, notifyClient = false })
 		end
 		if launcherLease.owner and launcherLease.owner ~= player then
+			journey:occupied(player)
 			sendActivity(player, "launcherOccupied", { result = "LAUNCHER OCCUPIED" })
 			return
 		end
 		if not livingRoot(player) then return end
 		if not launcherQueue:canMount(player) then
+			journey:occupied(player)
 			sendActivity(player, "launcherOccupied", { result = "TURN RESERVED", detail = "The next chef has a short chance to approach." })
 			return
 		end
@@ -728,6 +811,8 @@ local function setPlayerMode(player: Player, requestedMode: string)
 		state.lastRequestId = 0
 		state.mode = "launcher"
 		state.launcherMode = "select"
+		journey:mounted(player)
+		sendProfile(player)
 		launcherQueue:accepted(player)
 		invalidateActivity(player, "mounted")
 		InteractionService.setLauncherAvailable(false)
@@ -762,7 +847,7 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 			return
 		end
 		if RecordRunService.isSession(player) then
-			RecordRunService.cancel(player)
+			cancelRecordRun(player)
 		end
 		if state.resumeTargetId then
 			state.targetId = state.resumeTargetId
@@ -773,6 +858,7 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 		state.cleanupEpoch += 1
 		state.lastRequestId = 0
 		state.launcherMode = "select"
+		sendProfile(player)
 		updateDeliveryZones(state.upgrades.assist, false)
 		sendState(player, "modeSelection", { result = "CHOOSE HOW TO PLAY" })
 		broadcastActivity()
@@ -783,13 +869,15 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 	end
 	if requestedMode == "freePlay" then
 		if RecordRunService.isSession(player) then
-			RecordRunService.cancel(player)
+			cancelRecordRun(player)
 		end
 		customerFeedback:clear(player)
 		ProjectileService.clear(player)
 		state.cleanupEpoch += 1
 		state.lastRequestId = 0
 		state.launcherMode = "freePlay"
+		journey:emit(player, "ModeSelected", "freePlay", "selected")
+		sendProfile(player)
 		updateDeliveryZones(state.upgrades.assist, false)
 		sendState(player, "modeSelected", { result = "FREE PLAY", detail = "Practice launches with no time limit." })
 		broadcastActivity()
@@ -798,7 +886,7 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 			return
 		end
 		if RecordRunService.isSession(player) then
-			RecordRunService.cancel(player)
+			cancelRecordRun(player)
 		end
 		state.resumeTargetId = state.resumeTargetId or state.targetId
 		customerFeedback:clear(player)
@@ -809,6 +897,8 @@ local function selectLauncherMode(player: Player, requestedMode: string)
 		PropService.resetAll()
 		local started, reason = RecordRunService.begin(player)
 		if started then
+			journey:emit(player, "ModeSelected", "recordRun", "selected")
+			sendProfile(player)
 			updateDeliveryZones(0, true)
 			local snapshot = RecordRunService.getSnapshot(player)
 			state.targetId = snapshot.targetId or state.targetId
@@ -848,8 +938,12 @@ local function initializeCharacter(player: Player, character: Model)
 		end))
 		if humanoid.Health > 0 and launcherLease.owner ~= player then root.CFrame = Config.WALK_SPAWN_CFRAME end
 	end
-	table.insert(connections, character.ChildAdded:Connect(initializeReadyCharacter))
+	table.insert(connections, character.ChildAdded:Connect(function(child)
+		initializeReadyCharacter()
+		if child.Name == "Head" and player.Character == character then sendProfile(player) end
+	end))
 	initializeReadyCharacter()
+	sendProfile(player)
 end
 
 local function addPlayer(player: Player)
@@ -870,7 +964,11 @@ local function addPlayer(player: Player)
 		activityEpoch = 0,
 		activityRequests = { queue = 0, takeout = 0 },
 		activityRequestTimes = {},
+		profileRequestId = 0, profileRequestTimes = { request = -100, equip = -100 },
+		receiptSequences = { delivery = 0, takeout = 0, record = 0 },
 	}
+	journey:addPlayer(player)
+	profiles:addPlayer(player)
 	RecordRunService.addPlayer(player)
 	runner:addPlayer(player)
 
@@ -906,9 +1004,28 @@ end
 
 function GameService.start()
 	createRemotes()
+	journey = JourneyAnalytics.new()
+	profiles = ProfileService.new({
+		onChanged = function(player, snapshot) sendProfile(player, nil, nil, snapshot) end,
+		onEvent = function(player, eventName, reason)
+			if eventName == "ProfileLoadFailure" or eventName == "ProfileSaveFailure" then
+				journey:emit(player, eventName, "profile", reason == "locked" and "locked" or "failed")
+			end
+		end,
+	})
+	profiles:start()
 	ShiftEventService.reset()
 	launchRemote.OnServerEvent:Connect(onLaunch)
 	purchaseRemote.OnServerEvent:Connect(onPurchase)
+	profileActionRemote.OnServerEvent:Connect(onProfileAction)
+	journeyRemote.OnServerEvent:Connect(function(player, action, epoch, character)
+		local world = Workspace:FindFirstChild("PizzaLaunchWorld")
+		local anchor = world and world:FindFirstChild("LauncherInteractionAnchor", true)
+		if not anchor or not anchor:IsA("BasePart") then return end
+		journey:uiAction(player, action, epoch, character, {
+			state = states[player], spawnPosition = Config.WALK_SPAWN_CFRAME.Position, launcherPosition = anchor.Position,
+		})
+	end)
 	modeRemote.OnServerEvent:Connect(function(player, requestedMode, requestEpoch)
 		local state = states[player]
 		if not state or requestEpoch ~= state.cleanupEpoch or typeof(requestedMode) ~= "string" then
@@ -944,9 +1061,14 @@ function GameService.start()
 			if not state or not player.Parent then return end
 			state.coins += receipt.coinsEarned
 			setLeaderstats(player, state)
+			profiles:recordTakeout(player, table.freeze({ sequence = receiptSequence(state, "takeout") }))
 			if sharedMilestone then sharedMilestone:contribute(player, "takeout") end
 		end,
-		notify = sendActivity,
+		notify = function(player, eventName, payload)
+			if eventName == "runnerStarted" then journey:takeoutStarted(player)
+			elseif eventName == "runnerCompleted" then journey:takeoutCompleted(player) end
+			sendActivity(player, eventName, payload)
+		end,
 	})
 	launcherQueue = LauncherQueue.new({
 		now = function() return Workspace:GetServerTimeNow() end,
@@ -956,7 +1078,12 @@ function GameService.start()
 			local root = livingRoot(player, character)
 			return state ~= nil and state.mode == "walk" and root ~= nil and not root.Anchored
 		end,
-		notify = sendActivity, reservationSeconds = 15,
+		notify = function(player, eventName, payload)
+			if eventName == "queueAccepted" then journey:emit(player, "QueueAccepted", "queue", "accepted")
+			elseif eventName == "queueLeft" then journey:emit(player, "QueueAbandoned", "queue", "cancelled") end
+			sendActivity(player, eventName, payload)
+		end,
+		reservationSeconds = 15,
 	})
 	queueRemote.OnServerEvent:Connect(function(player, action, epoch, requestId)
 		if not activityRequest(player, "queue", epoch, requestId) then return end
@@ -967,6 +1094,7 @@ function GameService.start()
 				sendActivity(player, "queueRejected", { reason = "approachLauncher" }); return
 			end
 			local accepted, reason = launcherQueue:join(player)
+			if accepted and reason == nil then journey:emit(player, "QueueJoined", "queue", "accepted") end
 			sendActivity(player, accepted and "queueChanged" or "queueRejected", { reason = reason })
 		elseif action == "leave" then launcherQueue:cancel(player, "cancelled") end
 		broadcastActivity()
@@ -989,7 +1117,7 @@ function GameService.start()
 	ProjectileService.start(world)
 	WorldActivityService.start(world)
 	updateDeliveryZones(0, false)
-	RecordRunService.start(world, function(player, eventName)
+	RecordRunService.start(world, function(player, eventName, submission)
 		local state = states[player]
 		if not state then
 			return
@@ -999,6 +1127,16 @@ function GameService.start()
 			state.targetId = snapshot.targetId
 		end
 		if eventName == "recordEnding" then
+			-- The completion comes from RecordRunService's immutable pre-yield
+			-- receipt. Never sample the mutable score to construct durable gains.
+			if submission and submission.userId == player.UserId and submission.runId ~= state.lastCompletedRunId then
+				state.lastCompletedRunId = submission.runId
+				profiles:recordCompletedRun(player, table.freeze({
+					sequence = receiptSequence(state, "record"), score = submission.score,
+				}))
+				journey:emit(player, "RecordRunCompleted", "recordRun", "completed")
+				if snapshot.isNewBest then journey:emit(player, "NewPersonalBest", "recordRun", "earned") end
+			end
 			if launcherLease.owner == player then customerFeedback:clear(player) end
 			state.cleanupEpoch += 1
 			state.lastRequestId = 0
@@ -1007,6 +1145,9 @@ function GameService.start()
 			-- launcher lease while the compact result card saves, then explicitly
 			-- chooses another mode or exits.
 			clearActiveShot(player)
+			sendProfile(player)
+		elseif eventName == "recordStarted" then
+			journey:recordStarted(player)
 		end
 		sendState(player, eventName, nil)
 		broadcastActivity()
@@ -1077,6 +1218,9 @@ function GameService.start()
 		cleanupLauncherSession(player, "playerLeaving", { cancelRun = false, moveToExit = false, notifyClient = false })
 		RecordRunService.removePlayer(player)
 		runner:removePlayer(player)
+		profiles:removePlayer(player)
+		ProfileCosmetics.clear(player)
+		journey:removePlayer(player)
 		if sharedMilestone then sharedMilestone:removePlayer(player) end
 		disconnectCharacter(player)
 		states[player] = nil

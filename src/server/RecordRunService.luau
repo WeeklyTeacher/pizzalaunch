@@ -82,9 +82,9 @@ local function now(): number
 	return Workspace:GetServerTimeNow()
 end
 
-local function notify(player: Player, eventName: string)
+local function notify(player: Player, eventName: string, submission: { [string]: any }?)
 	if notifyChanged and player.Parent then
-		notifyChanged(player, eventName)
+		notifyChanged(player, eventName, submission)
 	end
 end
 
@@ -436,7 +436,9 @@ function RecordRunService.finish(player: Player)
 	run.combo = 0
 	run.multiplier = 1
 	run.isNewBest = isNewBest
-	notify(player, "recordEnding")
+	-- Progression observers receive the same frozen completion as persistence,
+	-- before any asynchronous write or subsequent run can change live state.
+	notify(player, "recordEnding", submission)
 
 	task.spawn(function()
 		savePending(run.persistence, 3)

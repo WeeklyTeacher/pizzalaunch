@@ -20,6 +20,9 @@ Work only in this repository. Required overhaul branch: `feat/astra-overhaul-202
 - Server owns lease, character mounting, mode, time, physics, hits, scoring, rewards, customers, purchases, persistence, and cleanup. Client payloads are requests.
 - A bystander must never alter the current operator's competitive state or physical lane. Walking activities have separate order state and award session coins only.
 - Runner/queue/shared progress use `RestaurantActivity`, not the launcher's GameState handler. Preserve clearance corners around the far-side bin/bench and the crosswalk return route.
+- Mastery uses separate `ProfileState`/`ProfileAction` channels. Profile receipts come only from accepted server outcomes; never forward client scores, hit identities or rewards. Coins and upgrades stay session-only.
+- Preserve `PizzaLaunch_PlayerProfile_v1` version/lease/revision fencing and failed-load protection. Studio/unpublished profiles and analytics must never access real services. Do not infer durable saves from a loaded snapshot or fake-backend tests.
+- Earned nameplates are nonphysical server-owned appearance and hide while mounted. Never feed cosmetic/profile fields into competitive tuning or queue policy. Paid fulfillment is unimplemented; reserved profile storage is not authorization to sell.
 - Preserve `PizzaLaunch_RecordRun_AllTime_v1`, numeric historical records, all six table centers, ballistic anchors, and launch tuning unless a replacement is explicitly tested and documented.
 - Preserve desktop, landscape touch, tablet, controller, immediate upgrades visibility, spawn route, and interior return cue.
 - Cleanup is idempotent and invalidates stale asynchronous work across exit, death, removal, replacement, disconnect, mode switches, countdown cancellation, and results.
