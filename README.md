@@ -29,6 +29,8 @@ Record scoring is calculated entirely by the server. Record runs use fixed launc
 
 ## Progression
 
+Coins and upgrades reset with a new server session. Chef Book mastery and earned styles use their separate profile when durable services are available; local Studio testing uses memory only.
+
 The restaurant runs four escalating service rounds:
 
 1. **First Orders** — two open, comfortable lanes and three forgiving deliveries.
@@ -73,6 +75,7 @@ src/
   server/LauncherLease.luau   Validated station ownership and character restoration
   server/ShotPolicy.luau     Request validation and fixed competitive tuning
   server/ProjectileService.luau  Server physics, avatar isolation and cleanup
+  server/DeliveryService.luau  Delivery rewards, rounds and feedback sequencing
   server/TakeoutRunner.luau   Independent walking orders and rewards
   server/LauncherQueue.luau   FIFO approach reservations
   server/ProfileService.luau  Versioned mastery, safe saves and session fencing
@@ -86,7 +89,7 @@ src/
   client/init.client.luau     Integration for camera/input/UI components and trajectory
 ```
 
-The server owns launcher occupancy, projectile creation, hit resolution, rewards, combos, rounds, record timing/scoring, reactions, prop resets, and purchases. Clients only submit a validated 3D aim direction/charge while they hold the launcher lease. World and UI assets are generated from code so the repository remains the source of truth.
+The server owns launcher occupancy, projectile creation, hit resolution, rewards, combos, rounds, record timing/scoring, reactions, prop resets, session purchases and profiles. Clients submit validated launch, mode, activity and earned-style requests; they cannot supply authoritative hits, scores, rewards or ownership. World and UI assets are generated from source.
 
 ## Audio assets
 
@@ -102,3 +105,5 @@ All five IDs were preloaded successfully in Studio during the 2026-08-30 quality
 Record Run personal bests and the all-time top 10 persist through an OrderedDataStore when Roblox services are available. Coins and upgrades still last for the current server session only; economy persistence remains deferred until broader balance testing. Furniture positions are authored and stable for predictable physics. Customer occupancy changes through deterministic, server-owned entrance and seating routes that stay outside the launcher and target lanes.
 
 Chef Book adds a separate versioned profile for mastery, table/customer stamps, completed-run milestones, earned nameplates and tutorial completion. It never changes competitive tuning or converts session coins into durable currency. Local Studio profiles use memory only. See the current test matrix for backend and hardware cases that still require owner validation.
+
+Paid functionality remains absent. [Future cosmetic entitlement design](docs/MONETIZATION_PREPARATION.md) documents the approval, durability and competitive-neutrality requirements without products, IDs, prompts or prices.

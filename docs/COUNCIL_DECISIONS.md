@@ -68,3 +68,9 @@ Acceptance requires the full recovery/behavior/build suite, four-player source-b
 ## Milestone 3b extraction decision
 
 Complete the delivery ownership boundary after the integrated mastery checkpoint. Extract the existing transaction into DeliveryService, retaining exact synchronous ordering and delayed callback guards. Keep profile/analytics/shared hooks in GameService and inject existing service instances. Rejected alternatives: changing rewards/rounds during extraction or constructing duplicate authority state. Acceptance requires the full suite, concrete numeric outgoing reward tests, unchanged four-player integration behavior and a fresh native delivery smoke test.
+
+## Milestone 4 final council decision
+
+Prepare documentation and service boundaries only. Future EntitlementService must use the profile's serialized writer or an explicitly reconciled ledger; no assumed atomicity across keys, no session flags as purchase confirmation, and no unbounded receipt list in the current document budget. Ownership lookup failure remains unknown and cannot erase confirmed ownership. Permanent cosmetics must not be sold twice to an existing owner. Candidate content is guaranteed appearance only; every competitive/accessibility/queue advantage and randomized sale is excluded.
+
+The persistence council reviewed these requirements against the current source. Paid receipt processing, platform catalog/IDs, product creation, prompts, prices, publishing and live configuration remain intentionally unimplemented. Required next evidence is owner-approved backend and device/multiplayer validation, not a store screen.

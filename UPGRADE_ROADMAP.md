@@ -1,5 +1,17 @@
 # Pizza Launch Upgrade Roadmap
 
+## 2026-09-13 overhaul checkpoint
+
+The earlier roadmap below is historical. Current architecture and evidence live in GAME_STATE, COUNCIL_DECISIONS and TEST_MATRIX.
+
+- Completed: correctness/recovery repairs, focused launcher/input/camera/delivery/persistence modules and behavioral tests.
+- Completed: independent Takeout Runner, honest FIFO reservations, NOW PLAYING and contributor-only shared progress.
+- Completed: ground reveal, oven hero, detailed pizza, six articulated customers/booths, restrained lighting and responsive UI.
+- Completed: versioned mastery, Chef Book, earned nameplates and bounded analytics; session coins/upgrades remain unchanged.
+- Prepared only: future cosmetic entitlement architecture. No paid products, IDs, prompts or live sales exist.
+- Next owner validation: four-player live station contention, actual human abandonment, physical mobile/controller input and performance, and separately approved backend profile handoff/rejoin tests.
+- Conditional next design: a small independent practice lane only if observed contention still blocks players. Queue reservations do not create capacity, and Free Play remains unlimited.
+
 Updated: 2026-08-30
 
 ## Living restaurant council build — current focus

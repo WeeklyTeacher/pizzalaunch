@@ -79,3 +79,9 @@ JourneyAnalytics records bounded join/route/mount/service/upgrade/queue/runner/r
 DeliveryService now owns the admitted shot transaction: customer claim, accuracy/scoring delegation, Free Play rewards and round transitions, Record Run delegation, feedback order and delayed visual consumption. It receives the existing lease, projectile, customer, layout, prop and scoring services through explicit dependencies; it creates no competing state. GameService retains remote entry points and profile/analytics/shared hooks. GameService is 1,082 lines after this extraction, down from 1,233 at M3; client bootstrap remains an 877-line integration/trajectory module behind focused input/camera/UI/onboarding/effects components.
 
 Eight additional behavior groups cover admission, duplicates, exact numeric tips/combo/shift/round rewards, later rounds, competitive isolation, unavailable customers, existing miss behavior and stale callbacks. The one old assertion tied to the location of tipBonus moved to actual outgoing-payload arithmetic coverage. No source file was removed.
+
+## Milestone 4 preparation only
+
+The repository has no paid products, identifiers, sale UI, price labels or MarketplaceService receipt handlers. MONETIZATION_PREPARATION documents future earned/paid appearance boundaries, a single serialized ownership writer, durable grant/deduplication requirements, restoration and competitive-neutrality acceptance. Profile pendingFulfillment is reserved/preserved data only, not a receipt ledger or implemented entitlement system. No session currency was made permanent.
+
+Code is verified through the pushed M3b extraction checkpoint `0088c7079be15bfc8b03a40db15496f0c74f0a01`. The next owner action is the manual acceptance list in TEST_MATRIX, especially real four-player contention, physical devices and a separately approved test backend. No publication or live overwrite is authorized by this run.

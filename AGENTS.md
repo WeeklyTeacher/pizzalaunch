@@ -24,6 +24,7 @@ Work only in this repository. Required overhaul branch: `feat/astra-overhaul-202
 - DeliveryService owns accepted-shot resolution and reward/round/feedback sequencing through injected existing services. GameService retains launcher entry points and profile/analytics/shared hooks. Never create duplicate service state during extraction.
 - Preserve `PizzaLaunch_PlayerProfile_v1` version/lease/revision fencing and failed-load protection. Studio/unpublished profiles and analytics must never access real services. Do not infer durable saves from a loaded snapshot or fake-backend tests.
 - Earned nameplates are nonphysical server-owned appearance and hide while mounted. Never feed cosmetic/profile fields into competitive tuning or queue policy. Paid fulfillment is unimplemented; reserved profile storage is not authorization to sell.
+- Read `docs/MONETIZATION_PREPARATION.md` before any future entitlement work. No second writer may bypass profile fencing; no paid feature may be implemented or configured without explicit owner approval and the documented backend/ownership QA.
 - Preserve `PizzaLaunch_RecordRun_AllTime_v1`, numeric historical records, all six table centers, ballistic anchors, and launch tuning unless a replacement is explicitly tested and documented.
 - Preserve desktop, landscape touch, tablet, controller, immediate upgrades visibility, spawn route, and interior return cue.
 - Cleanup is idempotent and invalidates stale asynchronous work across exit, death, removal, replacement, disconnect, mode switches, countdown cancellation, and results.
