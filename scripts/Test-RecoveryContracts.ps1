@@ -147,7 +147,8 @@ Assert-True ($world.Contains('ring:SetAttribute("DeliveryZone", true)')) 'Wider 
 Assert-True ($gameService.Contains('ShotPolicy.canPresent(player, launcherLease.owner, state)') -and $gameService.Contains('updateDeliveryZones(newLevel, false)')) 'Wider Plates presentation is routed through the behavior-tested owner policy'
 Assert-True ($gameService.Contains('RecordRunService.isSession(player) and 0 or state.upgrades.power')) 'Hotter Oven remains disabled for Record Run fairness'
 Assert-True ($gameService.Contains('ShotPolicy.reloadTime(Config, state, recordSession)')) 'Speedy Oven uses behavior-tested authoritative competitive-neutral reload policy'
-Assert-True ($gameService.Contains('payload.tipBonus')) 'Bigger Tips exposes its extra reward in delivery feedback'
+# DeliveryService.spec executes a concrete Bigger Tips/combo/shift/round reward
+# and verifies its extra tips in the actual outgoing delivery feedback payload.
 foreach ($eventName in @('DinnerRush', 'BirthdayTable', 'FoodCritic')) {
     Assert-True ($shiftEvents.Contains('"' + $eventName + '"')) "shift event service contains $eventName"
 }

@@ -165,7 +165,7 @@ modules.RecordRunService = {
 	cancel = function(player) runStates[player] = "idle" end,
 	removePlayer = function(player) runStates[player] = nil end,
 }
-for _, name in { "ProfileModel", "ProfileService", "ProfileCosmetics", "TakeoutRunner", "LauncherQueue", "SharedMilestone", "LayoutService", "PropService", "LauncherLease", "ShotPolicy", "ProjectileService", "DeliveryScoring", "PlayerProgression", "CustomerFeedback", "InteractionService" } do
+for _, name in { "ProfileModel", "ProfileService", "ProfileCosmetics", "TakeoutRunner", "LauncherQueue", "SharedMilestone", "LayoutService", "PropService", "LauncherLease", "ShotPolicy", "ProjectileService", "DeliveryScoring", "DeliveryService", "PlayerProgression", "CustomerFeedback", "InteractionService" } do
 	modules[name] = loadModule("src/server/" .. name .. ".luau", overrides)
 end
 local journeyClass = loadModule("src/server/JourneyAnalytics.luau", overrides)

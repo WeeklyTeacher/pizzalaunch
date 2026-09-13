@@ -16,6 +16,7 @@ local LauncherLease = require(script.Parent.LauncherLease)
 local ShotPolicy = require(script.Parent.ShotPolicy)
 local ProjectileService = require(script.Parent.ProjectileService)
 local DeliveryScoring = require(script.Parent.DeliveryScoring)
+local DeliveryService = require(script.Parent.DeliveryService)
 local PlayerProgression = require(script.Parent.PlayerProgression)
 local LauncherQueue = require(script.Parent.LauncherQueue)
 local TakeoutRunner = require(script.Parent.TakeoutRunner)
@@ -418,183 +419,31 @@ local function customerReaction(tableId, reaction)
 	customerFeedback:react(tableId, reaction)
 end
 
+local deliveryService = DeliveryService.new({
+	config = Config, getState = function(player) return states[player] end,
+	now = function() return Workspace:GetServerTimeNow() end, lease = launcherLease,
+	recordRun = RecordRunService, projectiles = ProjectileService, customers = CustomerService,
+	shiftEvents = ShiftEventService, scoring = DeliveryScoring, layout = LayoutService, props = PropService,
+	tableDefinition = tableDefinition, roundDefinition = roundDefinition, nextTarget = nextTarget,
+	customerReaction = customerReaction, reactionText = reactionText, worldTable = worldTable,
+	playSound = playSound, confettiBurst = confettiBurst, sounds = SOUND,
+	beginShiftEvent = beginShiftEvent, endShiftEvent = endShiftEvent,
+	setLeaderstats = setLeaderstats, sendState = sendState,
+	contributeShared = function(player)
+		if sharedMilestone then sharedMilestone:contribute(player, "freePlay") end
+	end,
+	recordDelivery = function(player, state, tableId, accuracy, customerName, recordSession)
+		profiles:recordDelivery(player, table.freeze({
+			sequence = receiptSequence(state, "delivery"), tableId = tableId,
+			accuracy = accuracy, customerName = customerName,
+		}))
+		journey:emit(player, "FirstSuccessfulDelivery", recordSession and "recordRun" or "freePlay", "completed")
+	end,
+	roundOneCompleted = function(player) journey:emit(player, "RoundOneCompleted", "freePlay", "completed") end,
+})
+
 local function finishShot(player: Player, pizza: BasePart, result: string, hitPosition: Vector3?, tableId: number?)
-	local state = states[player]
-	if not state or pizza:GetAttribute("Resolved") or not launcherLease:isValid(player) or not RecordRunService.canLaunch(player)
-		or not ProjectileService.resolve(player, pizza, state.cleanupEpoch) then
-		return
-	end
-	pizza:SetAttribute("Resolved", true)
-	state.shotActive = false
-	local recordSession = RecordRunService.isSession(player)
-	local effectiveReload = recordSession and Config.RELOAD_TIME or Config.RELOAD_TIME * (1 - state.upgrades.reload * 0.12)
-	local payload = {
-		result = result,
-		position = hitPosition,
-		tableId = tableId,
-		coinsEarned = 0,
-		comboBonus = 0,
-		reloadDelay = math.max(0.05, state.lastLaunch + effectiveReload - Workspace:GetServerTimeNow()),
-		recordRun = recordSession,
-	}
-	local eligibleTables = ShiftEventService.extendTablePool(roundDefinition(state.round).tables)
-	local tableEligible = tableId ~= nil and (recordSession or table.find(eligibleTables, tableId) ~= nil)
-	local acceptedDelivery = result == "delivery" and tableEligible and hitPosition ~= nil and CustomerService.claimDelivery(tableId)
-	local shiftOutcome = nil
-
-	if acceptedDelivery and tableId and hitPosition then
-		local definition = tableDefinition(tableId)
-		local round = roundDefinition(state.round)
-		local accuracy, distance = DeliveryScoring.accuracy(Config, definition.position, hitPosition, state, recordSession)
-		payload.result = accuracy.name
-		payload.color = accuracy.color
-		payload.accuracy = distance
-		local scoredDelivery = not recordSession
-
-		if recordSession then
-			local recordResult = RecordRunService.recordSuccess(player, tableId, accuracy.name)
-			if recordResult then
-				scoredDelivery = true
-				payload.recordPoints = recordResult.lastPoints
-				payload.recordScore = recordResult.score
-				payload.recordCombo = recordResult.combo
-				payload.recordMultiplier = recordResult.multiplier
-				if recordResult.combo == 4 or recordResult.combo == 7 or recordResult.combo == 10 then
-					payload.recordComboMilestone = true
-				end
-			else
-				payload.result = "TIME!"
-				payload.color = Color3.fromRGB(255, 203, 55)
-			end
-		else
-			state.combo += 1
-			state.bestCombo = math.max(state.bestCombo, state.combo)
-			state.roundProgress += 1
-			local deliveryReward, comboBonus, unmultipliedReward = DeliveryScoring.freePlayReward(accuracy, state.combo, state.upgrades.tips)
-			local serviceTime = Workspace:GetServerTimeNow() - (state.targetSetAt or Workspace:GetServerTimeNow())
-			shiftOutcome = ShiftEventService.recordDelivery(tableId, accuracy.name, serviceTime)
-			local earned = deliveryReward + (shiftOutcome.bonus or 0)
-			state.coins += earned
-			payload.coinsEarned = earned
-			payload.comboBonus = comboBonus
-			payload.tipBonus = math.max(0, deliveryReward - unmultipliedReward)
-			payload.rewardMultiplier = 1 + state.upgrades.tips * 0.25
-			payload.eventBonus = shiftOutcome.bonus or 0
-			payload.fastServiceBonus = shiftOutcome.fastService and shiftOutcome.bonus or nil
-			payload.eventMessage = shiftOutcome.message
-			if sharedMilestone then sharedMilestone:contribute(player, "freePlay") end
-		end
-		if scoredDelivery then
-			local customer = CustomerService.getInfo(tableId)
-			profiles:recordDelivery(player, table.freeze({
-				sequence = receiptSequence(state, "delivery"), tableId = tableId,
-				accuracy = accuracy.name, customerName = customer and customer.name or nil,
-			}))
-			journey:emit(player, "FirstSuccessfulDelivery", recordSession and "recordRun" or "freePlay", "completed")
-		end
-
-		pizza.Anchored = true
-		pizza.CFrame = CFrame.new(definition.position + Vector3.new(0, 4.95, 0)) * CFrame.Angles(0, 0, math.pi / 2)
-		customerReaction(tableId, "success")
-		CustomerService.served(tableId)
-		if shiftOutcome and shiftOutcome.confetti then
-			confettiBurst(definition.position + Vector3.new(0, 6, 0))
-			for _, tableData in Config.TABLES do
-				customerReaction(tableData.id, "crowd")
-			end
-		end
-		local crowdMilestone = (recordSession and payload.recordComboMilestone) or (not recordSession and (state.combo == 3 or state.combo == 5 or state.combo % 10 == 0))
-		if crowdMilestone then
-			payload.comboMilestone = recordSession and payload.recordCombo or state.combo
-			for _, tableData in Config.TABLES do
-				if tableData.id ~= tableId then
-					customerReaction(tableData.id, "crowd")
-				end
-			end
-		end
-		playSound(pizza, accuracy.name == "PERFECT!" and SOUND.perfect or SOUND.success, accuracy.name == "PERFECT!" and 0.75 or 0.65, 1.05)
-		local completedEpoch = state.cleanupEpoch
-		task.delay(0.62, function()
-			if not pizza.Parent or states[player] ~= state or state.cleanupEpoch ~= completedEpoch or launcherLease.owner ~= player then
-				return
-			end
-			local tableModel = worldTable(tableId)
-			local customer = tableModel and tableModel:FindFirstChild("Customer")
-			if customer and customer:IsA("Model") then
-				reactionText(customer, "NOM NOM NOM!\nDELICIOUS!")
-			end
-			ProjectileService.consumeVisual(pizza)
-		end)
-
-		if not recordSession then
-			if state.roundProgress >= round.goal then
-				state.coins += round.reward
-				payload.roundComplete = true
-				payload.roundReward = round.reward
-				payload.completedRound = state.round
-				payload.completedRoundName = round.name
-				if state.round == 1 then journey:emit(player, "RoundOneCompleted", "freePlay", "completed") end
-				state.roundProgress = 0
-				if state.round < #Config.ROUNDS then
-					state.round += 1
-				end
-				LayoutService.setRound(state.round)
-				PropService.resetAll()
-			end
-			state.targetId = nextTarget(state.targetId, state.round)
-			state.targetSetAt = Workspace:GetServerTimeNow()
-			if shiftOutcome and shiftOutcome.ended then
-				endShiftEvent(shiftOutcome.ended, shiftOutcome.message)
-			end
-			local startedEvent = ShiftEventService.maybeStart(roundDefinition(state.round).tables, state.targetId)
-			if startedEvent then
-				beginShiftEvent(startedEvent)
-			end
-		end
-	elseif tableId then
-		if recordSession then
-			RecordRunService.recordMiss(player)
-		else
-			local eventMiss = ShiftEventService.recordMiss()
-			if eventMiss then
-				payload.comboSaved = eventMiss.comboSaved
-				payload.eventMessage = eventMiss.message
-				endShiftEvent(eventMiss.ended, eventMiss.message)
-			else
-				state.combo = 0
-			end
-		end
-		payload.result = result == "delivery" and "TABLE IS CLEARING!" or "TOO HUNGRY!"
-		payload.color = Color3.fromRGB(255, 139, 95)
-		if result == "delivery" then
-			CustomerService.wrongPizza(tableId)
-			customerReaction(tableId, "wrong")
-		else
-			customerReaction(tableId, "dodge")
-		end
-		playSound(pizza, SOUND.miss, 0.38, 1.25)
-	else
-		if recordSession then
-			RecordRunService.recordMiss(player)
-		else
-			local eventMiss = ShiftEventService.recordMiss()
-			if eventMiss then
-				payload.comboSaved = eventMiss.comboSaved
-				payload.eventMessage = eventMiss.message
-				endShiftEvent(eventMiss.ended, eventMiss.message)
-			else
-				state.combo = 0
-			end
-		end
-		payload.color = Color3.fromRGB(255, 139, 95)
-		playSound(pizza, SOUND.splat, 0.5, math.random(85, 115) / 100)
-	end
-
-	setLeaderstats(player, state)
-	sendState(player, "shotResult", payload)
-	task.delay(1.45, function()
-		ProjectileService.removeVisual(player, pizza)
-	end)
+	return deliveryService.resolve(player, pizza, result, hitPosition, tableId)
 end
 
 local function onLaunch(player: Player, directionValue: any, chargeValue: any, requestId: any, requestEpoch: any)

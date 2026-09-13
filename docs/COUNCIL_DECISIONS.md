@@ -64,3 +64,7 @@ Chef Book is a walking modal with readable scrolling goals/stamps, quiet navigat
 Analytics uses a fixed event vocabulary and three bounded fields, with separate initial blocked/direct cohorts. Two UI route messages require current server proximity and character context; all rewards and achievements originate from existing authoritative outcomes. Deferred SDK failures may lose telemetry but cannot block gameplay. Paid products remain prohibited in this run.
 
 Acceptance requires the full recovery/behavior/build suite, four-player source-boundary isolation, failure/reconnect fault injection, native book/earned-style/progression and lifecycle checks, and explicit NOT RUN live backend/hardware cases. Review caught and fixed late-acquisition orphan leases, uncertain-renewal local expiry, stale book focus on death, and shared read/equip cadence suppressing immediate selection. No failing checkpoint is pushed.
+
+## Milestone 3b extraction decision
+
+Complete the delivery ownership boundary after the integrated mastery checkpoint. Extract the existing transaction into DeliveryService, retaining exact synchronous ordering and delayed callback guards. Keep profile/analytics/shared hooks in GameService and inject existing service instances. Rejected alternatives: changing rewards/rounds during extraction or constructing duplicate authority state. Acceptance requires the full suite, concrete numeric outgoing reward tests, unchanged four-player integration behavior and a fresh native delivery smoke test.
