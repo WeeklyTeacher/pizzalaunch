@@ -450,12 +450,7 @@ local function finishShot(player: Player, pizza: BasePart, result: string, hitPo
 			if customer and customer:IsA("Model") then
 				reactionText(customer, "NOM NOM NOM!\nDELICIOUS!")
 			end
-			TweenService:Create(pizza, TweenInfo.new(0.42, Enum.EasingStyle.Quad), { Size = Vector3.new(0.65, 2.8, 2.8), Transparency = 0.25 }):Play()
-			for _, topping in pizza:GetChildren() do
-				if topping:IsA("BasePart") then
-					TweenService:Create(topping, TweenInfo.new(0.35), { Transparency = 1 }):Play()
-				end
-			end
+			ProjectileService.consumeVisual(pizza)
 		end)
 
 		if not recordSession then

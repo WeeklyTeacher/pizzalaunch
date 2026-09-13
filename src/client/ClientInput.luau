@@ -101,9 +101,8 @@ function ClientInput.bind(context)
 			ui.fireButton.Text = "OVEN\nRELOAD"
 			ui.fireButton.BackgroundColor3 = Color3.fromRGB(142, 128, 119)
 		end
-		local touch = inputService.TouchEnabled
-		ui.fireButton.Size = inputState.charging and (touch and UDim2.fromOffset(134, 86) or UDim2.fromOffset(166, 110))
-			or (touch and UDim2.fromOffset(128, 80) or UDim2.fromOffset(160, 104))
+		ui.fireButton.Size = inputState.charging and (ui.fireChargeSize or UDim2.fromOffset(142, 92))
+			or (ui.fireIdleSize or UDim2.fromOffset(138, 88))
 		for direction, button in ui.aimButtons do
 			button.BackgroundColor3 = inputState.touchHeld[direction] and colors.yellow
 				or ((direction == "up" or direction == "down") and colors.orange or colors.red)

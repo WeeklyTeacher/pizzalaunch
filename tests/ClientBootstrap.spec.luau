@@ -94,10 +94,12 @@ local takeout = child(remotes, "RemoteEvent", "TakeoutAction")
 local queue = child(remotes, "RemoteEvent", "QueueAction")
 local sent = {}
 for _, remote in { launch, purchase, mode, takeout, queue } do function remote:FireServer(...) table.insert(sent, { remote = self.Name, arguments = table.pack(...) }) end end
-local inputService = { TouchEnabled = true, GamepadEnabled = false, InputBegan = signal(), InputEnded = signal(), InputChanged = signal(), WindowFocusReleased = signal(), TextBoxFocused = signal() }
+local inputService = { TouchEnabled = true, KeyboardEnabled = false, PreferredInput = roblox.Enum.PreferredInput.Touch, GamepadEnabled = false, InputBegan = signal(), InputEnded = signal(), InputChanged = signal(), WindowFocusReleased = signal(), TextBoxFocused = signal() }
 function inputService:GetFocusedTextBox() return nil end
 local selectedBefore = child(playerGui, "TextButton", "PreviouslySelected")
 local guiService = { SelectedObject = selectedBefore }
+local guiInset = roblox.Vector2.new(0, 44)
+function guiService:GetGuiInset() return guiInset, roblox.Vector2.zero end
 local boundActions = {}
 local actions = {}
 function actions:BindActionAtPriority(name) boundActions[name] = true end
@@ -125,7 +127,7 @@ local overrides = { Instance = { new = instance }, task = tasks, game = game, sc
 	TweenInfo = { new = function(...) return table.pack(...) end } }
 modules[configObject] = loadModule("src/shared/Config.luau")
 overrides.require = function(name) return assert(modules[name], "Unknown module " .. tostring(name)) end
-for _, name in { "UITheme", "UIConstruction", "UIPresentation", "Onboarding", "Feedback", "LauncherInputState", "ClientInput", "ClientCamera", "ActivityPresentation", "ActivityHUD" } do
+for _, name in { "UITheme", "UIConstruction", "UIPresentation", "Onboarding", "Feedback", "LauncherInputState", "ClientInput", "ClientCamera", "ActivityPresentation", "ActivityHUD", "ResponsiveLayout", "ResponsiveUI" } do
 	scriptObject[name] = name
 	scriptObject.Parent[name] = name
 	modules[name] = loadModule("src/client/" .. name .. ".luau", overrides)
@@ -138,6 +140,64 @@ local function find(name) for _, item in created do if item.Name == name then re
 assert(find("ShopToggle").Visible, "Upgrades must exist and be visible before the first remote")
 assert(find("ExitLauncher").Text == "EXIT", "Touch must not display keyboard exit labels")
 for _, item in created do if item.ClassName == "UIStroke" then assert(item.ApplyStrokeMode == roblox.Enum.ApplyStrokeMode.Border) end end
+local safeRoot = find("SafeContent")
+assert(find("PizzaLaunchHUD").ScreenInsets == roblox.Enum.ScreenInsets.CoreUISafeInsets)
+local function inside(item, width, height)
+	local anchor = item.AnchorPoint or roblox.Vector2.zero
+	local left = item.Position.X.Scale * width + item.Position.X.Offset - item.Size.X.Offset * anchor.X
+	local top = item.Position.Y.Scale * height + item.Position.Y.Offset - item.Size.Y.Offset * anchor.Y
+	assert(left >= 0 and top >= 0 and left + item.Size.X.Offset <= width and top + item.Size.Y.Offset <= height,
+		string.format("%s escapes safe content %dx%d: %.1f,%.1f %.1fx%.1f", item.Name, width, height, left, top, item.Size.X.Offset, item.Size.Y.Offset))
+end
+for _, profile in { { 667, 375, 44 }, { 874, 402, 44 }, { 1024, 768, 44 }, { 1366, 841, 44 } } do
+	camera.ViewportSize = roblox.Vector2.new(profile[1], profile[2])
+	safeRoot.AbsoluteSize = roblox.Vector2.new(profile[1], profile[2] - profile[3])
+	for _, kind in { roblox.Enum.PreferredInput.Touch, roblox.Enum.PreferredInput.KeyboardAndMouse, roblox.Enum.PreferredInput.Gamepad } do
+		-- A hybrid device keeps touch hardware available while preference changes.
+		inputService.KeyboardEnabled, inputService.GamepadEnabled = true, true
+		inputService.PreferredInput = kind
+		render(0.016)
+		for _, name in { "Stats", "ShopToggle", "ExitLauncher", "ChangeMode", "RoundCard", "RecordRunHUD", "LauncherModeSelection", "Controls", "TouchAimPad", "RecordSummary", "ShopPanel", "WalkHint" } do
+			inside(find(name), safeRoot.AbsoluteSize.X, safeRoot.AbsoluteSize.Y)
+		end
+		local exitText = find("ExitLauncher").Text
+		if kind == roblox.Enum.PreferredInput.Touch then assert(exitText == "EXIT")
+		elseif kind == roblox.Enum.PreferredInput.Gamepad then assert(exitText:find("%[B%]"))
+		else assert(exitText:find("%[Q%]")) end
+		assert(find("LaunchButton").Size.X.Offset >= 44 and find("LaunchButton").Size.Y.Offset >= 44)
+		for _, direction in { "Up", "Down", "Left", "Right" } do assert(find(direction).Size.Y.Offset >= 44) end
+		local heading = find("RecordRun"):FindFirstChild("Title")
+		assert(heading.Size.Y.Offset >= heading.TextSize * 2.2, "Both public Record Run heading lines must fit")
+		assert(find("RecordRun"):FindFirstChild("Description").TextSize >= 16)
+		assert(find("ShopPanel"):FindFirstChild("UpgradeCards").CanvasSize.Y.Offset > find("ShopPanel"):FindFirstChild("UpgradeCards").Size.Y.Offset or profile[2] > 700)
+	end
+end
+-- Regression evidence from the native 666x374 Studio landscape run. These
+-- observed projections are a specific fixture, not a simulated engine/render
+-- pass. GUI local positions must include GetGuiInset before comparison with
+-- WorldToViewportPoint coordinates.
+camera.ViewportSize = roblox.Vector2.new(666, 374)
+safeRoot.AbsoluteSize = roblox.Vector2.new(666, 316)
+inputService.PreferredInput = roblox.Enum.PreferredInput.Touch
+guiInset = roblox.Vector2.new(0, 58)
+render(0.016)
+local nativeProjections = { { 210, 217 }, { 447, 211 }, { 229, 191 }, { 431, 187 }, { 263, 176 }, { 400, 174 } }
+local inset = guiService:GetGuiInset()
+for _, name in { "RecordRunHUD", "RoundCard", "Controls", "TouchAimPad", "ShopToggle", "ExitLauncher", "ChangeMode" } do
+	local item = find(name)
+	local anchor = item.AnchorPoint or roblox.Vector2.zero
+	local left = item.Position.X.Offset - item.Size.X.Offset * anchor.X + inset.X
+	local top = item.Position.Y.Offset - item.Size.Y.Offset * anchor.Y + inset.Y
+	for index, point in nativeProjections do
+		assert(point[1] < left - 14 or point[1] > left + item.Size.X.Offset + 14 or point[2] < top - 14 or point[2] > top + item.Size.Y.Offset + 14,
+			string.format("%s overlaps native table %d including 58px GUI inset and14px ring margin", name, index))
+	end
+end
+camera.ViewportSize = roblox.Vector2.new(667, 375)
+safeRoot.AbsoluteSize = roblox.Vector2.new(667, 331)
+guiInset = roblox.Vector2.new(0, 44)
+inputService.PreferredInput = roblox.Enum.PreferredInput.Touch
+render(0.016)
 local activitySnapshot = {
 	activityEpoch = 0, character = character, event = "launcherOccupied", coins = 10, upgrades = {},
 	runner = { status = "idle", pickupPosition = roblox.Vector3.new(-50, 3, 98), normalReward = 8, quickBonus = 2 },
@@ -196,8 +256,28 @@ find("FreePlay").Activated:fire()
 assert(sent[#sent].remote == "LauncherMode" and sent[#sent].arguments[1] == "freePlay" and sent[#sent].arguments[2] == 1, "Mode requests carry their lease epoch")
 send("freePlay", "idle", 2)
 assert(find("Controls").Visible and not find("LauncherModeSelection").Visible and find("ShopToggle").Visible)
+assert(find("TouchAimPad").Visible and not find("Tutorial").Visible, "Compact touch keeps aim controls and omits the duplicate tutorial panel")
+inputService.PreferredInput = roblox.Enum.PreferredInput.KeyboardAndMouse
+render(0.016)
+assert(not find("TouchAimPad").Visible and find("Help").Text:find("SPACE"), "Hybrid keyboard switches control labels without relying on TouchEnabled")
+inputService.PreferredInput = roblox.Enum.PreferredInput.Gamepad
+render(0.016)
+assert(not find("TouchAimPad").Visible and find("Help").Text:find("RT"))
+local focusBeforeShop = guiService.SelectedObject
+find("ShopToggle").Activated:fire()
+assert(guiService.SelectedObject == find("tips"), "Controller enters the visible upgrade list")
+find("ShopToggle").Activated:fire()
+assert(guiService.SelectedObject == focusBeforeShop, "Closing the upgrade list restores prior selection")
+inputService.PreferredInput = roblox.Enum.PreferredInput.Touch
+render(0.016)
+assert(find("TouchAimPad").Visible and not find("Help").Text:find("SPACE"))
+stateRemote.OnClientEvent:fire({ mode = "launcher", launcherMode = "freePlay", cleanupEpoch = 2,
+	recordRun = { status = "idle" }, upgrades = {}, coins = 10, shotActive = false, reloadDelay = 0,
+	event = "shiftEventStarted", payload = { title = "DINNER RUSH", description = "Serve customers for a bonus." } })
+assert(find("ShiftEventBanner").Visible)
 find("ShopToggle").Activated:fire()
 assert(not find("Controls").Visible and find("ExitLauncher").Visible)
+assert(not find("ShiftEventBanner").Visible, "Opening upgrades hides an already-visible event without resetting projectile feedback")
 find("ShopToggle").Activated:fire()
 assert(find("Controls").Visible)
 render(0.016)
@@ -213,6 +293,11 @@ assert(find("RoundTitle").Text == previousRoundText and find("Score").Text == pr
 assert(not find("ActivityNotice").Visible and not find("WalkingActivity").Visible, "Activity rewards remain quiet during mounted play")
 send("recordRun", "finished", 3)
 assert(find("RecordSummary").Visible and not find("Controls").Visible)
+inputService.PreferredInput = roblox.Enum.PreferredInput.Gamepad
+render(0.016)
+assert(guiService.SelectedObject == find("Continue"), "Controller can choose another mode directly from results")
+inputService.PreferredInput = roblox.Enum.PreferredInput.Touch
+render(0.016)
 find("ShopToggle").Activated:fire()
 find("ShopToggle").Activated:fire()
 assert(not find("Controls").Visible and find("RecordSummary").Visible)

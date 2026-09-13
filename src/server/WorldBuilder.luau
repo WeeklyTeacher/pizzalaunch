@@ -4,17 +4,19 @@ local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local PizzaVisual = require(ReplicatedStorage.Shared.PizzaVisual)
+local LauncherArt = require(script.Parent.LauncherArt)
 
 local WorldBuilder = {}
 
 local COLORS = {
-	cream = Color3.fromRGB(255, 239, 203),
+	cream = Color3.fromRGB(242, 232, 211),
 	red = Color3.fromRGB(199, 48, 49),
-	darkRed = Color3.fromRGB(118, 31, 35),
+	darkRed = Color3.fromRGB(112, 48, 43),
 	green = Color3.fromRGB(45, 123, 83),
 	dark = Color3.fromRGB(52, 39, 39),
 	wood = Color3.fromRGB(139, 83, 50),
-	darkWood = Color3.fromRGB(85, 50, 39),
+	darkWood = Color3.fromRGB(108, 78, 59),
 	yellow = Color3.fromRGB(255, 200, 59),
 	orange = Color3.fromRGB(255, 126, 54),
 	steel = Color3.fromRGB(82, 88, 96),
@@ -54,7 +56,7 @@ local function surfaceText(part: BasePart, name: string, face: Enum.NormalId, di
 	label.TextScaled = true
 	label.TextWrapped = true
 	label.Font = Enum.Font.GothamBlack
-	label.TextStrokeTransparency = 0.85
+	label.TextStrokeTransparency = 1
 	label.Parent = gui
 	return gui
 end
@@ -79,7 +81,8 @@ local function billboard(adornee: BasePart, name: string, displayText: string, c
 	corner.Parent = frame
 	local border = Instance.new("UIStroke")
 	border.Color = color
-	border.Thickness = 3
+	border.Thickness = 2
+	border.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	border.Parent = frame
 
 	local label = Instance.new("TextLabel")
@@ -127,13 +130,13 @@ end
 
 local function configureLighting()
 	Workspace.Gravity = Config.GRAVITY
-	Lighting.ClockTime = 15.2
-	Lighting.Brightness = 2.15
-	Lighting.Ambient = Color3.fromRGB(101, 85, 78)
-	Lighting.OutdoorAmbient = Color3.fromRGB(128, 112, 102)
-	Lighting.EnvironmentDiffuseScale = 0.45
-	Lighting.EnvironmentSpecularScale = 0.55
-	Lighting.ColorShift_Top = Color3.fromRGB(255, 226, 190)
+	Lighting.ClockTime = 13.8
+	Lighting.Brightness = 2.2
+	Lighting.Ambient = Color3.fromRGB(128, 124, 116)
+	Lighting.OutdoorAmbient = Color3.fromRGB(151, 154, 153)
+	Lighting.EnvironmentDiffuseScale = 0.6
+	Lighting.EnvironmentSpecularScale = 0.35
+	Lighting.ColorShift_Top = Color3.fromRGB(0, 0, 0)
 
 	for _, name in { "RestaurantAtmosphere", "RestaurantColor", "RestaurantBloom" } do
 		local existing = Lighting:FindFirstChild(name)
@@ -144,37 +147,37 @@ local function configureLighting()
 
 	local atmosphere = Instance.new("Atmosphere")
 	atmosphere.Name = "RestaurantAtmosphere"
-	atmosphere.Density = 0.12
-	atmosphere.Color = Color3.fromRGB(255, 233, 203)
-	atmosphere.Decay = Color3.fromRGB(255, 190, 144)
-	atmosphere.Glare = 0.08
+	atmosphere.Density = 0.07
+	atmosphere.Color = Color3.fromRGB(232, 237, 239)
+	atmosphere.Decay = Color3.fromRGB(204, 214, 222)
+	atmosphere.Glare = 0.02
 	atmosphere.Parent = Lighting
 
 	local color = Instance.new("ColorCorrectionEffect")
 	color.Name = "RestaurantColor"
 	color.Brightness = 0
-	color.Contrast = 0.06
-	color.Saturation = 0.11
-	color.TintColor = Color3.fromRGB(255, 239, 220)
+	color.Contrast = 0.025
+	color.Saturation = -0.025
+	color.TintColor = Color3.fromRGB(255, 251, 245)
 	color.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
 	bloom.Name = "RestaurantBloom"
-	bloom.Intensity = 0.12
-	bloom.Size = 22
-	bloom.Threshold = 1.25
+	bloom.Intensity = 0.065
+	bloom.Size = 16
+	bloom.Threshold = 1.7
 	bloom.Parent = Lighting
 end
 
 local function buildShell(world: Folder)
-	local floor = markSplatSurface(makePart(world, "RestaurantFloor", Vector3.new(132, 1, 168), CFrame.new(0, -1, -12), Color3.fromRGB(91, 56, 42), Enum.Material.WoodPlanks))
+	local floor = markSplatSurface(makePart(world, "RestaurantFloor", Vector3.new(132, 1, 168), CFrame.new(0, -1, -12), Color3.fromRGB(203, 189, 164), Enum.Material.Concrete))
 	floor:SetAttribute("MissSurface", true)
 
-	for x = -60, 60, 12 do
-		for z = -88, 68, 12 do
-			local even = ((x + z) / 12) % 2 == 0
-			local tileColor = even and Color3.fromRGB(249, 224, 183) or Color3.fromRGB(177, 49, 50)
-			local tile = makePart(world, "CheckerTile", Vector3.new(11.7, 0.08, 11.7), CFrame.new(x, -0.46, z), tileColor, Enum.Material.CeramicTiles)
+	for x = -55, 55, 22 do
+		for z = -84, 60, 24 do
+			local even = (math.floor((x + 55) / 22) + math.floor((z + 84) / 24)) % 2 == 0
+			local tileColor = even and Color3.fromRGB(230, 220, 201) or Color3.fromRGB(222, 211, 191)
+			local tile = makePart(world, "FloorTile", Vector3.new(21.85, 0.08, 23.85), CFrame.new(x, -0.46, z), tileColor, Enum.Material.SmoothPlastic)
 			tile.CanCollide = false
 			tile.CanTouch = false
 		end
@@ -182,14 +185,14 @@ local function buildShell(world: Folder)
 
 	local back = markSplatSurface(makePart(world, "BackWall", Vector3.new(132, 34, 2), CFrame.new(0, 16, -96), COLORS.cream, Enum.Material.Plaster))
 	back:SetAttribute("MissSurface", true)
-	local left = markSplatSurface(makePart(world, "LeftWall", Vector3.new(2, 34, 168), CFrame.new(-66, 16, -12), Color3.fromRGB(245, 213, 174), Enum.Material.Brick))
+	local left = markSplatSurface(makePart(world, "LeftWall", Vector3.new(2, 34, 168), CFrame.new(-66, 16, -12), COLORS.cream, Enum.Material.Plaster))
 	left:SetAttribute("MissSurface", true)
-	local right = markSplatSurface(makePart(world, "RightWall", Vector3.new(2, 34, 168), CFrame.new(66, 16, -12), Color3.fromRGB(245, 213, 174), Enum.Material.Brick))
+	local right = markSplatSurface(makePart(world, "RightWall", Vector3.new(2, 34, 168), CFrame.new(66, 16, -12), COLORS.cream, Enum.Material.Plaster))
 	right:SetAttribute("MissSurface", true)
 
-	makePart(world, "BackWainscot", Vector3.new(130, 8, 0.6), CFrame.new(0, 4, -94.7), COLORS.darkRed, Enum.Material.WoodPlanks)
-	makePart(world, "LeftWainscot", Vector3.new(0.6, 8, 166), CFrame.new(-64.7, 4, -12), COLORS.darkRed, Enum.Material.WoodPlanks)
-	makePart(world, "RightWainscot", Vector3.new(0.6, 8, 166), CFrame.new(64.7, 4, -12), COLORS.darkRed, Enum.Material.WoodPlanks)
+	makePart(world, "BackWainscot", Vector3.new(130, 8, 0.6), CFrame.new(0, 4, -94.7), Color3.fromRGB(167, 114, 89), Enum.Material.WoodPlanks)
+	makePart(world, "LeftWainscot", Vector3.new(0.6, 8, 166), CFrame.new(-64.7, 4, -12), Color3.fromRGB(167, 114, 89), Enum.Material.WoodPlanks)
+	makePart(world, "RightWainscot", Vector3.new(0.6, 8, 166), CFrame.new(64.7, 4, -12), Color3.fromRGB(167, 114, 89), Enum.Material.WoodPlanks)
 
 	for _, z in { 40, 5, -30, -65 } do
 		local beam = makePart(world, "CeilingBeam", Vector3.new(126, 1, 1), CFrame.new(0, 31, z), COLORS.darkWood, Enum.Material.Wood)
@@ -200,10 +203,10 @@ end
 local function buildHangingLight(world: Folder, position: Vector3)
 	local cord = makePart(world, "LightCord", Vector3.new(0.18, 7, 0.18), CFrame.new(position + Vector3.new(0, 3.5, 0)), COLORS.dark, Enum.Material.Metal)
 	cord.CanCollide = false
-	local shade = makePart(world, "LightShade", Vector3.new(5.5, 1.2, 5.5), CFrame.new(position), COLORS.red, Enum.Material.Metal)
+	local shade = makePart(world, "LightShade", Vector3.new(1.2, 5.5, 5.5), CFrame.new(position), COLORS.red, Enum.Material.Metal)
 	shade.Shape = Enum.PartType.Cylinder
 	shade.Orientation = Vector3.new(0, 0, 90)
-	shade.CanCollide = false
+	shade.CanCollide, shade.CanTouch, shade.CanQuery = false, false, false
 	local bulb = makePart(world, "WarmBulb", Vector3.new(1.1, 1.1, 1.1), CFrame.new(position - Vector3.new(0, 0.9, 0)), Color3.fromRGB(255, 221, 145), Enum.Material.Neon)
 	bulb.Shape = Enum.PartType.Ball
 	bulb.CanCollide = false
@@ -239,16 +242,40 @@ local function buildStorefrontExterior(world: Folder)
 		{ x = 21.5, width = 55 },
 		{ x = 62.5, width = 7 },
 	} do
-		local wall = makePart(storefront, "FrontFacade", Vector3.new(segment.width, 18, 2), CFrame.new(segment.x, 8, 72), Color3.fromRGB(214, 82, 59), Enum.Material.Brick)
+		local wall = makePart(storefront, "FrontFacade", Vector3.new(segment.width, 18, 2), CFrame.new(segment.x, 8, 72), Color3.fromRGB(183, 126, 101), Enum.Material.Plaster)
 		wall:SetAttribute("SplatSurface", true)
-		makePart(storefront, "FacadeWainscot", Vector3.new(segment.width - 0.3, 4.5, 0.35), CFrame.new(segment.x, 1.6, 73.1), COLORS.darkWood, Enum.Material.WoodPlanks)
+		local wainscot = makePart(storefront, "FacadeWainscot", Vector3.new(segment.width - 0.3, 4.5, 0.35), CFrame.new(segment.x, 1.6, 73.1), COLORS.darkWood, Enum.Material.WoodPlanks)
+		if segment.x == 21.5 then
+			-- Native spawn QA found the old opaque segment hid the entire oven.
+			-- Keep its established physical boundary; replace only its appearance
+			-- with a low wall, open loading hatch and clear shop window.
+			wall.Transparency, wainscot.Transparency = 1, 1
+			wall:SetAttribute("FacadeCollisionProxy", true)
+			wainscot:SetAttribute("FacadeCollisionProxy", true)
+			local function facadePart(name, size, position, color, material)
+				local item = makePart(storefront, name, size, CFrame.new(position), color, material)
+				item.CanCollide, item.CanTouch, item.CanQuery = false, false, false
+				item:SetAttribute("HeroFacadeVisual", true)
+				return item
+			end
+			facadePart("HeroFacadeBase", Vector3.new(55, 1.7, 0.4), Vector3.new(21.5, 0.4, 73.1), Color3.fromRGB(183, 126, 101), Enum.Material.Plaster)
+			facadePart("HeroWindowSill", Vector3.new(55, 0.25, 0.65), Vector3.new(21.5, 1.38, 73.2), COLORS.cream, Enum.Material.SmoothPlastic)
+			for _, x in { -5.78, 8, 48.78 } do
+				facadePart("HeroWindowFrame", Vector3.new(0.35, 15.2, 0.4), Vector3.new(x, 9, 73.15), COLORS.cream, Enum.Material.SmoothPlastic)
+			end
+			facadePart("HeroWindowHeader", Vector3.new(55, 0.4, 0.4), Vector3.new(21.5, 16.65, 73.15), COLORS.cream, Enum.Material.SmoothPlastic)
+			facadePart("LoadingHatchHeader", Vector3.new(13.8, 0.35, 0.4), Vector3.new(1.1, 11.5, 73.15), COLORS.cream, Enum.Material.SmoothPlastic)
+			local upper = facadePart("LoadingHatchTransom", Vector3.new(13.35, 4.72, 0.12), Vector3.new(1.1, 14.04, 73.1), Color3.fromRGB(217, 231, 226), Enum.Material.Glass)
+			local window = facadePart("HeroShopWindow", Vector3.new(40.4, 14.95, 0.12), Vector3.new(28.4, 8.98, 73.1), Color3.fromRGB(217, 231, 226), Enum.Material.Glass)
+			upper.Transparency, window.Transparency = 0.82, 0.82
+		end
 	end
 
 	local header = makePart(storefront, "StorefrontHeader", Vector3.new(132, 5, 2.4), CFrame.new(0, 19.5, 72), COLORS.cream, Enum.Material.Plaster)
 	header:SetAttribute("SplatSurface", true)
-	local marquee = makePart(storefront, "MainMarquee", Vector3.new(50, 8, 1), CFrame.new(8, 20, 73.4), COLORS.darkRed, Enum.Material.Wood)
+	local marquee = makePart(storefront, "MainMarquee", Vector3.new(36, 4.7, 0.55), CFrame.new(10, 20, 73.4), COLORS.darkRed, Enum.Material.Wood)
 	marquee.CanCollide = false
-	surfaceText(marquee, "MainMarqueeText", Enum.NormalId.Back, "PIZZA LAUNCHER\nWALK HERE TO PLAY", COLORS.yellow, nil, 24)
+	surfaceText(marquee, "MainMarqueeText", Enum.NormalId.Back, "PIZZA LAUNCH", COLORS.cream, nil, 24)
 
 	local canopy = makePart(storefront, "StripedCanopy", Vector3.new(126, 1, 9), CFrame.new(0, 15.6, 77), COLORS.red, Enum.Material.Fabric)
 	canopy.CanCollide = false
@@ -269,9 +296,9 @@ local function buildStorefrontExterior(world: Folder)
 	for _, x in { -24.2, -16, -7.8 } do
 		makePart(storefront, "PlayerDoorFrame", Vector3.new(0.8, 14, 1), CFrame.new(x, 6, 71), COLORS.darkWood, Enum.Material.Wood)
 	end
-	local entranceSign = makePart(storefront, "EntranceSign", Vector3.new(17, 2.5, 0.6), CFrame.new(-16, 13.8, 70.6), COLORS.green, Enum.Material.Wood)
+	local entranceSign = makePart(storefront, "EntranceSign", Vector3.new(12, 1.5, 0.4), CFrame.new(-16, 13.8, 70.6), COLORS.green, Enum.Material.Wood)
 	entranceSign.CanCollide = false
-	surfaceText(entranceSign, "EntranceSignText", Enum.NormalId.Back, "ENTER  /  EXIT", COLORS.cream, nil, 18)
+	surfaceText(entranceSign, "EntranceSignText", Enum.NormalId.Back, "WELCOME", COLORS.cream, nil, 18)
 
 	for _, x in { -48, 48 } do
 		local planter = makePart(storefront, "FrontPlanter", Vector3.new(10, 3, 5), CFrame.new(x, 1, 83), COLORS.darkWood, Enum.Material.WoodPlanks)
@@ -361,6 +388,29 @@ local function buildKitchen(world: Folder)
 		cup.Shape = Enum.PartType.Cylinder
 		cup.Orientation = Vector3.new(0, 0, 90)
 	end
+
+	-- Source-owned exhaust fan: three nonphysical blades rotate behind the
+	-- kitchen, outside customers, runner paths and all launch sightlines.
+	local fan = Instance.new("Model")
+	fan.Name = "KitchenVentFan"
+	fan:SetAttribute("SourceOwnedAmbient", true)
+	fan.Parent = kitchen
+	local function fanPart(name, size, frame, color, shape)
+		local item = makePart(fan, name, size, frame, color, Enum.Material.Metal)
+		item.CanCollide, item.CanTouch, item.CanQuery = false, false, false
+		item:SetAttribute("CosmeticOnly", true)
+		if shape then item.Shape = shape end
+		return item
+	end
+	fanPart("FanHousing", Vector3.new(7, 7, 0.35), CFrame.new(-40, 23.5, -85.8), COLORS.cream)
+	fanPart("FanRecess", Vector3.new(0.2, 6.4, 6.4), CFrame.new(-40, 23.5, -85.53) * CFrame.Angles(0, math.pi / 2, 0), COLORS.steel, Enum.PartType.Cylinder)
+	local hubFrame = CFrame.new(-40, 23.5, -85.28)
+	for index = 0, 2 do
+		local blade = fanPart("VentBlade", Vector3.new(0.85, 3.4, 0.12), hubFrame * CFrame.Angles(0, 0, index * math.pi * 2 / 3) * CFrame.new(0, 1.25, 0), Color3.fromRGB(182, 172, 145))
+		blade:SetAttribute("FanBlade", true)
+		blade:SetAttribute("FanAuthoredCFrame", blade.CFrame)
+	end
+	fanPart("FanHub", Vector3.new(0.8, 0.8, 0.3), hubFrame, COLORS.darkWood, Enum.PartType.Ball)
 
 	buildPizzaArt(world, Vector3.new(-51, 20, -94.5), COLORS.red)
 	buildPizzaArt(world, Vector3.new(53, 20, -94.5), COLORS.green)
@@ -458,15 +508,23 @@ local function buildTable(world: Folder, definition)
 	local topWidth = definition.id <= 2 and 14 or (definition.id <= 4 and 16 or 18)
 	local topDepth = definition.id <= 2 and 9 or (definition.id <= 4 and 10 or 11)
 	local seatOffset = topDepth * 0.5 + 3.2
-	local rug = makePart(model, "Rug", Vector3.new(topWidth + 7, 0.12, topDepth + 9), CFrame.new(p + Vector3.new(0, -0.38, -1)), definition.color:Lerp(COLORS.cream, 0.58), Enum.Material.Fabric)
+	local rug = makePart(model, "Rug", Vector3.new(topWidth + 7, 0.12, topDepth + 9), CFrame.new(p.X, -0.32, p.Z - 1), definition.color:Lerp(COLORS.cream, 0.82), Enum.Material.Fabric)
 	rug.CanCollide = false
 	rug.CanTouch = false
 	local top = makePart(model, "TableTop", Vector3.new(topWidth, 1, topDepth), CFrame.new(p + Vector3.new(0, 4.2, 0)), Color3.fromRGB(250, 231, 196), Enum.Material.Wood)
 	top:SetAttribute("TableId", definition.id)
 	top:SetAttribute("DeliverySurface", true)
 	top:SetAttribute("SplatSurface", true)
-	makePart(model, "TablePost", Vector3.new(3, 4.2, 3), CFrame.new(p + Vector3.new(0, 1.7, 0)), COLORS.darkWood, Enum.Material.Wood)
-	makePart(model, "TableBase", Vector3.new(9, 0.8, 7), CFrame.new(p + Vector3.new(0, -0.2, 0)), COLORS.darkWood, Enum.Material.Wood)
+	-- Preserve original physical supports; source art extends visibly to the floor.
+	local post = makePart(model, "TablePost", Vector3.new(3, 4.2, 3), CFrame.new(p + Vector3.new(0, 1.7, 0)), COLORS.darkWood, Enum.Material.Wood)
+	post.Transparency = 1
+	local base = makePart(model, "TableBase", Vector3.new(9, 0.8, 7), CFrame.new(p + Vector3.new(0, -0.2, 0)), COLORS.darkWood, Enum.Material.Wood)
+	base.Transparency = 1
+	local supportTop = p.Y + 3.7
+	local support = makePart(model, "GroundedTableSupport", Vector3.new(3, supportTop + 0.1, 3), CFrame.new(p.X, (supportTop - 0.1) / 2, p.Z), COLORS.darkWood, Enum.Material.Wood)
+	support.CanCollide, support.CanTouch, support.CanQuery = false, false, false
+	local foot = makePart(model, "GroundedTableFoot", Vector3.new(9, 0.45, 7), CFrame.new(p.X, -0.15, p.Z), COLORS.darkWood, Enum.Material.Wood)
+	foot.CanCollide, foot.CanTouch, foot.CanQuery = false, false, false
 
 	local plate = makePart(model, "Plate", Vector3.new(0.35, 6.8, 6.8), CFrame.new(p + Vector3.new(0, 4.85, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 255, 248))
 	plate.Shape = Enum.PartType.Cylinder
@@ -487,6 +545,27 @@ local function buildTable(world: Folder, definition)
 	local boothBack = makePart(model, "BoothBack", Vector3.new(topWidth - 1, definition.id <= 2 and 6 or 7, 1.5), CFrame.new(p + Vector3.new(0, 5, -seatOffset - 2.2)), definition.color:Lerp(COLORS.darkRed, 0.2), Enum.Material.Fabric)
 	boothSeat:SetAttribute("SplatSurface", true)
 	boothBack:SetAttribute("SplatSurface", true)
+	if definition.id == 1 then
+		-- One reviewed hero booth; other detailed furnishings wait for slice QA.
+		-- Realistic-lighting QA rendered Fabric nearly black. Keep its original
+		-- physical material on hidden proxies and use quiet toy upholstery art.
+		boothSeat.Transparency, boothBack.Transparency = 1, 1
+		local seatArt = makePart(model, "HeroBoothSeat", boothSeat.Size, boothSeat.CFrame, Color3.fromRGB(134, 158, 112), Enum.Material.SmoothPlastic)
+		local backArt = makePart(model, "HeroBoothBack", boothBack.Size, boothBack.CFrame, Color3.fromRGB(116, 143, 99), Enum.Material.SmoothPlastic)
+		for _, artPart in { seatArt, backArt } do
+			artPart.CanCollide, artPart.CanTouch, artPart.CanQuery = false, false, false
+		end
+		rug.Material = Enum.Material.SmoothPlastic
+		rug.Color = Color3.fromRGB(212, 205, 180)
+		for _, x in { -topWidth / 2 + 1, topWidth / 2 - 1 } do
+			local leg = makePart(model, "HeroBoothLeg", Vector3.new(0.7, 4.2, 0.7), CFrame.new(p.X + x, 1.75, p.Z - seatOffset - 0.5), COLORS.darkWood, Enum.Material.Wood)
+			leg.CanCollide, leg.CanTouch, leg.CanQuery = false, false, false
+		end
+		for _, x in { -3.4, 0, 3.4 } do
+			local seam = makePart(model, "HeroBoothSeam", Vector3.new(0.09, 4.4, 0.09), CFrame.new(p.X + x, p.Y + 5, p.Z - seatOffset - 1.4), Color3.fromRGB(142, 160, 116), Enum.Material.Fabric)
+			seam.CanCollide, seam.CanTouch, seam.CanQuery = false, false, false
+		end
+	end
 
 	local edge = topWidth * 0.5 - 1.15
 	local shaker = makeReactive(model, "TableParmesan", Vector3.new(1.15, 2.1, 1.15), CFrame.new(p + Vector3.new(-edge, 5.75, -0.6)), Color3.fromRGB(247, 235, 187))
@@ -534,17 +613,18 @@ local function buildLauncher(world: Folder)
 	interiorGuide.CanTouch = false
 	interiorGuide.CanQuery = false
 	interiorGuide.Transparency = 1
-	local interiorBillboard = billboard(interiorGuide, "InteriorLauncherBillboard", "PIZZA LAUNCHER\nTURN AROUND  •  FOLLOW THE ARROWS", COLORS.darkRed, Vector3.zero, Vector2.new(260, 76))
+	local interiorBillboard = billboard(interiorGuide, "InteriorLauncherBillboard", "PIZZA LAUNCHER\nTURN AROUND  •  FOLLOW THE ARROWS", COLORS.darkRed, Vector3.zero, Vector2.new(216, 58))
 	interiorBillboard.MaxDistance = 34
-	local marquee = makePart(station, "Backboard", Vector3.new(18, 6, 1), CFrame.new(18, 11, 72.5), COLORS.red, Enum.Material.Wood)
+	local marquee = makePart(station, "Backboard", Vector3.new(13, 3.8, 0.5), CFrame.new(18, 9.6, 72.5), COLORS.red, Enum.Material.Wood)
 	marquee.CanCollide = false
-	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "PIZZA LAUNCHER\nWALK HERE TO PLAY", COLORS.yellow, nil, 21)
+	surfaceText(station.Backboard, "StationTitle", Enum.NormalId.Back, "PIZZA LAUNCHER", COLORS.cream, nil, 21)
 
 	local operatorConsole = makePart(station, "OperatorConsole", Vector3.new(9, 4.5, 3), CFrame.new(0, 3.2, 73), COLORS.green, Enum.Material.Metal)
-	operatorConsole.CanCollide = false
-	surfaceText(operatorConsole, "ConsoleLabel", Enum.NormalId.Back, "PIZZA LAUNCHER\nUSE FROM THE PIZZA PAD", COLORS.yellow, COLORS.dark, 16)
+	operatorConsole.Transparency = 1
+	operatorConsole.CanCollide, operatorConsole.CanTouch, operatorConsole.CanQuery = false, false, false
+	-- This small console holds the one prompt anchor; instructions live in the picker.
 	-- This is the one authoritative interaction destination. The pizza press
-	-- reaches Z=80, so the anchor sits one clear player-step in front at Z=84.
+	-- ends before Z=77, leaving the established pad at Z=84 clear.
 	-- Tutorial code and server permission checks bind to this exact part only.
 	local interactionAnchor = makePart(operatorConsole, "LauncherInteractionAnchor", Vector3.new(2, 4, 2), CFrame.new(0, 2.4, 84), Color3.new(1, 1, 1))
 	interactionAnchor.Transparency = 1
@@ -554,183 +634,36 @@ local function buildLauncher(world: Folder)
 	interactionAnchor.CastShadow = false
 	interactionAnchor:SetAttribute("AuthoritativeLauncherInteraction", true)
 	prompt(interactionAnchor, "LauncherPrompt", "USE LAUNCHER", "PIZZA LAUNCHER", 12)
-	billboard(interactionAnchor, "LauncherMountBillboard", "STEP HERE TO PLAY", COLORS.darkRed, Vector3.new(0, 5.2, 0), Vector2.new(260, 68))
 
 	-- The prompt's exact activation point is reinforced by a flat, non-colliding
 	-- pizza-colored pad. It remains clear of the storefront and never becomes an
 	-- invisible seat players have to discover.
-	local usePad = makePart(station, "LauncherUsePad", Vector3.new(0.18, 10, 10), CFrame.new(0, 0.16, 84) * CFrame.Angles(0, 0, math.pi / 2), COLORS.yellow, Enum.Material.Neon)
+	local usePad = makePart(station, "LauncherUsePad", Vector3.new(0.18, 10, 10), CFrame.new(0, -0.22, 84) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(228, 185, 99), Enum.Material.SmoothPlastic)
 	usePad.Shape = Enum.PartType.Cylinder
 	usePad.CanCollide = false
 	usePad.CanTouch = false
 	usePad.CanQuery = false
-	usePad.Transparency = 0.18
+	usePad.Transparency = 0
 	usePad:SetAttribute("LauncherMountPosition", true)
-	local padCenter = makePart(station, "LauncherUsePadCenter", Vector3.new(0.2, 6.8, 6.8), CFrame.new(0, 0.27, 84) * CFrame.Angles(0, 0, math.pi / 2), COLORS.red, Enum.Material.SmoothPlastic)
+	local padCenter = makePart(station, "LauncherUsePadCenter", Vector3.new(0.2, 6.8, 6.8), CFrame.new(0, -0.1, 84) * CFrame.Angles(0, 0, math.pi / 2), COLORS.red, Enum.Material.SmoothPlastic)
 	padCenter.Shape = Enum.PartType.Cylinder
 	padCenter.CanCollide = false
 	padCenter.CanTouch = false
 	padCenter.CanQuery = false
 	for _, offset in { Vector3.new(-1.5, 0, -1.2), Vector3.new(1.4, 0, -0.5), Vector3.new(0.3, 0, 1.6) } do
-		local topping = makePart(station, "LauncherUsePadPepperoni", Vector3.new(0.22, 1.25, 1.25), CFrame.new(Vector3.new(0, 0.39, 84) + offset) * CFrame.Angles(0, 0, math.pi / 2), COLORS.darkRed, Enum.Material.Neon)
+		local topping = makePart(station, "LauncherUsePadPepperoni", Vector3.new(0.22, 1.25, 1.25), CFrame.new(Vector3.new(0, 0.02, 84) + offset) * CFrame.Angles(0, 0, math.pi / 2), COLORS.darkRed, Enum.Material.SmoothPlastic)
 		topping.Shape = Enum.PartType.Cylinder
 		topping.CanCollide = false
 		topping.CanTouch = false
 		topping.CanQuery = false
 	end
 
-	local recordConsole = makePart(station, "ModeInfoConsole", Vector3.new(10, 5.5, 3), CFrame.new(-13, 3.7, 73), COLORS.red, Enum.Material.Metal)
-	recordConsole.CanCollide = false
-	surfaceText(recordConsole, "ModeInfoSign", Enum.NormalId.Back, "TWO WAYS TO PLAY\nCHOOSE AFTER MOUNTING", COLORS.yellow, COLORS.dark, 17)
-	local recordGlow = makePart(station, "RecordRunGlow", Vector3.new(0.16, 9, 9), CFrame.new(-13, 0.04, 73) * CFrame.Angles(0, 0, math.pi / 2), COLORS.yellow, Enum.Material.Neon)
-	recordGlow.Shape = Enum.PartType.Cylinder
-	recordGlow.CanCollide = false
-	recordGlow.CanTouch = false
-	recordGlow.Transparency = 0.38
-
-	local bestDisplay = makePart(station, "PersonalBestDisplay", Vector3.new(10, 3.6, 0.7), CFrame.new(-13, 8.8, 72.7), COLORS.darkRed, Enum.Material.Wood)
-	bestDisplay.CanCollide = false
-	surfaceText(bestDisplay, "PersonalBestGui", Enum.NormalId.Back, "YOUR BEST\nLOADING...", COLORS.cream, nil, 18)
-
-	-- A compact restaurant machine, deliberately all behind the muzzle so the
-	-- aiming lane remains clean from the operator camera to every table.
-	local base = makePart(station, "CannonBase", Vector3.new(18, 5, 16), CFrame.new(0, 2.5, 65), COLORS.darkRed, Enum.Material.Metal)
-	base.Shape = Enum.PartType.Cylinder
-	base.Orientation = Vector3.new(0, 0, 90)
-	makePart(station, "BaseTrim", Vector3.new(19, 1.1, 17), CFrame.new(0, 4.4, 65), COLORS.yellow, Enum.Material.Metal)
-	local feedOven = makePart(station, "PizzaFeedOven", Vector3.new(13, 11, 10), CFrame.new(0, 7, 75), COLORS.darkWood, Enum.Material.Brick)
-	local ovenDoor = makePart(station, "OvenMouth", Vector3.new(8, 6, 0.45), CFrame.new(0, 7, 69.8), COLORS.dark, Enum.Material.Metal)
-	ovenDoor.CanCollide = false
-	local ovenFire = makePart(station, "OvenGlow", Vector3.new(6.8, 4.6, 0.18), CFrame.new(0, 7, 69.52), COLORS.orange, Enum.Material.Neon)
-	ovenFire.CanCollide = false
-	local ovenLight = Instance.new("PointLight")
-	ovenLight.Color = COLORS.orange
-	ovenLight.Brightness = 2.3
-	ovenLight.Range = 19
-	ovenLight.Parent = ovenFire
-	surfaceText(feedOven, "OvenBrand", Enum.NormalId.Back, "MAMA MIA\nPIZZA PRESS", COLORS.cream, COLORS.darkRed, 18)
-	local steam = Instance.new("Smoke")
-	steam.Name = "WarmOvenSteam"
-	steam.Color = Color3.fromRGB(255, 238, 210)
-	steam.Opacity = 0.24
-	steam.RiseVelocity = 3
-	steam.Size = 4
-	steam.Parent = feedOven
-	makePart(station, "FeedBelt", Vector3.new(8, 0.7, 10), CFrame.new(0, 5.1, 71.5), COLORS.steel, Enum.Material.Metal)
-	for z = 68, 75, 2 do
-		local roller = makePart(station, "FeedRoller", Vector3.new(1, 6.5, 1), CFrame.new(0, 5.85, z), COLORS.yellow, Enum.Material.Metal)
-		roller.Shape = Enum.PartType.Cylinder
-		roller.Orientation = Vector3.new(0, 0, 90)
-		roller:SetAttribute("CosmeticBaseCFrame", roller.CFrame)
-	end
-	for _, x in { -7.5, 7.5 } do
-		local wheel = makePart(station, "CannonWheel", Vector3.new(2, 11, 11), CFrame.new(x, 3.2, 66), COLORS.steel, Enum.Material.Metal)
-		wheel.Shape = Enum.PartType.Cylinder
-	end
-	local gaugePost = makePart(station, "PressureGaugePost", Vector3.new(0.8, 7, 0.8), CFrame.new(10, 7, 70), COLORS.steel, Enum.Material.Metal)
-	local gauge = makePart(station, "PressureGauge", Vector3.new(0.65, 6, 6), CFrame.new(10, 10, 70), COLORS.cream, Enum.Material.Metal)
-	gauge.Shape = Enum.PartType.Cylinder
-	gauge.Orientation = Vector3.new(0, 0, 90)
-	gauge.CanCollide = false
-	surfaceText(gauge, "PressureReadout", Enum.NormalId.Back, "POWER\nHOT", COLORS.darkRed, nil, 16)
-	makePart(station, "CrankBase", Vector3.new(3.5, 3.5, 3.5), CFrame.new(-10, 5.5, 70), COLORS.steel, Enum.Material.Metal)
-	local crankRig = Instance.new("Model")
-	crankRig.Name = "CosmeticCrankRig"
-	crankRig:SetAttribute("BasePivot", CFrame.new(-10, 5.5, 70))
-	crankRig.Parent = station
-	local crankPivot = makePart(crankRig, "CrankPivot", Vector3.new(0.2, 0.2, 0.2), CFrame.new(-10, 5.5, 70), Color3.new(1, 1, 1))
-	crankPivot.Transparency = 1
-	crankPivot.CanCollide = false
-	crankPivot.CanTouch = false
-	crankPivot.CanQuery = false
-	crankRig.PrimaryPart = crankPivot
-	local lever = makePart(crankRig, "LaunchCrank", Vector3.new(1, 9, 1), CFrame.new(-10, 9, 70) * CFrame.Angles(0, 0, math.rad(-32)), COLORS.red, Enum.Material.Metal)
-	lever.CanCollide = false
-	local leverKnob = makePart(crankRig, "CrankKnob", Vector3.new(2.6, 2.6, 2.6), lever.CFrame * CFrame.new(0, 4.4, 0), COLORS.yellow, Enum.Material.SmoothPlastic)
-	leverKnob.Shape = Enum.PartType.Ball
-	leverKnob.CanCollide = false
-
-	local rig = Instance.new("Model")
-	rig.Name = "AimRig"
-	rig.Parent = station
-	local pivot = makePart(rig, "AimPivot", Vector3.new(0.2, 0.2, 0.2), CFrame.new(Config.LAUNCH_ORIGIN), Color3.new(1, 1, 1))
-	pivot.Transparency = 1
-	pivot.CanCollide = false
-	pivot.CanTouch = false
-	rig.PrimaryPart = pivot
-	local barrel = makePart(rig, "Barrel", Vector3.new(7.4, 7.4, 16), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, 7.4)), Color3.fromRGB(186, 47, 46), Enum.Material.Metal)
-	barrel.CanCollide = false
-	local barrelBand = makePart(rig, "BarrelBand", Vector3.new(8.2, 8.2, 1.2), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, 2.0)), COLORS.yellow, Enum.Material.Metal)
-	barrelBand.CanCollide = false
-	local muzzle = makePart(rig, "Muzzle", Vector3.new(9, 9, 2.2), CFrame.new(Config.LAUNCH_ORIGIN), COLORS.yellow, Enum.Material.Metal)
-	muzzle.CanCollide = false
-	local muzzleOpening = makePart(rig, "MuzzleOpening", Vector3.new(0.25, 6.7, 6.7), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, -1.15)), COLORS.dark, Enum.Material.SmoothPlastic)
-	muzzleOpening.CanCollide = false
-	local muzzleFlash = makePart(rig, "CosmeticMuzzleFlash", Vector3.new(0.35, 7.3, 7.3), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, -1.42)), COLORS.orange, Enum.Material.Neon)
-	muzzleFlash.Transparency = 1
-	muzzleFlash.CanCollide = false
-	muzzleFlash.CanTouch = false
-	muzzleFlash.CanQuery = false
-	local flashLight = Instance.new("PointLight")
-	flashLight.Name = "FireLight"
-	flashLight.Color = Color3.fromRGB(255, 174, 72)
-	flashLight.Brightness = 4
-	flashLight.Range = 22
-	flashLight.Enabled = false
-	flashLight.Shadows = false
-	flashLight.Parent = muzzleFlash
-	local muzzleEffects = Instance.new("Attachment")
-	muzzleEffects.Name = "MuzzleEffects"
-	muzzleEffects.Parent = muzzleOpening
-	local flourPuff = Instance.new("ParticleEmitter")
-	flourPuff.Name = "FlourPuff"
-	flourPuff.Enabled = false
-	flourPuff.Color = ColorSequence.new(Color3.fromRGB(255, 244, 220))
-	flourPuff.EmissionDirection = Enum.NormalId.Front
-	flourPuff.LightEmission = 0.25
-	flourPuff.Lifetime = NumberRange.new(0.28, 0.48)
-	flourPuff.Rate = 0
-	flourPuff.RotSpeed = NumberRange.new(-80, 80)
-	flourPuff.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 4.8) })
-	flourPuff.Speed = NumberRange.new(9, 15)
-	flourPuff.SpreadAngle = Vector2.new(18, 18)
-	flourPuff.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.18), NumberSequenceKeypoint.new(1, 1) })
-	flourPuff.Parent = muzzleEffects
-	local cheeseSpark = Instance.new("ParticleEmitter")
-	cheeseSpark.Name = "CheeseSpark"
-	cheeseSpark.Enabled = false
-	cheeseSpark.Color = ColorSequence.new(COLORS.yellow, COLORS.orange)
-	cheeseSpark.EmissionDirection = Enum.NormalId.Front
-	cheeseSpark.LightEmission = 0.9
-	cheeseSpark.Lifetime = NumberRange.new(0.2, 0.38)
-	cheeseSpark.Rate = 0
-	cheeseSpark.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.42), NumberSequenceKeypoint.new(1, 0) })
-	cheeseSpark.Speed = NumberRange.new(12, 20)
-	cheeseSpark.SpreadAngle = Vector2.new(12, 12)
-	cheeseSpark.Parent = muzzleEffects
-	local loadedPizza = makePart(rig, "LoadedPizza", Vector3.new(0.5, 5.8, 5.8), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(0, 0, -1.35)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 197, 68), Enum.Material.SmoothPlastic)
-	loadedPizza.Shape = Enum.PartType.Cylinder
-	loadedPizza.CanCollide = false
-	for _, offset in { Vector3.new(0, 1.3, 1.1), Vector3.new(0, -1.2, 1.0), Vector3.new(0, 0.2, -1.45) } do
-		local pepperoni = makePart(rig, "LoadedPepperoni", Vector3.new(0.22, 1.05, 1.05), loadedPizza.CFrame * CFrame.new(offset), COLORS.red, Enum.Material.SmoothPlastic)
-		pepperoni.Shape = Enum.PartType.Cylinder
-		pepperoni.CanCollide = false
-	end
-	for index = 0, 4 do
-		local tick = makePart(rig, "AngleTick", Vector3.new(0.35, 0.32 + index * 0.12, 1.1), CFrame.new(Config.LAUNCH_ORIGIN + Vector3.new(-4.15, -2 + index, 3.2)), COLORS.yellow, Enum.Material.Metal)
-		tick.CanCollide = false
-		tick.CanTouch = false
-	end
-	local muzzleLight = Instance.new("PointLight")
-	muzzleLight.Color = COLORS.yellow
-	muzzleLight.Brightness = 1.2
-	muzzleLight.Range = 13
-	muzzleLight.Parent = muzzle
-
-	for _, x in { -13, 13 } do
-		local rail = makePart(station, "SafetyRail", Vector3.new(1, 5, 18), CFrame.new(x, 2.5, 65), COLORS.yellow, Enum.Material.Metal)
-		rail.CanCollide = false
-	end
+	-- Personal records are available beside the dining-room wall, away from the
+	-- entrance and the launcher camera's primary line of sight.
+	local bestDisplay = makePart(station, "PersonalBestDisplay", Vector3.new(0.45, 3.6, 8), CFrame.new(-61, 10.5, 45), COLORS.darkRed, Enum.Material.Wood)
+	bestDisplay.CanCollide, bestDisplay.CanTouch, bestDisplay.CanQuery = false, false, false
+	surfaceText(bestDisplay, "PersonalBestGui", Enum.NormalId.Right, "YOUR BEST\nLOADING...", COLORS.cream, nil, 18)
+	LauncherArt.build(station, Config, COLORS, PizzaVisual)
 
 	local frontCounter = Instance.new("Model")
 	frontCounter.Name = "FrontOrderCounter"
@@ -823,7 +756,7 @@ local function buildRestaurantArtPass(world: Folder)
 
 	-- All detail stays at the perimeter, ceiling, or behind the service counter.
 	-- The six table coordinates and the full launcher-to-table airspace remain unchanged.
-	local ceiling = makePart(art, "WarmPlasterCeiling", Vector3.new(126, 0.7, 160), CFrame.new(0, 32.5, -12), Color3.fromRGB(242, 224, 199), Enum.Material.Plaster)
+	local ceiling = makePart(art, "WarmPlasterCeiling", Vector3.new(126, 0.7, 160), CFrame.new(0, 32.5, -12), Color3.fromRGB(241, 234, 221), Enum.Material.Plaster)
 	ceiling.CanCollide = false
 	ceiling.CanTouch = false
 	for _, x in { -48, -24, 0, 24, 48 } do
@@ -831,7 +764,7 @@ local function buildRestaurantArtPass(world: Folder)
 		rib.CanCollide = false
 	end
 	for _, z in { 52, 18, -16, -50, -84 } do
-		local inlay = makePart(art, "TileInlay", Vector3.new(124, 0.05, 0.45), CFrame.new(0, -0.4, z), Color3.fromRGB(248, 203, 83), Enum.Material.CeramicTiles)
+		local inlay = makePart(art, "TileInlay", Vector3.new(124, 0.05, 0.45), CFrame.new(0, -0.4, z), Color3.fromRGB(197, 178, 144), Enum.Material.SmoothPlastic)
 		inlay.CanCollide = false
 		inlay.CanTouch = false
 	end
@@ -1026,27 +959,6 @@ local function buildNeighborhoodStreet(world: Folder)
 		wheel.Orientation = Vector3.new(0, 90, 0)
 	end
 
-	local pedestrian = Instance.new("Model")
-	pedestrian.Name = "AmbientStreetPedestrian"
-	pedestrian:SetAttribute("AmbientActivity", true)
-	pedestrian.Parent = street
-	local pedestrianStart = Vector3.new(-84, -2, 151)
-	local pedestrianRoot = makePart(pedestrian, "Root", Vector3.new(1, 1, 1), CFrame.new(pedestrianStart + Vector3.new(0, 3, 0)), Color3.new(1, 1, 1))
-	pedestrianRoot.Transparency = 1
-	pedestrianRoot.CanCollide = false
-	pedestrianRoot.CanTouch = false
-	pedestrianRoot.CanQuery = false
-	pedestrian.PrimaryPart = pedestrianRoot
-	local pedestrianBody = makePart(pedestrian, "Body", Vector3.new(2.4, 3.5, 1.5), CFrame.new(pedestrianStart + Vector3.new(0, 3.5, 0)), Color3.fromRGB(80, 124, 179), Enum.Material.SmoothPlastic)
-	local pedestrianHead = makePart(pedestrian, "Head", Vector3.new(2.2, 2.2, 2.2), CFrame.new(pedestrianStart + Vector3.new(0, 6.2, 0)), Color3.fromRGB(211, 161, 119), Enum.Material.SmoothPlastic)
-	pedestrianHead.Shape = Enum.PartType.Ball
-	for _, part in { pedestrianBody, pedestrianHead } do
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Transparency = 1
-		part:SetAttribute("AmbientVisibleTransparency", 0)
-	end
 
 	for _, boundary in {
 		{ "StreetBoundaryLeft", Vector3.new(2, 20, 66), CFrame.new(-91, 9, 130) },

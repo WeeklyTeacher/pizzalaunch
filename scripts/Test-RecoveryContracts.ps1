@@ -31,7 +31,7 @@ foreach ($relativePath in $transferInvariantHashes.Keys) {
     Assert-True ($actual -eq $transferInvariantHashes[$relativePath]) "$relativePath remains byte-identical to Transfer"
 }
 # RojoBuild.spec compares the protected mapping structurally, allowing only the
-# reviewed Position-to-CFrame serialization repair, and inspects a real build.
+# reviewed ground/lighting changes, and inspects a real build.
 
 $worldPath = Join-Path $root 'src\server\WorldBuilder.luau'
 $world = Get-Content -LiteralPath $worldPath -Raw
@@ -70,10 +70,10 @@ Assert-True ($world.Contains('prompt(interactionAnchor, "LauncherPrompt", "USE L
 Assert-True (-not $world.Contains('prompt(recordConsole, "RecordRunPrompt"')) 'world has no competing Record Run prompt'
 Assert-True ($world.Contains('item.ClickablePrompt = true') -and $world.Contains('item.GamepadKeyCode = Enum.KeyCode.ButtonX')) 'launcher prompt supports touch and controller input'
 Assert-True ($world.Contains('"LauncherUsePad"') -and $world.Contains('LauncherMountPosition')) 'exact launcher use point has a visible pizza-shaped pad'
-Assert-True ($world.Contains('"PIZZA LAUNCHER\nWALK HERE TO PLAY"')) 'entrance and launcher signs use direct player language'
+# WorldContracts executes the authored destination/return cues and verifies that
+# the duplicate mount billboard is absent; exact historical copy is not safety.
 Assert-True ($world.Contains('"InteriorLauncherGuide"') -and $world.Contains('"InteriorLauncherBillboard", "PIZZA LAUNCHER\nTURN AROUND  •  FOLLOW THE ARROWS"')) 'restaurant interior has a camera-facing launcher direction sign'
 Assert-True ($world.Contains('interiorBillboard.MaxDistance = 34')) 'interior direction sign does not overlap the real spawn view'
-Assert-True ($world.Contains('"LauncherMountBillboard", "STEP HERE TO PLAY"')) 'authoritative mount point has an explicit STEP HERE TO PLAY label'
 Assert-True ($world.Contains('AuthoritativeLauncherInteraction')) 'launcher anchor declares its authoritative interaction role'
 Assert-True (-not $world.Contains('"OperatorSpot"')) 'obsolete glow underneath the pizza press is removed'
 Assert-True ($config.Contains('Config.RECORD_RUN_STORE = "PizzaLaunch_RecordRun_AllTime_v1"')) 'OrderedDataStore name is unchanged'
@@ -108,14 +108,15 @@ Assert-True ($client.Contains('interactionAnchor.Position.X + offset.X') -and $c
 Assert-True ($client.Contains('world:FindFirstChild("LauncherUsePad", true)') -and $client.Contains('highlight.Adornee = (usePad')) 'launcher highlighting binds to the visible use pad'
 Assert-True (-not $client.Contains('FindFirstChild("OperatorConsole"')) 'onboarding never guesses its destination from the decorative console'
 Assert-True ($gameService.Contains('root.Position - interactionAnchor.Position')) 'server mount permission validates against LauncherInteractionAnchor'
-Assert-True ($client.Contains('shaft.Size = Vector3.new(2.4, 0.16, 3.5)') -and $client.Contains('arrowHead.Size = Vector3.new(1.5, 0.16, 3.1)')) 'Pizza Trail arrow geometry is wide and unmistakable'
+# Onboarding.spec executes the smaller plain gold route construction and its
+# part/footprint budget; exact historical arrow dimensions are not a safety rule.
 Assert-True ($client.Contains('Workspace:Raycast(horizontalPoint + Vector3.new(0, 12, 0)') -and $client.Contains('floorHit.Position.Y + 0.14')) 'each Pizza Trail arrow is raycast onto approved floor geometry with full-thickness clearance'
 Assert-True (-not $client.Contains('local trailFloorY =')) 'Pizza Trail never relies on one hard-coded floor height'
 $pressFrontZ = 80.0
 $finalMarkerZ = 84.0
 Assert-True (($finalMarkerZ - $pressFrontZ) -ge 4.0) 'final trail marker remains on clear floor in front of the decorative pizza press'
-$pepperoniBlock = [regex]::Match($client, 'for _, pepperoniOffset in \{([\s\S]*?)\r?\n\s*\} do')
-Assert-True ($pepperoniBlock.Success -and ([regex]::Matches($pepperoniBlock.Groups[1].Value, 'Vector3\.new\(')).Count -eq 3) 'every Pizza Trail arrow carries three round pepperoni circles'
+# Decorative toppings are deliberately removed. Actual-module tests retain
+# route destination/count/surface clearance, visibility and fade recovery.
 Assert-True ($client.Contains('part.CanCollide = false') -and $client.Contains('part.CanTouch = false') -and $client.Contains('part.CanQuery = false')) 'Pizza Trail markers cannot affect movement, shots, or target queries'
 Assert-True ($client.Contains('folder:SetAttribute("ClientOnly", true)')) 'Pizza Trail world art is local to each player'
 Assert-True ($client.Contains('Follow the pizza arrows to the Pizza Launcher!')) 'first-spawn hint uses simple player language'
@@ -159,4 +160,5 @@ foreach ($customerName in @('Mia', 'Bo', 'Ziggy', 'Pip', 'Nana', 'Max', 'Lulu', 
 foreach ($category in @('greeting', 'waiting', 'happy', 'wrong', 'leaving')) {
     Assert-True ($dialogue.Contains($category + ' =')) "dialogue pools contain $category lines"
 }
-Assert-True ($worldActivity.Contains('AmbientStreetPedestrian')) 'street activity animates the isolated ambient pedestrian'
+# WorldActivity.spec executes bounded fan motion, authored restoration, stale
+# callbacks and teardown. The old sliding pedestrian/glass pulse is retired.

@@ -17,7 +17,7 @@ function ActivityHUD.new(context)
 		item.ZIndex = 16
 		item.Parent = context.gui
 		Theme.addCorner(item, 16)
-		Theme.addStroke(item, colors.darkRed, 2)
+		Theme.addStroke(item, colors.border, 1.5)
 		return item
 	end
 	local function label(parent, name, text, size, position, fontSize)
@@ -35,7 +35,7 @@ function ActivityHUD.new(context)
 	local title = label(card, "Objective", "TAKEOUT RUNNER", UDim2.new(1, -24, 0, 26), UDim2.fromOffset(12, 8), 18)
 	title.TextColor3 = colors.darkRed
 	local detail = label(card, "Detail", "", UDim2.new(1, -24, 0, 43), UDim2.fromOffset(12, 36), 14)
-	local queueText = label(card, "Queue", "", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 81), 12)
+	local queueText = label(card, "Queue", "", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 81), 14)
 	queueText.TextColor3 = colors.darkRed
 	local takeout = button(card, "DoTakeout", "DO TAKEOUT ORDERS", UDim2.new(0.58, -18, 0, 40), UDim2.fromOffset(12, 105), colors.green)
 	local leave = button(card, "LeaveLine", "LEAVE LINE", UDim2.new(0.42, -18, 0, 40), UDim2.new(0.58, 6, 0, 105), colors.red)
@@ -45,7 +45,7 @@ function ActivityHUD.new(context)
 	local choiceDetail = label(choice, "NowPlaying", "", UDim2.new(1, -24, 0, 56), UDim2.fromOffset(12, 43), 14)
 	local join = button(choice, "JoinLine", "JOIN LINE", UDim2.new(0.5, -18, 0, 62), UDim2.fromOffset(12, 115), colors.red)
 	local chooseTakeout = button(choice, "ChooseTakeout", "DO TAKEOUT\nORDERS", UDim2.new(0.5, -18, 0, 62), UDim2.new(0.5, 6, 0, 115), colors.green)
-	local close = button(choice, "Close", "X", UDim2.fromOffset(36, 36), UDim2.new(1, -46, 0, 8), colors.darkRed)
+	local close = button(choice, "Close", "X", UDim2.fromOffset(44, 44), UDim2.new(1, -54, 0, 8), colors.darkRed)
 	join.NextSelectionRight = chooseTakeout
 	chooseTakeout.NextSelectionLeft = join
 	close.NextSelectionDown = join
@@ -60,7 +60,8 @@ function ActivityHUD.new(context)
 	local function setChoice(open)
 		if open == self.choiceOpen then return end
 		self.choiceOpen = open
-		if open and context.UserInputService.GamepadEnabled then
+		local layout = context.getLayout and context.getLayout()
+		if open and ((layout and layout.inputKind == "gamepad") or (not layout and context.UserInputService.PreferredInput == Enum.PreferredInput.Gamepad)) then
 			self.previousSelection = context.GuiService.SelectedObject
 			context.GuiService.SelectedObject = join
 		elseif not open then
@@ -263,7 +264,8 @@ function ActivityHUD.new(context)
 		if self.epoch <= self.suppressedEpoch then return end
 		local now = context.Workspace:GetServerTimeNow()
 		local view = Presentation.select(self.snapshot, now, self.mounted, self.routeRequested)
-		context.exitButton.Text = view.passTurn and "EXIT &\nPASS TURN" or defaultExit
+		local layout = context.getLayout and context.getLayout()
+		context.exitButton.Text = view.passTurn and "EXIT &\nPASS TURN" or (layout and layout.exitText or defaultExit)
 		card.Visible = view.visible and not self.choiceOpen and not self.covered
 		choice.Visible = self.choiceOpen and not self.mounted and not self.covered
 		notice.Visible = not self.mounted and not self.covered and now < (self.noticeUntil or 0)
@@ -274,10 +276,19 @@ function ActivityHUD.new(context)
 			takeout.Visible, leave.Visible = view.canDoTakeout, view.canLeaveLine
 			local camera = context.Workspace.CurrentCamera
 			local width = camera and camera.ViewportSize.X or 900
-			local availableWidth = math.max(300, math.min(420, width - 36))
-			card.Size = UDim2.fromOffset(availableWidth, (view.canDoTakeout or view.canLeaveLine) and 154 or 108)
+			local availableWidth = layout and layout.activityWidth or math.max(300, math.min(420, width - 36))
+			local y = layout and layout.activityY or 76
+			local cardHeight = (view.canDoTakeout or view.canLeaveLine) and 158 or 108
+			card.Position = UDim2.new(0.5, 0, 0, y)
+			card.Size = UDim2.fromOffset(availableWidth, cardHeight)
+			takeout.Size = UDim2.new(0.58, -18, 0, 44)
+			leave.Size = UDim2.new(0.42, -18, 0, 44)
 			choice.Size = UDim2.fromOffset(math.min(430, availableWidth), 194)
-			notice.Position = UDim2.new(0.5, 0, 0, card.Visible and 240 or 88)
+			choice.Position = UDim2.new(0.5, 0, 0, y)
+			notice.Size = UDim2.fromOffset(math.min(380, availableWidth), 64)
+			local noticeY = card.Visible and y + cardHeight + 8 or y
+			if layout then noticeY = math.min(noticeY, layout.height - 74) end
+			notice.Position = UDim2.new(0.5, 0, 0, noticeY)
 		end
 		updateWorld(view)
 	end

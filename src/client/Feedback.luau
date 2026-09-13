@@ -2,6 +2,7 @@ local Feedback = {}
 function Feedback.new(context)
 	local self = {}
 	local lifetime = 0
+	local recoilStarted
 	local tweens = {}
 	local engineTask = task
 	local task = { delay = function(seconds, callback)
@@ -14,7 +15,11 @@ function Feedback.new(context)
 		tween.Completed:Once(function() tweens[tween] = nil end)
 		return tween
 	end }
-	local Workspace, UserInputService, TextService, COLORS = context.Workspace, context.UserInputService, context.TextService, context.COLORS
+	local Workspace, TextService, COLORS = context.Workspace, context.TextService, context.COLORS
+	local function covered() return context.isCovered and context.isCovered() end
+	local function loadedVisual(item)
+		return item:IsA("BasePart") and (item.Name == "LoadedPizza" or item.Name == "LoadedPepperoni" or item:GetAttribute("CosmeticLoadedPizza") == true)
+	end
 	local feedback = context.ui.feedback
 	local dialogueCard = context.ui.dialogueCard
 	local dialoguePortrait = context.ui.dialoguePortrait
@@ -31,22 +36,25 @@ function Feedback.new(context)
 	local roundOverlayDetail = context.ui.roundOverlayDetail
 local feedbackToken = 0
 local function showFeedback(displayText: string, color: Color3, detail: string?)
+	if covered() or roundOverlay.Visible then return end
 	feedbackToken += 1
 	local token = feedbackToken
 	feedback.Text = detail and string.format("%s\n%s", displayText, detail) or displayText
-	feedback.TextColor3 = color
+	feedback.TextColor3 = color == COLORS.green and COLORS.green or COLORS.ink
 	feedback.TextTransparency = 0
-	feedback.Position = UDim2.new(0.5, -290, 0.39, 0)
-	feedback.Rotation = -4
+	feedback.BackgroundTransparency = 0.06
+	local targetPosition = context.ui.feedbackPosition or feedback.Position
+	feedback.Position = targetPosition + UDim2.fromOffset(0, 8)
+	feedback.Rotation = 0
 	feedback.Visible = true
-	TweenService:Create(feedback, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.5, -290, 0.31, 0), Rotation = 0,
+	TweenService:Create(feedback, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = targetPosition,
 	}):Play()
 	task.delay(1.25, function()
 		if token ~= feedbackToken then
 			return
 		end
-		local tween = TweenService:Create(feedback, TweenInfo.new(0.25), { TextTransparency = 1 })
+		local tween = TweenService:Create(feedback, TweenInfo.new(0.25), { TextTransparency = 1, BackgroundTransparency = 1 })
 		tween:Play()
 		tween.Completed:Wait()
 		if token == feedbackToken then
@@ -80,15 +88,17 @@ local function hideCustomerDialogue(immediate: boolean?)
 end
 
 local function showCustomerDialogue(payload)
+	if covered() or roundOverlay.Visible or eventBanner.Visible then return end
 	dialogueToken += 1
 	local token = dialogueToken
 	local name = payload.name or "Customer"
 	local line = payload.line or "A hot cheese pizza would be perfect."
-	local textWidth = UserInputService.TouchEnabled and 222 or 262
-	local textSize = UserInputService.TouchEnabled and 14 or 16
+	local cardWidth = dialogueCard.Size.X.Offset
+	local textWidth = math.max(200, cardWidth - 98)
+	local textSize = 16
 	local bounds = TextService:GetTextSize(line, textSize, Enum.Font.GothamMedium, Vector2.new(textWidth, 500))
-	local cardHeight = math.max(UserInputService.TouchEnabled and 104 or 110, 70 + bounds.Y)
-	dialogueCard.Size = UDim2.fromOffset(UserInputService.TouchEnabled and 320 or 360, cardHeight)
+	local cardHeight = math.max(110, 70 + bounds.Y)
+	dialogueCard.Size = UDim2.fromOffset(cardWidth, cardHeight)
 	dialogueText.Size = UDim2.new(1, -98, 0, bounds.Y + 4)
 	dialoguePortrait.Text = string.upper(string.sub(name, 1, 1))
 	dialoguePortrait.BackgroundColor3 = payload.color or COLORS.red
@@ -128,13 +138,19 @@ end)
 
 local eventBannerToken = 0
 local function showEventBanner(payload)
+	if covered() then return end
+	if roundOverlay.Visible then
+		task.delay(2.5, function() showEventBanner(payload) end)
+		return
+	end
+	hideCustomerDialogue(true)
 	eventBannerToken += 1
 	local token = eventBannerToken
 	eventIcon.Text = payload.icon or "!"
 	eventTitle.Text = payload.title or "SHIFT EVENT"
 	eventDetail.Text = payload.description or payload.detail or payload.message or "Keep serving!"
 	eventBanner.BackgroundTransparency = 1
-	local targetPosition = UserInputService.TouchEnabled and UDim2.new(1, -10, 0, 148) or UDim2.new(1, -18, 0, 212)
+	local targetPosition = context.ui.eventPosition or eventBanner.Position
 	eventBanner.Position = targetPosition + UDim2.fromOffset(18, 0)
 	for _, label in { eventIcon, eventTitle, eventDetail } do label.TextTransparency = 1 end
 	local border = eventBanner:FindFirstChildOfClass("UIStroke")
@@ -162,11 +178,17 @@ end
 
 local roundBannerToken = 0
 local function showRoundComplete(payload)
+	if covered() then return end
+	feedbackToken += 1
+	eventBannerToken += 1
+	feedback.Visible = false
+	eventBanner.Visible = false
+	hideCustomerDialogue(true)
 	roundBannerToken += 1
 	local token = roundBannerToken
 	roundOverlayTitle.Text = string.format("ROUND %d CLEARED!", payload.completedRound or context.getState().round)
 	roundOverlayDetail.Text = string.format("%s  -  +%d COINS  -  NEXT: %s", payload.completedRoundName or "GREAT WORK", payload.roundReward or 0, context.getState().roundName or "MORE ORDERS")
-	local targetPosition = UserInputService.TouchEnabled and UDim2.new(0.5, 0, 0, 84) or UDim2.new(0.5, 0, 0, 126)
+	local targetPosition = context.ui.roundPosition or roundOverlay.Position
 	roundOverlay.Position = targetPosition - UDim2.fromOffset(0, 18)
 	roundOverlay.BackgroundTransparency = 1
 	roundOverlayTitle.TextTransparency = 1
@@ -208,6 +230,7 @@ end
 
 local launcherEffectToken = 0
 local function playLauncherFire(reloadTime: number?)
+	recoilStarted = os.clock()
 	launcherEffectToken += 1
 	local token = launcherEffectToken
 	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
@@ -218,20 +241,20 @@ local function playLauncherFire(reloadTime: number?)
 	end
 
 	for _, descendant in rig:GetDescendants() do
-		if descendant:IsA("BasePart") and (descendant.Name == "LoadedPizza" or descendant.Name == "LoadedPepperoni") then
+		if loadedVisual(descendant) then
 			descendant.LocalTransparencyModifier = 1
 		elseif descendant:IsA("ParticleEmitter") then
 			if descendant.Name == "FlourPuff" then
-				descendant:Emit(10)
+				descendant:Emit(6)
 			elseif descendant.Name == "CheeseSpark" then
-				descendant:Emit(16)
+				descendant:Emit(4)
 			end
 		end
 	end
 
 	local flash = rig:FindFirstChild("CosmeticMuzzleFlash", true)
 	if flash and flash:IsA("BasePart") then
-		flash.Transparency = 0.08
+		flash.Transparency = 0.45
 		local fireLight = flash:FindFirstChild("FireLight")
 		if fireLight and fireLight:IsA("PointLight") then
 			fireLight.Enabled = true
@@ -247,7 +270,7 @@ local function playLauncherFire(reloadTime: number?)
 	local ovenGlow = station:FindFirstChild("OvenGlow")
 	local ovenLight = ovenGlow and ovenGlow:FindFirstChildOfClass("PointLight")
 	if ovenLight then
-		ovenLight.Brightness = 4.8
+		ovenLight.Brightness = 3.5
 		local restingBrightness = 2.3 + (context.getState().upgrades and context.getState().upgrades.power or 0) * 0.6
 		TweenService:Create(ovenLight, TweenInfo.new(0.3), { Brightness = restingBrightness }):Play()
 	end
@@ -267,7 +290,7 @@ local function playLauncherFire(reloadTime: number?)
 			return
 		end
 		for _, descendant in rig:GetDescendants() do
-			if descendant:IsA("BasePart") and (descendant.Name == "LoadedPizza" or descendant.Name == "LoadedPepperoni") then
+			if loadedVisual(descendant) then
 				descendant.LocalTransparencyModifier = 0
 			end
 		end
@@ -277,6 +300,7 @@ end
 
 function self.reset()
     lifetime += 1
+    recoilStarted = nil
     feedbackToken += 1
     dialogueToken += 1
     eventBannerToken += 1
@@ -295,7 +319,7 @@ function self.reset()
             ovenLight.Brightness = 2.3 + (upgrades and upgrades.power or 0) * 0.6
         end
         for _, item in station:GetDescendants() do
-            if item:IsA("BasePart") and (item.Name == "LoadedPizza" or item.Name == "LoadedPepperoni") then item.LocalTransparencyModifier = 0 end
+            if loadedVisual(item) then item.LocalTransparencyModifier = 0 end
             if item:IsA("BasePart") and item.Name == "CosmeticMuzzleFlash" then item.Transparency = 1 end
             if item:IsA("PointLight") and item.Name == "FireLight" then item.Enabled = false end
             if item:IsA("Smoke") and item.Name == "WarmOvenSteam" then item.Opacity = 0.24 end
@@ -308,6 +332,12 @@ self.showCustomerDialogue = showCustomerDialogue
 self.showEventBanner = showEventBanner
 self.showRoundComplete = showRoundComplete
 self.playLauncherFire = playLauncherFire
+function self.recoilOffset(now)
+	if not recoilStarted then return 0 end
+	local elapsed = now - recoilStarted
+	if elapsed < 0 or elapsed >= 0.28 then return 0 end
+	return math.sin(elapsed / 0.28 * math.pi) * (1 - elapsed / 0.28) * 0.7
+end
 return self
 end
 return Feedback

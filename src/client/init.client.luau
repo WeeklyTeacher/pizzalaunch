@@ -18,6 +18,7 @@ local LauncherInputState = require(script.LauncherInputState)
 local ClientInput = require(script.ClientInput)
 local ClientCamera = require(script.ClientCamera)
 local ActivityHUD = require(script.ActivityHUD)
+local ResponsiveUI = require(script.ResponsiveUI)
 local inputState = LauncherInputState.new((Config.DEFAULT_PITCH - Config.MIN_PITCH) / (Config.MAX_PITCH - Config.MIN_PITCH), Config.CHARGE_TIME)
 
 local player = Players.LocalPlayer
@@ -78,6 +79,7 @@ local function delayUI(seconds, callback)
 end
 
 local ui = UIConstruction.build({ playerGui = playerGui, UserInputService = UserInputService, purchaseRemote = purchaseRemote, Config = Config, charge = inputState.charge })
+local responsiveUI = ResponsiveUI.new(ui, Workspace, UserInputService)
 
 local screenTint = ui.screenTint
 local stats = ui.stats
@@ -119,7 +121,7 @@ local upgradeOrder = ui.upgradeOrder
 local touchAimPad = ui.touchAimPad
 local walkHint = ui.walkHint
 
-local onboarding = Onboarding.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, player = player, COLORS = COLORS, ui = ui, isOperating = function() return operating end, restoreTutorialAppearance = function() restoreTutorialAppearance() end })
+local onboarding = Onboarding.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, player = player, COLORS = COLORS, ui = ui, isOperating = function() return operating end, getInputKind = function() return ui.layout.inputKind end, restoreTutorialAppearance = function() restoreTutorialAppearance() end })
 local trajectoryFolder = Instance.new("Folder")
 trajectoryFolder.Name = "LocalAimGuide"
 trajectoryFolder.Parent = Workspace
@@ -221,7 +223,8 @@ local function applyPresentation()
 	shopToggle.Visible = view.upgrades
 	shopToggle.Text = view.shop and "CLOSE" or "UPGRADES"
 	controls.Visible = view.controls
-	touchAimPad.Visible = view.controls and UserInputService.TouchEnabled
+	touchAimPad.Visible = view.controls and ui.layout.inputKind == "touch"
+	if ui.layout.compact or view.shop or view.picker then tutorial.Visible = false end
 	exitButton.Visible = view.exit
 	walkHint.Visible = view.walking and not objective
 	roundCard.Visible = view.round and not objective
@@ -230,6 +233,11 @@ local function applyPresentation()
 	recordSummary.Visible = view.results
 	recordContinue.Visible = view.continue
 	changeModeButton.Visible = view.changeMode
+	if view.shop or view.picker or view.results then
+		for _, item in { ui.feedback, ui.dialogueCard, ui.eventBanner, ui.roundOverlay } do item.Visible = false end
+	end
+	cameraController.setNavigation(view.shop and shopPanel or (view.results and recordSummary or nil),
+		view.shop and upgradeCards[upgradeOrder[1]].card or (view.continue and recordContinue or nil), ui.layout.inputKind)
 	inputState:setBlocked(view.shop or view.picker)
 end
 
@@ -264,7 +272,7 @@ local function updateRecordUI()
 			rankLine = "GLOBAL RECORDS UNAVAILABLE RIGHT NOW"
 		end
 		recordSummaryDetail.Text = string.format("FINAL SCORE  %d\nPERSONAL BEST  %d\n%s", run.score or 0, run.personalBest or 0, rankLine)
-		recordSummaryHint.Text = run.globalBoardAvailable and "CHOOSE MODE TO PLAY AGAIN" or "THIS SERVER STILL REMEMBERS YOUR BEST — CHOOSE MODE TO PLAY AGAIN"
+			recordSummaryHint.Text = run.globalBoardAvailable and "CHOOSE MODE TO PLAY AGAIN" or "Best kept for this session • Choose a mode to play again"
 	end
 	if not session then
 		countdownLabel.Visible = false
@@ -348,7 +356,7 @@ local function updateTargetVisuals()
 						if descendant:IsA("BasePart") then
 							descendant.LocalTransparencyModifier = isActive and 0 or 1
 						elseif descendant:IsA("SurfaceGui") and descendant.Name == "Face" then
-							descendant.Enabled = isActive and tableModel:GetAttribute("Occupied") ~= false
+							descendant.Enabled = isActive and tableModel:GetAttribute("Occupied") ~= false and not descendant:GetAttribute("CustomerProxyFace")
 						elseif descendant:IsA("ProximityPrompt") then
 							descendant.Enabled = isActive and available and not operating
 						end
@@ -407,9 +415,11 @@ local function updateTargetVisuals()
 	end
 end
 
-local effects = Feedback.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, TextService = TextService, COLORS = COLORS, ui = ui, getState = function() return state end })
+local effects = Feedback.new({ Workspace = Workspace, UserInputService = UserInputService, TweenService = TweenService, TextService = TextService, COLORS = COLORS, ui = ui, getState = function() return state end,
+	isCovered = function() return shopPanel.Visible or modeSelection.Visible or recordSummary.Visible end })
 activityHud = ActivityHUD.new({
-	gui = ui.gui, player = player, Workspace = Workspace, UserInputService = UserInputService, GuiService = GuiService,
+	gui = ui.safeRoot, player = player, Workspace = Workspace, UserInputService = UserInputService, GuiService = GuiService,
+	getLayout = function() return ui.layout end,
 	activityRemote = activityRemote, takeoutRemote = takeoutRemote, queueRemote = queueRemote, exitButton = exitButton,
 	onChanged = applyPresentation,
 	onEconomy = function(coins, upgrades)
@@ -538,12 +548,10 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	local changedLauncherMode = state.launcherMode ~= previousLauncherMode
 	coinsLabel.Text = string.format("COINS  %d", state.coins or 0)
 	comboLabel.Text = string.format("COMBO  x%d", state.combo or 0)
-	local eventSuffix = state.shiftEvent and string.format("  -  EVENT %s", state.shiftEvent.icon or "!") or ""
-	local freePlayPrefix = state.launcherMode == "freePlay" and "FREE PLAY • NO TIMER  •  " or ""
-	roundTitle.Text = string.format("%sROUND %d • %s%s", freePlayPrefix, state.round or 1, state.roundName or "FIRST ORDERS", eventSuffix)
-	targetLabel.Text = "SERVE ANY HUNGRY CUSTOMER"
+	roundTitle.Text = "FREE PLAY • NO TIMER"
+	targetLabel.Text = string.format("Round %d • Serve hungry customers", state.round or 1)
 	progressFill.Size = UDim2.fromScale(math.clamp((state.roundProgress or 0) / math.max(state.roundGoal or 1, 1), 0, 1), 1)
-	roundCard.BackgroundColor3 = state.roundColor or COLORS.green
+	roundCard.BackgroundColor3 = COLORS.cream
 	updateShop(state.upgrades)
 	if changedMode or changedLauncherMode or inputChanged then
 		applyMode()
@@ -558,8 +566,8 @@ stateRemote.OnClientEvent:Connect(function(newState)
 	if state.event == "launched" and operating and state.payload and state.payload.requestEpoch == inputState.epoch then
 		local reloadTime = state.payload and state.payload.reloadTime or Config.RELOAD_TIME
 		effects.playLauncherFire(reloadTime)
-		shakeUntil = os.clock() + 0.22
-		shakeStrength = 0.7
+		-- Anticipation/flour/recoil lives on the machine; ordinary launches do
+		-- not shake or flash the whole camera.
 		if not onboarding.onboardingCompleted then
 			onboarding.onboardingCompleted = true
 			onboarding.onboardingReachedLauncher = false
@@ -581,45 +589,26 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		local detail
 		if payload.recordRun then
 			if payload.recordPoints and payload.recordPoints > 0 then
-				detail = string.format("+%d POINTS  -  COMBO %d  x%.2f", payload.recordPoints, payload.recordCombo or 0, payload.recordMultiplier or 1)
-				if payload.recordComboMilestone then
-					detail ..= "\nMULTIPLIER UP - THE ROOM CHEERS!"
-				end
-				shakeStrength = payload.result == "PERFECT!" and 1.15 or 0.65
+				detail = string.format("+%d POINTS • COMBO %d", payload.recordPoints, payload.recordCombo or 0)
+				shakeStrength = payload.result == "PERFECT!" and 0.18 or 0
 			else
 				detail = "COMBO RESET - NEXT PIZZA!"
-				shakeStrength = 0.75
+				shakeStrength = 0
 			end
-			shakeUntil = os.clock() + 0.28
+			shakeUntil = os.clock() + 0.18
 		elseif payload.coinsEarned and payload.coinsEarned > 0 then
 			detail = string.format("+%d COINS", payload.coinsEarned)
 			if payload.comboBonus and payload.comboBonus > 0 then
 				detail ..= string.format(" • COMBO +%d", payload.comboBonus)
 			end
+			shakeStrength = payload.result == "PERFECT!" and 0.18 or 0
 			if payload.comboMilestone then
-				detail ..= "\nTHE WHOLE ROOM CHEERS!"
-				screenTint.BackgroundColor3 = COLORS.yellow
-				tweenUI(screenTint, TweenInfo.new(0.08), { BackgroundTransparency = 0.76 }):Play()
-				delayUI(0.1, function()
-					tweenUI(screenTint, TweenInfo.new(0.28), { BackgroundTransparency = 1 }):Play()
-				end)
+				shakeStrength = 0.28
 			end
-			if payload.tipBonus and payload.tipBonus > 0 then
-				detail ..= string.format("  -  BIGGER TIPS +%d", payload.tipBonus)
-			end
-			if payload.eventMessage then
-				detail ..= "\n" .. payload.eventMessage
-			end
-			shakeStrength = payload.result == "PERFECT!" and 1.15 or 0.65
-			if payload.comboMilestone then
-				shakeStrength = 1.4
-			end
-			shakeUntil = os.clock() + 0.34
+			shakeUntil = os.clock() + 0.18
 		else
 			detail = payload.comboSaved and "COMBO SAVED - the critic only skips the bonus!" or "Quick reload — give it another whirl!"
-			if payload.eventMessage then detail ..= "\n" .. payload.eventMessage end
-			shakeStrength = 0.85
-			shakeUntil = os.clock() + 0.28
+			shakeStrength = 0
 		end
 		if not payload.recordRun or recordStatus() == "running" then
 			effects.showFeedback(payload.result or "PIZZA!", payload.color or COLORS.yellow, detail)
@@ -645,7 +634,7 @@ stateRemote.OnClientEvent:Connect(function(newState)
 		-- reload/shot state. A rejection cannot complete onboarding or effects.
 		inputController.render()
 	elseif state.event == "modeSelected" and state.payload then
-		effects.showFeedback(state.payload.result or "FREE PLAY", COLORS.green, state.payload.detail or "Practice launches with no time limit.")
+		-- The new mode HUD is the acknowledgement; keep the first aim clear.
 	elseif state.event == "purchaseResult" and state.payload then
 		if state.payload.success then
 			effects.showEventBanner({ title = state.payload.result, icon = "UP", detail = state.payload.changeMessage or state.payload.effect or "Upgrade applied now!" })
@@ -671,6 +660,12 @@ stateRemote.OnClientEvent:Connect(function(newState)
 end)
 
 RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
+	if responsiveUI.refresh() then
+		onboarding.updateOnboardingWalkHint()
+		if tutorial.Visible then onboarding.showFirstPizzaHint() end
+		cameraController.setPicker(modeSelection, freePlayChoice, modeSelection.Visible)
+		applyPresentation()
+	end
 	onboarding.updatePizzaTrail()
 	activityHud.render()
 	inputController.render()
@@ -683,14 +678,14 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	if status == "countdown" then
 		local remaining = math.max(1, math.ceil((run.countdownEndsAt or 0) - Workspace:GetServerTimeNow()))
 		countdownLabel.Text = tostring(remaining)
-		countdownLabel.Visible = true
+		countdownLabel.Visible = not shopPanel.Visible
 		recordTimer.Text = "1:00"
-		recordTimer.TextColor3 = Color3.new(1, 1, 1)
+		recordTimer.TextColor3 = COLORS.ink
 	elseif status == "running" then
 		local remaining = math.max(0, (run.endsAt or 0) - Workspace:GetServerTimeNow())
 		local wholeSeconds = math.ceil(remaining)
 		recordTimer.Text = wholeSeconds >= 60 and "1:00" or string.format("0:%02d", wholeSeconds)
-		recordTimer.TextColor3 = remaining <= 10 and COLORS.orange or Color3.new(1, 1, 1)
+		recordTimer.TextColor3 = remaining <= 10 and COLORS.red or COLORS.ink
 		countdownLabel.Visible = false
 	elseif status == "saving" or status == "finished" then
 		recordTimer.Text = "0:00"
@@ -704,7 +699,7 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	inputState:step(deltaTime, os.clock())
 	local ready = inputState:isReady(os.clock())
 
-	local cameraFrame = CFrame.lookAt(Config.CAMERA_POSITION, Config.CAMERA_FOCUS)
+	local cameraFrame = ClientCamera.frameForViewport(Config.CAMERA_POSITION, Config.CAMERA_FOCUS, ui.layout.height)
 	if os.clock() < shakeUntil then
 		local fade = (shakeUntil - os.clock()) / 0.35
 		cameraFrame *= CFrame.new((math.random() - 0.5) * shakeStrength * fade, (math.random() - 0.5) * shakeStrength * fade, 0)
@@ -713,10 +708,10 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 
 	powerFill.Size = UDim2.fromScale(math.max(inputState.charge, 0.02), 1)
 	local powerLevel = status ~= "idle" and 0 or (state.upgrades and state.upgrades.power or 0)
-	powerText.Text = string.format("POWER  %d%%  -  RANGE +%d%%", math.floor(inputState.charge * 100 + 0.5), powerLevel * 4)
+	powerText.Text = string.format("POWER  %d%%", math.floor(inputState.charge * 100 + 0.5))
 	local pitchDegrees = math.deg(Config.MIN_PITCH + inputState.aimPitch * (Config.MAX_PITCH - Config.MIN_PITCH))
 	local arcName = pitchDegrees < 37 and "LOW" or (pitchDegrees < 49 and "MEDIUM" or "HIGH")
-	arcText.Text = "ARC  " .. arcName
+	arcText.Text = powerLevel > 0 and string.format("%s ARC • +%d%% RANGE", arcName, powerLevel * 4) or "ARC  " .. arcName
 
 	local direction = currentDirection()
 	local speed = Config.speedFromCharge(inputState.charge, powerLevel)
@@ -750,7 +745,9 @@ RunService:BindToRenderStep("PizzaLaunchRender", Enum.RenderPriority.Camera.Valu
 	local station = world and world:FindFirstChild("LauncherStation")
 	local rig = station and station:FindFirstChild("AimRig")
 	if rig and rig:IsA("Model") then
-		rig:PivotTo(CFrame.lookAt(Config.LAUNCH_ORIGIN, Config.LAUNCH_ORIGIN + direction))
+		-- Only the local cosmetic rig recoils. Physics and trajectory calculations
+		-- above continue to use the unchanged authoritative launch origin.
+		rig:PivotTo(CFrame.lookAt(Config.LAUNCH_ORIGIN, Config.LAUNCH_ORIGIN + direction) * CFrame.new(0, 0, effects.recoilOffset(os.clock())))
 	end
 	if station then
 		local crankRig = station:FindFirstChild("CosmeticCrankRig")

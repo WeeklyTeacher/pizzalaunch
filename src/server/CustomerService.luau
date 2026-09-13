@@ -2,6 +2,7 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local CustomerDialogue = require(script.Parent.CustomerDialogue)
+local CustomerRig = require(script.Parent.CustomerRig)
 
 local CustomerService = {}
 
@@ -28,7 +29,7 @@ local IDENTITIES = {
 local function parts(record)
 	local result = {}
 	for _, descendant in record.customer:GetDescendants() do
-		if descendant:IsA("BasePart") then
+		if descendant:IsA("BasePart") and not descendant:GetAttribute("CustomerVisual") then
 			table.insert(result, descendant)
 		end
 	end
@@ -43,6 +44,7 @@ end
 
 local function setState(record, stateName: string)
 	record.state = stateName
+	if record.visual then record.visual:setState(stateName) end
 	local history = record.customer:GetAttribute("CustomerStateHistory") or ""
 	local updatedHistory = history == "" and stateName or (history .. ">" .. stateName)
 	if #updatedHistory > 180 then updatedHistory = string.sub(updatedHistory, -180) end
@@ -74,6 +76,7 @@ end
 local function setFace(record, text: string)
 	local label = labelInside(record.customer, "Face")
 	if label then label.Text = text end
+	if record.visual then record.visual:setExpression(text) end
 end
 
 local function setMarker(record, text: string, color: Color3?)
@@ -120,7 +123,7 @@ local function setVisible(record, visible: boolean, duration: number?)
 			base = part.Transparency
 			part:SetAttribute("CustomerBaseTransparency", base)
 		end
-		local target = visible and base or 1
+		local target = visible and not part:GetAttribute("CustomerRenderProxy") and base or 1
 		if duration and duration > 0 then
 			TweenService:Create(part, TweenInfo.new(duration), { Transparency = target }):Play()
 		else
@@ -129,9 +132,10 @@ local function setVisible(record, visible: boolean, duration: number?)
 	end
 	for _, descendant in record.customer:GetDescendants() do
 		if descendant:IsA("SurfaceGui") and descendant.Name == "Face" then
-			descendant.Enabled = visible
+			descendant.Enabled = visible and not descendant:GetAttribute("CustomerProxyFace")
 		end
 	end
+	if record.visual then record.visual:setVisible(visible, duration) end
 end
 
 local function updateSeat(record)
@@ -173,6 +177,7 @@ local function applyIdentity(record)
 	identityCounter += 1
 	local identity = IDENTITIES[(identityCounter + record.tableId * 2 - 2) % #IDENTITIES + 1]
 	record.identity = identity
+	if record.visual then record.visual:setIdentity(identity) end
 	record.customer:SetAttribute("CustomerName", identity.name)
 	record.customer:SetAttribute("Mood", identity.mood)
 	record.customer:SetAttribute("PersonalityLine", CustomerDialogue.get(identity.name, "waiting"))
@@ -244,8 +249,11 @@ local function beginDeparture(record, token: number)
 	local root = record.customer.PrimaryPart
 	if root then
 		tweenRootTo(record, sideAislePoint(record, root.Position.Z), 1.0)
+		if record.token ~= token or recordsByTable[record.tableId] ~= record or not record.customer.Parent then return end
 		tweenRootTo(record, sideAislePoint(record, 55), 1.25)
+		if record.token ~= token or recordsByTable[record.tableId] ~= record or not record.customer.Parent then return end
 		tweenRootTo(record, arrivalPoint(record), 0.75)
+		if record.token ~= token or recordsByTable[record.tableId] ~= record or not record.customer.Parent then return end
 	end
 	setVisible(record, false, 0.3)
 	task.wait(0.35)
@@ -258,9 +266,10 @@ end
 local function idleLoop(record)
 	task.spawn(function()
 		local beat = 0
-		while record.customer.Parent do
+		while record.customer.Parent and recordsByTable[record.tableId] == record do
 			beat += 1
 			task.wait(2.5 + (record.tableId % 3) * 0.45)
+			if recordsByTable[record.tableId] ~= record or not record.customer.Parent then return end
 			if record.state ~= "SeatedWaiting" or (record.customer:GetAttribute("ReactingUntil") or 0) > Workspace:GetServerTimeNow() then continue end
 			local head = record.customer:FindFirstChild("Head")
 			local arm = record.customer:FindFirstChild(beat % 2 == 0 and "LeftArm" or "RightArm")
@@ -275,6 +284,7 @@ local function idleLoop(record)
 				end
 			end
 			task.wait(0.65)
+			if recordsByTable[record.tableId] ~= record or not record.customer.Parent then return end
 			if record.state == "SeatedWaiting" and (record.customer:GetAttribute("ReactingUntil") or 0) <= Workspace:GetServerTimeNow() then
 				for _, part in { head, arm } do
 					if part and part:IsA("BasePart") then
@@ -289,6 +299,10 @@ local function idleLoop(record)
 end
 
 function CustomerService.start(world: Instance, onLifecycle)
+	for _, previous in recordsByTable do
+		previous.token += 1
+		if previous.visual then previous.visual:destroy() end
+	end
 	table.clear(recordsByTable)
 	table.clear(entrancePoints)
 	lifecycleCallback = onLifecycle
@@ -318,6 +332,7 @@ function CustomerService.start(world: Instance, onLifecycle)
 					part:SetAttribute("CustomerBaseTransparency", part.Transparency)
 				end
 				recordsByTable[tableId] = record
+				if tableId == 1 then record.visual = CustomerRig.install(descendant) end
 				applyIdentity(record)
 				setState(record, "SeatedWaiting")
 				refreshWaitingMarker(record)
@@ -329,6 +344,16 @@ end
 
 function CustomerService.markReacting(customer: Model, duration: number)
 	customer:SetAttribute("ReactingUntil", Workspace:GetServerTimeNow() + duration)
+end
+
+function CustomerService.feedbackReaction(customer: Model, reaction: string, token: number)
+	local record = recordsByTable[customer:GetAttribute("TableId")]
+	if record and record.customer == customer and record.visual then record.visual:react(reaction, token) end
+end
+
+function CustomerService.clearFeedback(customer: Model)
+	local record = recordsByTable[customer:GetAttribute("TableId")]
+	if record and record.customer == customer and record.visual then record.visual:clearReaction() end
 end
 
 function CustomerService.isDeliverable(tableId: number): boolean

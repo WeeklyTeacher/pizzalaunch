@@ -199,12 +199,7 @@ do
 	local configModule = roblox.Instance.new("ModuleScript")
 	configModule.Name, configModule.Parent = "Config", shared
 	local gameConfig = loadModule("src/shared/Config.luau")
-	local builder = loadModule("src/server/WorldBuilder.luau", {
-		game = { GetService = function(_, name) return services[name] end },
-		require = function(module) assert(module == configModule); return gameConfig end,
-		ColorSequence = roblox.ColorSequence, ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
-		NumberSequence = roblox.NumberSequence, NumberSequenceKeypoint = roblox.NumberSequenceKeypoint, NumberRange = roblox.NumberRange,
-	})
+	local builder = require("./support/WorldFixture")(services, gameConfig)
 	local world = builder.build()
 	local obstacles = {}
 	for _, part in world.NeighborhoodStreet:GetDescendants() do

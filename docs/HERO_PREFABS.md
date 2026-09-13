@@ -1,0 +1,19 @@
+# Hero slice source assets
+
+The first slice uses original procedural Roblox geometry authored in this repository. No imported meshes, texture IDs, animation IDs, paid assets, or external DCC files are required. Rebuilding the source recreates the assets; there is no separate export preset or undocumented Studio-only model.
+
+## PizzaVisual
+
+`src/shared/PizzaVisual.luau` exposes `attach(anchor, {diameter = 6, name = "PizzaVisual", loaded = false})`. The anchor's local positive X is the cheese-facing normal, matching Roblox's Cylinder axis. A 27-part render model supplies a baked underside, tomato rim, cheese, raised crust, six pepperoni, bake variation and two basil leaves. Every part is welded to the supplied anchor, massless, unanchored and noncolliding/non-touching/non-queryable.
+
+ProjectileService retains the original cylinder, dimensions, custom physical properties, origin, velocity, angular velocity and server ownership. The cylinder is invisible; the visual model never changes those physical properties. `consumeVisual` fades only already-resolved pizza art over 0.42 seconds. Normal shot cleanup still removes the complete object. Loaded variants tag their render parts with `CosmeticLoadedPizza` for client feedback visibility.
+
+Native Studio verification measured root mass and assembly mass both 11.9459056854 with all 27 visual parts attached. The probe object was removed immediately. A fresh-place normal remote launch also delivered the pizza successfully. Luau tests verify the unchanged collider parameters, every massless weld, serialization and the render-only landing fade. Roblox documents that massless welded parts do not contribute assembly mass/inertia when joined to a part with mass: [BasePart Massless](https://create.roblox.com/docs/reference/engine/classes/BasePart#Massless).
+
+## CustomerRig
+
+`src/server/CustomerRig.luau` installs only on table 1 for the first slice. It creates a separate anchored render root, ten Motor6D joints, rounded body/limbs, apron, expressive face and a three-style bow/cap/beanie accessory library. The rig stays below 32 render parts. Procedural Idle, Walk, Sit, Wait, Eat, Cheer, Startled and Leave poses update at most ten times per second. No animation asset is needed. Motor6D C0 updates are used for this custom server-rendered rig because Transform is not replicated: [Motor6D Transform](https://create.roblox.com/docs/reference/engine/classes/Motor6D#Transform).
+
+Original CustomerPart instances become invisible contact proxies and retain their sizes, touch/collision policy and original lifecycle/feedback movement. CustomerService excludes rig art from its old per-part movement loops and owns state, identity, seat changes, arrival/departure timing and delivery availability. The render root follows the existing lifecycle root; cosmetic walking posture does not move it. Visibility fades keep the proxies hidden. CustomerFeedback forwards transient reactions, and owner cleanup clears those visual reactions without resetting customer lifecycle.
+
+Heartbeat connections and visibility tweens are cancelled on rig destruction/restart. Behavior tests execute the actual CustomerService lifecycle, verify the original 1.7/1.05/1.55-second phases and delivery availability, inspect proxy invariants, cover all eight pose selections and test stale restart/removal cleanup. These checks do not establish final animation feel or native collision/mass behavior. Propagation to the other five customers awaits the first slice's Studio visual review.

@@ -19,15 +19,7 @@ local ownedPart = roblox.Instance.new("Part")
 ownedPart.Name = "OwnerWall"
 ownedPart.Position = roblox.Vector3.new(200, 10, 0)
 ownedPart.Parent = protected
-local builder = loadModule("src/server/WorldBuilder.luau", {
-	game = { GetService = function(_, name) return assert(services[name]) end },
-	require = function(module) assert(module == configModule); return config end,
-	ColorSequence = roblox.ColorSequence,
-	ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
-	NumberSequence = roblox.NumberSequence,
-	NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
-	NumberRange = roblox.NumberRange,
-})
+local builder = require("./support/WorldFixture")(services, config)
 local world = builder.build()
 assert(protected.Parent == services.Workspace and protected:GetAttribute("OwnerEvidence") == "unchanged")
 assert(ownedPart.Position == roblox.Vector3.new(200, 10, 0))
@@ -42,6 +34,24 @@ for _, item in world:GetDescendants() do
 	assert(item.Name ~= "RecordRunPrompt", "Duplicate launcher prompt")
 end
 assert(prompts == 1)
+local station = world.LauncherStation
+assert(not station:FindFirstChild("LauncherMountBillboard", true), "Prompt already explains the contextual interaction")
+assert(station.Backboard.StationTitle.Label.Text == "PIZZA LAUNCHER", "Destination cue must stay concise")
+local returnCue = station:FindFirstChild("InteriorLauncherBillboard", true)
+assert(returnCue and returnCue.MaxDistance <= 34, "Interior return cue must not cover spawn")
+assert(station.PersonalBestDisplay.CFrame.Position.X <= -55, "Personal records belong off the entrance sightline")
+local tileCount, tiles = 0, {}
+for _, item in world:GetChildren() do
+	if item.Name == "FloorTile" then
+		tileCount += 1
+		assert(not item.CanCollide and not item.CanTouch)
+		local _, saturation = item.Color:ToHSV()
+		assert(saturation < .2, "Revealed flooring must remain quiet")
+		table.insert(tiles, item)
+	end
+end
+assert(tileCount > 0 and tileCount <= 50, "Large floor panels need a bounded part count")
+assert(world.RestaurantFloor.CFrame.Position.Y + world.RestaurantFloor.Size.Y/2 > -2)
 local expected = {
 	roblox.Vector3.new(-24, 2.5, 2), roblox.Vector3.new(24, 2.5, -3),
 	roblox.Vector3.new(-28, 2.5, -24), roblox.Vector3.new(28, 2.5, -30),

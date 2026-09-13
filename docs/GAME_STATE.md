@@ -26,7 +26,7 @@ Connected Studio `pizzalaunch` is an unpublished local place (PlaceId 0), initia
 
 The server now separates LauncherLease, ShotPolicy, ProjectileService, DeliveryScoring, PlayerProgression, RecordPersistence, ServerEffects, and CustomerFeedback. GameService remains the integration owner for remote handlers, delivery routing and round progression. CustomerService remains the lifecycle authority. No canonical source file was deleted.
 
-The client separates LauncherInputState, ClientInput, ClientCamera, UITheme, UIConstruction, UIPresentation, Onboarding and Feedback. The bootstrap retains target/aim visuals and integration. Launch requests include a monotonically increasing request ID and cleanup epoch; accepted/rejected replies reconcile readiness against authoritative active-shot/reload state. Picker/countdown/input-modal gating is explicit. Mode requests still use the original protocol; adding mode epochs is planned with multiplayer integration.
+The client separates LauncherInputState, ClientInput, ClientCamera, UITheme, UIConstruction, UIPresentation, Onboarding and Feedback. The bootstrap retains target/aim visuals and integration. Launch requests include a monotonically increasing request ID and cleanup epoch; accepted/rejected replies reconcile readiness against authoritative active-shot/reload state. Picker/countdown/input-modal gating is explicit. Mode requests also carry cleanup epochs, added in Milestone 1.
 
 Completed records freeze user ID, score, GUID and timestamps before any yield. Session best, confirmed saved best and pending submissions are distinct. Writes serialize per player, retry with bounded backoff, survive local departure, and use max-preserving UpdateAsync transforms. Corrupt/failed loads cannot cause default writes. Shutdown retries are bounded; pending memory cannot survive a full server failure without a successful DataStore write.
 
@@ -36,7 +36,7 @@ Recovery generation now discovers every required script through Rojo and checks 
 
 ## Next checkpoint
 
-Milestone 0 is pushed as `10a454628daa63cc94f483444fd08280b213363d`; source and fresh-place runtime checks completed as recorded in TEST_MATRIX. Implement independent Takeout Runner and honest FIFO launcher reservations. Use a separate RestaurantActivity snapshot channel so walking activity never updates an operator's target presentation. Visual work follows the runner loop.
+Milestone 0 is pushed as `10a454628daa63cc94f483444fd08280b213363d`; Milestone 1 as `8b13e6ff4d7255dd1a087dbf5f436b894145ad33`. Source and actual runtime evidence are recorded in TEST_MATRIX. Milestone 2 is building the first launcher/table/customer/pizza visual slice, revealing authored flooring and making HUD layouts respond to real viewports. Preserve competitive anchors and proxies; inspect spawn, walking, mounted and mobile views before wider propagation.
 
 ## Milestone 1 implementation
 
@@ -45,3 +45,13 @@ TakeoutRunner owns per-player walking orders, immutable completion receipts, req
 LauncherQueue owns FIFO entries and 15-second reservations. Reservation never mounts or moves a character; GameService still acquires a healthy nearby character lease. Activity request IDs/epochs reject duplicates and stale joins/leaves; mode requests now also carry the launcher cleanup epoch. Occupied prompts remain enabled, with JOIN LINE / DO TAKEOUT ORDERS choices, positions and real mode/time. Unlimited Free Play says NO TIME LIMIT. EXIT & PASS TURN uses ordinary cleanup.
 
 RestaurantActivity carries queue, runner, station, wallet and shared milestone snapshots independently from launcher GameState. ActivityHUD/ActivityPresentation own walking objectives, nonphysical local carry/route visuals, reservation cues and quiet wallet updates. No walking reward refreshes an operator's competitive target presentation. SharedMilestone counts 12 successful Free Play/takeout completions and gives 10 session coins only to present actual contributors; Record Run never contributes. No paid or persistent coin economy added.
+
+## Milestone 2 first visual slice
+
+LauncherArt builds a compact oven/tray/barrel/gauge/crank around the unchanged launch pivot. PizzaVisual supplies 27 welded massless render parts while ProjectileService retains the authoritative collider and physics. CustomerRig adds ten Motor6D joints and eight bounded procedural poses to table 1; original contact proxies and CustomerService lifecycle remain authoritative. Detailed booth treatment is limited to table 1 until slice acceptance. Hidden physical furniture proxies retain their material/response where visual overlays replace dark Fabric.
+
+The mapped ground is now at Y=-12 (top=-2), exposing 42 broad quiet floor tiles, sidewalk and street. The central source-owned facade reveals the oven while keeping doors and collision boundaries. Instructions are reduced to a destination cue, contextual prompt and mounted picker; personal best is on the side wall. Ambient motion is a bounded kitchen fan with explicit teardown. Original owner geometry is untouched.
+
+ResponsiveLayout/UIPresentation use safe content and PreferredInput; essential controls keep readable sizes, upgrades scroll on phones, existing notices hide behind modal panels, and focus restores for controller navigation. Loaded-pizza detail participates in feedback cleanup; recoil is local and cannot move the gameplay origin. Desktop camera is (0,28,67) toward (0,1,-12); short safe viewports use (0,26,67) toward (0,9,-22) to clear the top HUD. Tests include observed native target projections plus actual CoreUI inset.
+
+Modern lighting requires a Technology=Future compatibility seed for current Rojo/Studio serialization. Fresh Studio verification, not only Lune decoding, established Realistic/true/.35. Runtime fill/bloom remains restrained. See ART_PROVENANCE and HERO_PREFABS for source reproduction and budgets. Paid products and persistent session coins remain absent.

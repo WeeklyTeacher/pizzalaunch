@@ -1,6 +1,8 @@
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local PizzaVisual = require(game:GetService("ReplicatedStorage").Shared.PizzaVisual)
 
 local ProjectileService = {}
 local CHARACTERS, PROJECTILES, PROPS = "PizzaLaunchCharacters", "PizzaLaunchProjectiles", "PizzaLaunchProps"
@@ -77,6 +79,19 @@ function ProjectileService.removeVisual(player, pizza)
 	if pizza.Parent then pizza:Destroy() end
 end
 
+function ProjectileService.consumeVisual(pizza): boolean
+	if not pizza.Parent or pizza:GetAttribute("Resolved") ~= true then return false end
+	local model = pizza:FindFirstChild("PizzaVisual")
+	if not model then return false end
+	-- The delivered pizza fades without resizing or revealing its physics proxy.
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part:GetAttribute("PizzaCosmetic") then
+			TweenService:Create(part, TweenInfo.new(0.42, Enum.EasingStyle.Quad), { Transparency = 1 }):Play()
+		end
+	end
+	return true
+end
+
 function ProjectileService.clear(player)
 	local shot = active[player]
 	active[player] = nil
@@ -104,27 +119,8 @@ function ProjectileService.create(Config, player: Player, direction: Vector3, ch
 	ProjectileService.prepare(pizza)
 	pizza.Parent = Workspace
 
-	for index, offset in {
-		Vector3.new(0.42, -1.5, -0.9), Vector3.new(0.42, 1.2, -1.2),
-		Vector3.new(0.42, -0.4, 1.35), Vector3.new(0.42, 1.35, 0.8),
-	} do
-		local topping = Instance.new("Part")
-		topping.Name = string.format("Pepperoni%d", index)
-		topping.Shape = Enum.PartType.Ball
-		topping.Size = Vector3.new(1.05, 0.35, 1.05)
-		topping.Color = Color3.fromRGB(190, 46, 45)
-		topping.Material = Enum.Material.SmoothPlastic
-		topping.CFrame = pizza.CFrame * CFrame.new(offset)
-		topping.CanCollide = false
-		topping.CanTouch = false
-		topping.CanQuery = false
-		topping.Massless = true
-		topping.Parent = pizza
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = pizza
-		weld.Part1 = topping
-		weld.Parent = topping
-	end
+	pizza.Transparency = 1
+	PizzaVisual.attach(pizza)
 
 	local speed = Config.speedFromCharge(charge, powerLevel)
 	pizza.AssemblyLinearVelocity = direction.Unit * speed

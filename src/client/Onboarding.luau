@@ -2,7 +2,7 @@ local Onboarding = {}
 function Onboarding.new(context)
 	local self = { onboardingCompleted = false, onboardingReachedLauncher = false, onboardingTrailActive = true, onboardingTrailParts = {}, onboardingNextDistanceCheck = 0 }
 	local trailTweens = {}
-	local Workspace, UserInputService, TweenService = context.Workspace, context.UserInputService, context.TweenService
+	local Workspace, TweenService = context.Workspace, context.TweenService
 	local player, COLORS, tutorial, tutorialTitle, tutorialText, walkHint = context.player, context.COLORS, context.ui.tutorial, context.ui.tutorialTitle, context.ui.tutorialText, context.ui.walkHint
 local PIZZA_TRAIL_ANCHOR_OFFSETS = {
 	-- Every marker derives from LauncherInteractionAnchor. The route starts in
@@ -51,39 +51,24 @@ local function makePizzaArrow(parent: Instance, position: Vector3, nextPosition:
 
 	local shaft = Instance.new("Part")
 	shaft.Name = "CheeseShaft"
-	shaft.Size = Vector3.new(2.4, 0.16, 3.5)
+	shaft.Size = Vector3.new(1.05, 0.08, 1.9)
 	shaft.CFrame = arrowFrame * CFrame.new(0, 0, 0.35)
 	shaft.Color = COLORS.yellow
-	shaft.Material = Enum.Material.Neon
+	shaft.Material = Enum.Material.SmoothPlastic
 	shaft.Parent = model
 	registerTrailPart(shaft, 0.02)
 
 	for side = -1, 1, 2 do
 		local arrowHead = Instance.new("Part")
 		arrowHead.Name = "CheeseArrowHead"
-		arrowHead.Size = Vector3.new(1.5, 0.16, 3.1)
-		arrowHead.CFrame = arrowFrame * CFrame.new(side, 0, -1.65) * CFrame.Angles(0, math.rad(side * 40), 0)
+		arrowHead.Size = Vector3.new(0.7, 0.08, 1.6)
+		arrowHead.CFrame = arrowFrame * CFrame.new(side * 0.55, 0, -0.8) * CFrame.Angles(0, math.rad(side * 40), 0)
 		arrowHead.Color = COLORS.yellow
-		arrowHead.Material = Enum.Material.Neon
+		arrowHead.Material = Enum.Material.SmoothPlastic
 		arrowHead.Parent = model
 		registerTrailPart(arrowHead, 0.02)
 	end
 
-	for _, pepperoniOffset in {
-		Vector3.new(-0.48, 0.1, 0.72),
-		Vector3.new(0.48, 0.1, 0.08),
-		Vector3.new(0, 0.1, -0.72),
-	} do
-		local pepperoni = Instance.new("Part")
-		pepperoni.Name = "Pepperoni"
-		pepperoni.Shape = Enum.PartType.Cylinder
-		pepperoni.Size = Vector3.new(0.14, 0.9, 0.9)
-		pepperoni.CFrame = arrowFrame * CFrame.new(pepperoniOffset) * CFrame.Angles(0, 0, math.pi / 2)
-		pepperoni.Color = COLORS.red
-		pepperoni.Material = Enum.Material.Neon
-		pepperoni.Parent = model
-		registerTrailPart(pepperoni, 0)
-	end
 end
 
 local function ensurePizzaTrailWorld()
@@ -159,9 +144,9 @@ end
 local function updateOnboardingWalkHint()
 	if self.onboardingTrailActive and not self.onboardingReachedLauncher then
 		walkHint.Text = "Follow the pizza arrows to the Pizza Launcher!"
-	elseif UserInputService.TouchEnabled then
+	elseif context.getInputKind() == "touch" then
 		walkHint.Text = "Tap USE LAUNCHER on the pizza pad!"
-	elseif UserInputService.GamepadEnabled then
+	elseif context.getInputKind() == "gamepad" then
 		walkHint.Text = "Press X to USE LAUNCHER on the pizza pad!"
 	else
 		walkHint.Text = "Press E to USE LAUNCHER on the pizza pad!"
@@ -186,7 +171,7 @@ local function setPizzaTrailVisible(visible: boolean, immediate: boolean?)
 		end
 	end
 	if self.onboardingHighlight then
-		self.onboardingHighlight.Enabled = self.onboardingReachedLauncher and not context.isOperating()
+		self.onboardingHighlight.Enabled = visible and self.onboardingReachedLauncher and not context.isOperating()
 	end
 	local world = Workspace:FindFirstChild("PizzaLaunchWorld")
 	local interiorGuide = world and world:FindFirstChild("InteriorLauncherBillboard", true)
@@ -207,9 +192,9 @@ end
 
 local function showFirstPizzaHint()
 	tutorialTitle.Text = "AIM  •  CHARGE  •  LAUNCH!"
-	if UserInputService.TouchEnabled then
+	if context.getInputKind() == "touch" then
 		tutorialText.Text = "DRAG / ARROWS • AIM\nHOLD + RELEASE"
-	elseif UserInputService.GamepadEnabled then
+	elseif context.getInputKind() == "gamepad" then
 		tutorialText.Text = "LEFT STICK • AIM\nHOLD RT, THEN RELEASE"
 	else
 		tutorialText.Text = "MOUSE / W A S D TO AIM\nHOLD SPACE OR CLICK, THEN RELEASE"

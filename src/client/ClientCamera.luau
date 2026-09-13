@@ -2,6 +2,16 @@
 -- Character pose, health validation and the launcher lease stay server-owned.
 local ClientCamera = {}
 
+function ClientCamera.frameForViewport(position, focus, safeHeight)
+	-- Native landscape validation includes the 58px core inset: this higher
+	-- framing leaves the far tables below the HUD and above the thumb controls.
+	-- These are viewing coordinates only; projectile anchors never use them.
+	if safeHeight < 540 then
+		return CFrame.lookAt(Vector3.new(0, 26, 67), Vector3.new(0, 9, -22))
+	end
+	return CFrame.lookAt(position, focus)
+end
+
 function ClientCamera.new(context)
 	local self = { mounted = false, connections = {}, characterConnections = {}, touchDefaults = {}, cameraDefaults = {}, characterToken = 0 }
 	local player, playerGui = context.player, context.playerGui
@@ -74,10 +84,26 @@ function ClientCamera.new(context)
 		end
 	end
 	function self.setPicker(picker, choice, visible: boolean)
-		if visible and context.UserInputService.GamepadEnabled then
+		if visible and context.UserInputService.PreferredInput == Enum.PreferredInput.Gamepad then
 			GuiService.SelectedObject = choice
 		elseif GuiService.SelectedObject and picker:IsAncestorOf(GuiService.SelectedObject) then
 			GuiService.SelectedObject = nil
+		end
+	end
+	function self.setNavigation(panel, firstChoice, inputKind)
+		if inputKind ~= "gamepad" then panel = nil end
+		if panel ~= self.navigationPanel then
+			local selected = GuiService.SelectedObject
+			if self.navigationPanel and selected and self.navigationPanel:IsAncestorOf(selected) then
+				local prior = self.navigationBefore
+				GuiService.SelectedObject = prior and prior.Parent and prior or nil
+			end
+			self.navigationPanel = panel
+			self.navigationBefore = panel and GuiService.SelectedObject or nil
+		end
+		if panel and firstChoice then
+			local selected = GuiService.SelectedObject
+			if not selected or not panel:IsAncestorOf(selected) then GuiService.SelectedObject = firstChoice end
 		end
 	end
 	function self.render(frame)

@@ -132,19 +132,23 @@ local characterEvent = signal()
 local playerCharacter = { DescendantAdded = characterEvent, GetDescendants = function() return { body } end }
 local otherPlayer = { Character = playerCharacter }
 local createdParts, delayed = {}, {}
-local projectiles = loadModule("src/server/ProjectileService.luau", {
-	game = { GetService = function(_, name)
-		if name == "PhysicsService" then return physics end
-		return { GetPlayers = function() return { otherPlayer } end }
-	end },
-	Instance = { new = function(className)
+local testInstance = { new = function(className)
 		local item = part(false)
 		item.attributes, item.className = {}, className
 		function item:SetAttribute(key, value) self.attributes[key] = value end
 		function item:SetNetworkOwner(value) assert(value == nil); self.serverOwned = true end
 		table.insert(createdParts, item)
 		return item
+	end }
+local pizzaVisual = loadModule("src/shared/PizzaVisual.luau", { Instance = testInstance })
+local projectiles = loadModule("src/server/ProjectileService.luau", {
+	game = { GetService = function(_, name)
+		if name == "PhysicsService" then return physics end
+		if name == "ReplicatedStorage" then return { Shared = { PizzaVisual = "PizzaVisual" } } end
+		return { GetPlayers = function() return { otherPlayer } end }
 	end },
+	Instance = testInstance,
+	require = function(name) assert(name == "PizzaVisual"); return pizzaVisual end,
 	PhysicalProperties = { new = function(...) return { ... } end },
 	task = { delay = function(_, callback) table.insert(delayed, callback) end },
 })
@@ -201,7 +205,7 @@ for _, item in createdParts do
 		assert(item.CanCollide == false and item.CanTouch == false and item.CanQuery == false and item.Massless)
 	end
 end
-assert(toppings == 4 and soundCalls == 1)
+assert(toppings == 6 and soundCalls == 1, "hero pizza uses six cosmetic pepperoni with unchanged launch sound")
 builtPizza:Destroy()
 delayed[#delayed]()
 assert(soundCalls == 1, "cleared projectile cannot play delayed whoosh")

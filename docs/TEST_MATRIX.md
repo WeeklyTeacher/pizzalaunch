@@ -13,14 +13,14 @@ Results below describe this run only. Historical BUILD_LOG results are not new e
 | Studio connection | PASS | `pizzalaunch`, Edit mode, PlaceId 0 |
 | New source build | PASS | Rojo builds `.qa-artifacts/Milestone0-source.rbxl`; fresh Studio check follows |
 | Immutable save / cancellation / retry faults | PASS (Luau) | 13 pure model cases and 3 actual RecordRunService scheduler/store regressions; real DataStore NOT RUN |
-| Owner/walker purchase isolation | PASS (Luau policy) | Actual inventory/owner policy tested; two-client runtime still NOT RUN |
+| Owner/walker purchase isolation | PASS Luau + partial two-client Studio | Four-player handler tests; real runner reward during another player's Record Run preserved rings/score/camera |
 | Picker input / rejected launch / re-entry | PASS desktop Studio + Luau | E mount, Space in picker, click Free Play, Space shot/miss/reload, malformed direction rejection then accepted Space shot; touch/controller actual hardware NOT RUN |
 | Round 3/4 props after reset | PASS Luau + Studio module probe | Explicitly initialized modules: rounds 1/3/4/1 have 0/1/4/0 active obstacles after reset; not natural four-round playthrough |
 | Death/removal/replacement/disconnect cleanup | PASS partial Studio + Luau | Q restores speed16/unanchored/Custom/FOV70/upgrades; mounted death and respawn hide picker/results/exit and restore camera. Disconnect/multiple real clients NOT RUN |
 | Projectile/bystander physical isolation | NOT RUN | Real physics and two/four-player scenarios |
 | Takeout replay / queue / reservations | PASS Studio + Luau | Both destinations, replay, late reward, real two-client queue/handoff; four-player boundary suite |
-| Hero art slice / fresh-build visual parity | NOT RUN | Spawn, entrance, mounted, pizza, table/customer |
-| 667x375 / 874x402 / tablet / controller | NOT RUN | Actual responsive composition and input |
+| Hero art slice / fresh-build visual parity | PASS Studio slice review | Final facade/booth rechecked in fresh build; spawn, mounted, pizza delivery/customer reaction observed; fresh Realistic properties verified after migration fix |
+| 667x375 / 874x402 / tablet / controller | PASS native composition; hardware limits below | Exact phone sizes,1024x768 tablet, console emulation; physical two-finger/controller input NOT RUN |
 | Live persistence / reconnect / rapid servers | NOT RUN | No production DataStore access authorized |
 
 Additional passing source-execution evidence: WorldBuilder preserves a mock owner model and all six ballistic centers; recovery overlay includes all current Rojo modules, rejects incomplete/ambiguous/unreviewed mappings, preserves a geometry fixture through binary round trip, and rejects unsafe/existing output paths. This does not establish live Studio/Rojo preservation.
@@ -44,3 +44,13 @@ Corrected genuine two-client fresh-place test PASS: both players see Baseplate Y
 Studio multiplayer child windows initially did not render while hidden. Restoring only generated Place1 test windows resolved the input/capture wait; this was a test-window condition. A mounted picker screenshot was genuinely viewed. Four-client rerun follows. Current aggregate count is 17 spec files after adding the build parity regression.
 
 Native four-client test: NOT RUN. ExecuteMultiplayerTestAsync(4) stalled while launching generated clients before MCP connections became available. Freed older generated-place processes and restored only test windows; no progress. Stopped only the known generated test processes. The owner's working Studio process was preserved. Actual two-client evidence and four-player executable boundary tests are separate from this missing runtime case. No human abandonment/capacity conclusion is claimed.
+
+## Milestone 2a acceptance evidence
+
+PASS: 41 source modules compile; 25 actual Luau spec files; recovery safety/contracts; real Rojo binary build; independent council code review; whitespace checks. Added real prefab/rig/pizza/fan/onboarding tests, safe-area and hybrid-input tests, and preserved mapping/authority/recovery coverage.
+
+Observed Studio: original live source and separate fresh builds. Verified ground Y=-12, Realistic lighting/quality after the compatibility seed, final central facade exposing the oven, lighter first booth, desktop/compact camera composition, and all six target projections. Final source in exact667x375 selected camera(0,26,67), with target centers Y174..218 clear of the58px-inset HUD. Phone874x402 and tablet1024x768 layouts were also observed. Picker, Free Play, Record Run, natural results, scrollable upgrades and runner captions had no observed text overflow in tested states. An outside-button release produced an accepted launch/reload. Console simulation changed labels correctly; VirtualInput ButtonB was blocked by CoreGUI, so physical controller action remains NOT RUN.
+
+Fresh normal server-validated scripted shots delivered to tables2 and1. Hero customer history observed SeatedWaiting → Served → HappyReaction → Eating → Leaving → Despawn → Entering → WalkingToSeat → SeatedWaiting. A temporary camera/HUD suppression captured the detailed pizza/customer reaction; it was restored afterward. This is an art-review view, not ordinary walking UI. Native pizza root/assembly mass matched with all27 visual parts. Final source fan was visible. Output inspected throughout; only expected unpublished DataStore warnings in final sessions.
+
+NOT RUN: physical two-finger/controller hardware, full native four-client session, human capacity/abandonment study, sustained low-end mobile performance, live DataStore/rejoin/shutdown, exhaustive max-number text and every occupied/runner combination. M1 real two-client isolation remains evidence; M2 did not repeat that complete scenario. Bulk actual captures are ignored .qa-artifacts/M2-*.png; no screenshot set is committed. Studio tests do not establish preservation of unknown geometry in a source-only build.

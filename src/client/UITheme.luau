@@ -1,12 +1,15 @@
 local COLORS = {
-	red = Color3.fromRGB(205, 48, 53),
-	darkRed = Color3.fromRGB(123, 31, 38),
-	cream = Color3.fromRGB(255, 242, 207),
-	ink = Color3.fromRGB(55, 38, 40),
-	yellow = Color3.fromRGB(255, 203, 55),
-	green = Color3.fromRGB(75, 200, 116),
-	orange = Color3.fromRGB(244, 112, 54),
-	blue = Color3.fromRGB(80, 187, 230),
+	red = Color3.fromRGB(183, 58, 47),
+	darkRed = Color3.fromRGB(89, 42, 33),
+	cream = Color3.fromRGB(250, 243, 227),
+	ink = Color3.fromRGB(62, 50, 40),
+	yellow = Color3.fromRGB(232, 181, 70),
+	green = Color3.fromRGB(67, 125, 81),
+	orange = Color3.fromRGB(193, 114, 70),
+	blue = Color3.fromRGB(92, 133, 142),
+	surface = Color3.fromRGB(255, 250, 240),
+	muted = Color3.fromRGB(116, 99, 78),
+	border = Color3.fromRGB(217, 202, 179),
 }
 
 local function addCorner(parent: GuiObject, radius: number)
@@ -42,7 +45,7 @@ local function makeLabel(parent: Instance, name: string, displayText: string, si
 	item.Text = displayText
 	item.TextColor3 = COLORS.ink
 	item.TextSize = textSize
-	item.Font = Enum.Font.GothamBold
+	item.Font = Enum.Font.GothamMedium
 	item.TextWrapped = true
 	item.Parent = parent
 	return item
@@ -58,11 +61,11 @@ local function makeButton(parent: Instance, name: string, displayText: string, s
 	button.TextColor3 = Color3.new(1, 1, 1)
 	button.TextSize = 19
 	button.TextWrapped = true
-	button.Font = Enum.Font.GothamBlack
+	button.Font = Enum.Font.GothamBold
 	button.AutoButtonColor = false
 	button.Parent = parent
-	addCorner(button, 15)
-	addStroke(button, COLORS.darkRed, 3)
+	addCorner(button, 12)
+	addStroke(button, COLORS.darkRed, 1.5)
 	return button
 end
 

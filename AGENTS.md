@@ -10,6 +10,8 @@ Work only in this repository. Required overhaul branch: `feat/astra-overhaul-202
 - Preserve the pre-existing untracked `PizzaLaunch-Astra-Working_1_0.rbxl` untouched.
 - Workspace must have no `$path`; `$ignoreUnknownInstances` must remain true. Never modify, replace, or delete `StudioRestaurant`.
 - Map the Baseplate transform with `CFrame`, never `Position` alone: real fresh-build QA found that Position was lost in serialization. Run the actual binary ground-parity test after any mapping change.
+- Keep the documented `Technology=Future` serialization seed alongside modern LightingStyle/quality properties until fresh Studio tests prove it unnecessary. Without it, Studio migration overwrote the modern settings (rbx-dom #637). Do not assign protected lighting controls from runtime scripts.
+- Cosmetic pizza/customer/booth geometry must remain separate from unchanged competitive proxies. Validate new art in a fresh place as well as live sync; inspect actual assembly mass and target visibility when relevant.
 - Stage exact intended paths. Review full diff, run checks, commit coherent passing slices, push immediately to the required branch, and verify the remote hash.
 
 ## Game contracts
@@ -31,5 +33,7 @@ Use the six Astra Ultra council specialties requested for this overhaul, in boun
 Required checks: `scripts/Test-RecoverySafety.ps1`, `scripts/Test-RecoveryContracts.ps1`, all behavioral tests, `rojo build default.project.json` to an ignored output, and `git diff --check`.
 
 Use the connected local test Studio when available; inspect Output. Never claim runtime tests from source checks or screenshots from previous runs. Record unavailable cases as NOT RUN. A source-only Rojo build cannot prove preservation of unknown Studio geometry. Do not use the recovery generator as the normal build path.
+
+For geometry tests, pinned Lune 0.10.5 has a `CFrame.lookAt` convention mismatch; use a verified explicit right/up/back basis. Native Roblox uses its ordinary API. For mobile QA, use simulator ActualResolution and read the actual viewport and CoreUI inset; safe-content containment alone does not prove target visibility. Restore device simulation and temporary QA camera overrides after testing.
 
 Maintain game state, council decisions, test matrix, and build log at each checkpoint. Record pushed commit hashes in the next documentation checkpoint, avoiding self-referential commit hashes.

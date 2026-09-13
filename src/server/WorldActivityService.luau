@@ -1,65 +1,58 @@
-local TweenService = game:GetService("TweenService")
+-- A slow kitchen exhaust fan is presentation only. One capped update connection
+-- replaces the old window-opacity pulses and sideways pedestrian tweens.
+local RunService = game:GetService("RunService")
 
 local WorldActivityService = {}
 local generation = 0
+local active = nil
+local UPDATE_INTERVAL = 1 / 8
+local ANGULAR_SPEED = 1.3
+
+function WorldActivityService.stop()
+	generation += 1
+	local previous = active
+	active = nil
+	if not previous then return end
+	if previous.connection then previous.connection:Disconnect() end
+	for _, entry in previous.blades do
+		if entry.part.Parent then entry.part.CFrame = entry.authored end
+	end
+end
 
 function WorldActivityService.start(world: Instance)
-	generation += 1
+	WorldActivityService.stop()
+	local fan = world:FindFirstChild("KitchenVentFan", true)
+	if not fan or fan:GetAttribute("SourceOwnedAmbient") ~= true then return end
+	local hub = fan:FindFirstChild("FanHub")
+	if not hub or not hub:IsA("BasePart") then return end
+	local blades = {}
+	for _, item in fan:GetChildren() do
+		if item:IsA("BasePart") and item:GetAttribute("FanBlade") == true then
+			-- Authored values survive repeated starts; do not capture a moving pose.
+			local authored = item:GetAttribute("FanAuthoredCFrame")
+			if typeof(authored) ~= "CFrame" then return end
+			table.insert(blades, { part = item, authored = authored, relative = hub.CFrame:ToObjectSpace(authored) })
+		end
+	end
+	if #blades ~= 3 then return end
 	local token = generation
-	local pedestrian = world:FindFirstChild("AmbientStreetPedestrian", true)
-	if pedestrian and pedestrian:IsA("Model") then
-		for _, part in pedestrian:GetDescendants() do
-			if part:IsA("BasePart") then
-				part:SetAttribute("AmbientBaseCFrame", part.CFrame)
-			end
+	local state = { blades = blades, elapsed = 0, angle = 0, hubFrame = hub.CFrame }
+	active = state
+	state.connection = RunService.Heartbeat:Connect(function(deltaTime)
+		-- Disconnect plus an epoch check covers already-queued callbacks too.
+		if generation ~= token or active ~= state then return end
+		if not world.Parent or not fan.Parent or not hub.Parent then
+			WorldActivityService.stop()
+			return
 		end
-		task.spawn(function()
-			task.wait(7)
-			while token == generation and pedestrian.Parent do
-				for _, part in pedestrian:GetDescendants() do
-					if part:IsA("BasePart") then
-						local base = part:GetAttribute("AmbientBaseCFrame")
-						if typeof(base) == "CFrame" then
-							part.CFrame = base
-						end
-						if part:GetAttribute("AmbientVisibleTransparency") ~= nil then
-							TweenService:Create(part, TweenInfo.new(0.35), { Transparency = part:GetAttribute("AmbientVisibleTransparency") }):Play()
-						end
-					end
-				end
-				task.wait(0.4)
-				for _, part in pedestrian:GetDescendants() do
-					if part:IsA("BasePart") then
-						TweenService:Create(part, TweenInfo.new(15, Enum.EasingStyle.Linear), { CFrame = part.CFrame + Vector3.new(168, 0, 0) }):Play()
-					end
-				end
-				task.wait(14.3)
-				for _, part in pedestrian:GetDescendants() do
-					if part:IsA("BasePart") and part:GetAttribute("AmbientVisibleTransparency") ~= nil then
-						TweenService:Create(part, TweenInfo.new(0.45), { Transparency = 1 }):Play()
-					end
-				end
-				task.wait(18 + math.random() * 12)
-			end
-		end)
-	end
-
-	local windows = {}
-	for _, descendant in world:GetDescendants() do
-		if descendant:IsA("BasePart") and descendant.Name == "RestaurantWindow" then
-			table.insert(windows, descendant)
-		end
-	end
-	task.spawn(function()
-		local bright = false
-		while token == generation and world.Parent do
-			task.wait(10)
-			bright = not bright
-			for _, window in windows do
-				if window.Parent then
-					TweenService:Create(window, TweenInfo.new(3, Enum.EasingStyle.Sine), { Transparency = bright and 0.2 or 0.34 }):Play()
-				end
-			end
+		state.elapsed += math.clamp(deltaTime, 0, 0.25)
+		if state.elapsed < UPDATE_INTERVAL then return end
+		state.angle = (state.angle + state.elapsed * ANGULAR_SPEED) % (math.pi * 2)
+		state.elapsed = 0
+		local frame = state.hubFrame * CFrame.Angles(0, 0, state.angle)
+		for _, entry in blades do
+			if not entry.part.Parent then WorldActivityService.stop(); return end
+			entry.part.CFrame = frame * entry.relative
 		end
 	end)
 end

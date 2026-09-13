@@ -44,7 +44,7 @@
             0.38823
           ],
           "Locked": true,
-          "CFrame": [0, -10, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+          "CFrame": [0, -12, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
           "Size": [
             512,
             20,
@@ -62,8 +62,10 @@
         ],
         "Brightness": 2,
         "GlobalShadows": true,
-        "Outlines": false,
-        "Technology": "Voxel"
+        "LightingStyle": "Realistic",
+        "Technology": "Future",
+        "PrioritizeLightingQuality": true,
+        "ShadowSoftness": 0.35
       }
     },
     "SoundService": {

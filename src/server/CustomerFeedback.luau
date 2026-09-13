@@ -42,6 +42,7 @@ function CustomerFeedback:_stop(customer, restore)
 	if not record then return end
 	self.reactions[customer] = nil
 	for _, tween in record.tweens do tween:Cancel() end
+	if self.dependencies.customerService.clearFeedback then self.dependencies.customerService.clearFeedback(customer) end
 	if customer.Parent then
 		customer:SetAttribute("ReactionToken", (customer:GetAttribute("ReactionToken") or 0) + 1)
 		if restore then restorePose(customer) end
@@ -64,6 +65,7 @@ function CustomerFeedback:react(tableId, reaction): boolean
 	local token = (customer:GetAttribute("ReactionToken") or 0) + 1
 	customer:SetAttribute("ReactionToken", token)
 	self.dependencies.customerService.markReacting(customer, 1.7)
+	if self.dependencies.customerService.feedbackReaction then self.dependencies.customerService.feedbackReaction(customer, reaction, token) end
 	local record = { owner = owner, token = token, tweens = {} }
 	self.reactions[customer] = record
 	local function tween(part, info, target)

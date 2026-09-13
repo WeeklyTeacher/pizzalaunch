@@ -99,6 +99,7 @@ local replicated = instance("ReplicatedStorage")
 local shared = child(replicated, "Folder", "Shared")
 local configObject = child(shared, "ModuleScript", "Config")
 local takeoutObject = child(shared, "ModuleScript", "TakeoutConfig")
+local pizzaVisualObject = child(shared, "ModuleScript", "PizzaVisual")
 local takeoutConfig = loadModule("src/shared/TakeoutConfig.luau")
 local groups = {}
 local physics = {}
@@ -115,6 +116,7 @@ local overrides = {
 	task = { spawn = function() end, delay = function(_, callback) table.insert(timers, callback) end },
 	require = function(name) return assert(modules[name], tostring(name)) end,
 }
+modules[pizzaVisualObject] = loadModule("src/shared/PizzaVisual.luau", overrides)
 local noop = function() end
 modules.CustomerService = { start = noop, getAvailableTables = function() return { 1, 2, 3, 4, 5, 6 } end }
 modules.WorldActivityService = { start = noop }
